@@ -1,4 +1,4 @@
-// Settings (Task 12): the "You 設定" sheet.
+// Settings (Task 12): the "You" sheet.
 
 const assert = require("node:assert/strict");
 const { ORIGIN, SEED, THREE, NOON28, open, advance, until, text, expectText, visible } = require("./helpers.cjs");
@@ -43,7 +43,7 @@ async function pick(page, name) {
 
 module.exports = [
   {
-    name: "You opens the sheet, titled You 設定, a dialog with focus inside, rows in order; Done, the scrim and Escape close it and focus returns to You",
+    name: "You opens the sheet, titled You, a dialog with focus inside, rows in order; Done, the scrim and Escape close it and focus returns to You",
     async run({ page }) {
       await ready(page);
       assert.equal(await isOpen(page), false);
@@ -51,7 +51,7 @@ module.exports = [
       await openYou(page);
       assert.equal(await page.getAttribute("#you", "role"), "dialog");
       assert.equal(await page.getAttribute("#you", "aria-modal"), "true");
-      assert.equal(await text(page, "#you .sheet-top span"), "You設定");
+      assert.equal(await text(page, "#you .sheet-top span"), "You");
       assert.equal(await page.evaluate(() => document.getElementById("you").contains(document.activeElement)), true, "focus moves into the sheet");
       const order = await page.evaluate(() => {
         const ids = ["setWho", "setMail", "setSound", "setHist", "setFresh", "setDemo", "setHow", "setInstall", "setInvite", "setClaude", "setPlanner", "setSheet", "setReport"];

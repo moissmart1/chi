@@ -143,7 +143,7 @@ function more(stop, origin) {
     return a;
   };
   const map = mapsUrl(stop, origin);
-  if (map) btns.append(link("r-map", "地図 Directions ↗", map));
+  if (map) btns.append(link("r-map", "Directions ↗", map));
   const own = safeHref(stop.link);
   if (own) btns.append(link("r-map alt", "Ticket or booking ↗", own));
   // Opens the stop sheet on this stop (js/views/stopsheet.js).
@@ -171,14 +171,14 @@ function row(stop, i, model) {
   const title = str(stop.title);
   if (title || next) {
     const n = el("div", "r-n");
-    if (next) n.append(el("span", "tag", "こんど"));
+    if (next) n.append(el("span", "tag", "Next"));
     if (title) n.append(title);
     body.append(n);
   }
-  // A time that cannot slip: 指定 beside the English, under the name.
+  // A time that cannot slip, under the name.
   if (stop.fixed === true) {
     const fx = el("div", "r-fx");
-    fx.append(el("b", "", "指定"), " ", el("span", "", "Fixed time"));
+    fx.append(el("span", "", "Fixed time"));
     body.append(fx);
   }
   const lead = next ? nextLine(stop, minutes) : "";
@@ -213,15 +213,11 @@ function gate(day, h, mark) {
   return insp;
 }
 
-// The right-hand side of the date row: 当日限り有効, or on Day 1 before the
-// trip how many days until it is valid.
+// The right-hand side of the date row: good for this day only, or on Day 1
+// before the trip how many days until it is valid.
 function validity(number, toGo) {
-  if (number === 1 && toGo > 0) {
-    const s = el("span", "", "あと" + toGo + "日");
-    s.append(el("i", "", toGo === 1 ? "Valid tomorrow" : "Valid in " + toGo + " days"));
-    return s;
-  }
-  return el("span", "", "当日限り有効");
+  if (number === 1 && toGo > 0) return el("span", "", toGo === 1 ? "Valid tomorrow" : "Valid in " + toGo + " days");
+  return el("span", "", "Good for this day only");
 }
 
 // Under the date, on the day whose stamp is open and not yet pressed: a line
@@ -234,13 +230,13 @@ function stampLine() {
   return b;
 }
 
-// 宿泊 Tonight and the stay's name: a button that opens the hotel card.
+// Tonight and the stay's name: a button that opens the hotel card.
 function stayRow(stay) {
   const b = el("button", "tk-stay");
   b.type = "button";
   b.dataset.stay = stay.id;
   const label = el("span", "tk-stay-l");
-  label.append(el("b", "", "宿泊"), el("span", "", "Tonight"));
+  label.append(el("span", "", "Tonight"));
   b.append(label);
   const name = str(stay.name) || str(stay.nameJp);
   if (name) b.append(el("span", "tk-stay-n", name));
@@ -259,8 +255,7 @@ export function ticketEl(model) {
 
   const head = el("div", "tk-head");
   const kind = el("div", "tk-kind");
-  const k = el("span", "", "一日乗車券");
-  k.append(el("i", "", "1-Day Ticket"));
+  const k = el("span", "", "1-Day Ticket");
   kind.append(k, el("span", "fare", total > 0 ? tripMoney(total) : ""));
   head.append(kind, route(h, tripName));
   if (h.title) head.append(el("div", "tk-title", h.title));

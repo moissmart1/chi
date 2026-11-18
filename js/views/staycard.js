@@ -6,7 +6,7 @@
 // root is the phone. The card draws from store.state.stays only, so it opens
 // with no signal; nothing is fetched. It redraws on every store change while
 // open, and closes itself when its stay is gone. The name and the address are
-// large, in Japanese when there is Japanese; under them ここまでお願いします
+// large, in Japanese when there is Japanese; under them "Please take me here."
 // (Please take me here.), the note, a map link and the booking link. A stay's optional photo comes
 // first, as a stop's does on its ticket. Text from
 // the Sheet goes in with textContent; a link only through safeHref.
@@ -14,7 +14,7 @@
 import { safeHref, stayMapsUrl } from "../plan.js";
 
 const MARKUP = `
-<div class="sheet-top"><span>Where you sleep<i>宿泊</i></span><button type="button" id="stayDone">Done</button></div>
+<div class="sheet-top"><span>Where you sleep</span><button type="button" id="stayDone">Done</button></div>
 <div class="sy" id="stayBody"></div>`;
 
 function el(tag, cls, text) {
@@ -62,13 +62,13 @@ function card(stay) {
   const address = str(stay.addressJp);
   if (address) nodes.push(el("div", "sy-ad", address));
   const ask = el("div", "sy-ask");
-  ask.append(el("b", "", "ここまでお願いします"), el("span", "", "Please take me here."));
+  ask.append(el("b", "", "Please take me here."));
   nodes.push(ask);
   const note = str(stay.note);
   if (note) nodes.push(el("div", "sy-note", note));
   const btns = el("div", "r-btns");
   const map = stayMapsUrl(stay);
-  if (map) btns.append(link("r-map sy-map", "地図 Map ↗", map));
+  if (map) btns.append(link("r-map sy-map", "Map ↗", map));
   const booking = safeHref(stay.link);
   if (booking) btns.append(link("r-map alt", "Booking ↗", booking));
   if (btns.childElementCount) nodes.push(btns);

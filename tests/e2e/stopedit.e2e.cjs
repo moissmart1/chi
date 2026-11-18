@@ -34,7 +34,7 @@ const waitSheet = (page) =>
 const waitSheetClosed = (page) => until(async () => !(await isOpen(page, "stop")), "the stop sheet closes");
 const idle = (page) => page.evaluate(() => globalThis.__matTest.store.idle());
 
-// The stop names on a ticket, without the こんど tag the next stop carries.
+// The stop names on a ticket, without the Next tag the next stop carries.
 const rowTitles = (page, date) => page.evaluate((sel) => [...document.querySelectorAll(sel + " .r[data-id] .r-n")].map((n) => n.lastChild.textContent), tk(date));
 const value = (page, sel) => page.evaluate((s) => document.querySelector(s).value, sel);
 const disabled = (page, sel) => page.evaluate((s) => document.querySelector(s).disabled, sel);

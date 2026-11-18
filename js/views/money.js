@@ -96,7 +96,7 @@ function drawDay(day, lines, ctx) {
   group.dataset.day = day;
   const h = dayHead(day, ctx.days);
   const head = el("div", "rc-day");
-  head.append(el("span", "", h.en), el("i", "", h.jp));
+  head.append(el("span", "", h.en));
   if (h.city) head.append(el("span", "rc-city", h.city));
   group.append(head);
   if (!lines.length) {
@@ -109,7 +109,7 @@ function drawDay(day, lines, ctx) {
   } else {
     for (const e of lines) group.append(drawLine(e, ctx));
     const sub = el("div", "rc-sub");
-    sub.append(el("span", "", "小計 subtotal"), fig("b", "rc-cad", dollars(sum(lines, cadCents))), fig("b", "", tripMoney(sum(lines, tripCents))));
+    sub.append(el("span", "", "Subtotal"), fig("b", "rc-cad", dollars(sum(lines, cadCents))), fig("b", "", tripMoney(sum(lines, tripCents))));
     group.append(sub);
   }
   group.append(el("div", "rule"));
@@ -119,7 +119,7 @@ function drawDay(day, lines, ctx) {
 function drawReceipt(rc, s, live, ctx) {
   const head = el("div", "rc-h");
   head.append(el("b", "", issuer(s.people)), document.createTextNode([s.trip.name, tripSpan(s.trip)].filter(Boolean).join(", ")));
-  head.append(el("div", "rc-no", "レシート No." + String(live.length).padStart(4, "0")));
+  head.append(el("div", "rc-no", "Receipt No." + String(live.length).padStart(4, "0")));
   if (s.loadedAt !== null) {
     const fresh = el("button", "rc-fresh", freshText(s.loadedAt));
     fresh.type = "button";
@@ -134,13 +134,13 @@ function drawReceipt(rc, s, live, ctx) {
 
   const totalTrip = sum(live, tripCents);
   const tot = el("div", "rc-tot");
-  tot.append(el("span", "", "合計 Total"), fig("b", "", tripMoney(totalTrip)));
+  tot.append(el("span", "", "Total"), fig("b", "", tripMoney(totalTrip)));
   const inDollars = el("div", "rc-sub");
   inDollars.append(el("span", "", "in dollars"), fig("b", "", dollars(sum(live, cadCents))));
   const each = el("div", "rc-sub");
-  each.append(el("span", "", "1人あたり each, about"), fig("b", "", tripMoney(shares(totalTrip, ctx.names)[ctx.names[0]])));
+  each.append(el("span", "", "Each, about"), fig("b", "", tripMoney(shares(totalTrip, ctx.names)[ctx.names[0]])));
   const foot = el("div", "rc-f");
-  foot.append(el("i", "", "毎度ありがとうございます"), document.createTextNode("Thank you, come again."), el("div", "bars"));
+  foot.append(document.createTextNode("Thank you, come again."), el("div", "bars"));
 
   rc.replaceChildren(head, el("div", "rule"), ...days, tot, inDollars, each, el("div", "rule"), foot);
 }
@@ -150,7 +150,7 @@ export function mountMoney(root, store, { onRing = () => {}, onLine = () => {}, 
   say.id = "say";
   const sayP = el("p");
   sayP.id = "sayP";
-  const histBtn = el("button", "hist-btn", "履歴 History");
+  const histBtn = el("button", "hist-btn", "History");
   histBtn.type = "button";
   histBtn.id = "histBtn";
   const histN = el("span", "hist-n");

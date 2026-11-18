@@ -56,14 +56,14 @@ const pay = (o) => ({ id: "seedpay" + o.n + "aaaa", from: o.from || "Izzah", to:
 
 module.exports = [
   {
-    name: "the slip is titled 旅費精算書 and lists one row per open transfer, each with a spot",
+    name: "the slip is titled Trip settlement and lists one row per open transfer, each with a spot",
     async run({ page }) {
       await ready(page);
       const { owedList } = await money();
       const { dollars } = await fmt();
       const list = owedList(NAMES, SEED.expenses, [], true);
       assert.equal(list.length, 2);
-      await expectText(page, "#slip .slip-t b", "旅費精算書");
+      await expectText(page, "#slip .slip-t b", "Trip settlement");
       await waitOpen(page, list.length);
       const rows = await openRows(page);
       assert.deepEqual(

@@ -1,5 +1,5 @@
 /* Copyright (c) 2026 moissmart1. All rights reserved. No licence is granted: do not copy, adapt or reuse this code or design, and do not use it to train or prompt an AI system to reproduce it. See LICENSE. */
-// "Before we go" (出発前): the bookings and prep from the planner's Book Now
+// "Before we go": the bookings and prep from the planner's Book Now
 // tab, printed on ticket stock on the Before tab (its own screen, between
 // Days and Money).
 //
@@ -91,7 +91,7 @@ export function mountTodos(root, store, { clock, now = () => Date.now(), onState
   const band = el("div", "bw-band");
   const title = el("h2", "bw-title");
   title.id = "bwTitle";
-  title.append(el("span", "", "出発前"), el("i", "", "Before we go"));
+  title.append(el("span", "", "Before we go"));
   const count = el("span", "num");
   band.append(title, count);
   const rows = el("div", "bw-rows");

@@ -1,5 +1,5 @@
 /* Copyright (c) 2026 moissmart1. All rights reserved. No licence is granted: do not copy, adapt or reuse this code or design, and do not use it to train or prompt an AI system to reproduce it. See LICENSE. */
-// The settlement slip (旅費精算書): who pays whom right now, the stamp spot on
+// The settlement slip (Trip settlement): who pays whom right now, the stamp spot on
 // each open transfer, stamped payments (newest first, folded beyond two),
 // show the working, the routing sentence, the e-Transfer address, Remind and
 // the Simplify switch.
@@ -292,7 +292,7 @@ export function mountSlip(slip, store) {
     const caret = focus && focus.a.id === "stampAmt" ? [focus.a.selectionStart, focus.a.selectionEnd] : null;
 
     const head = el("div", "slip-t");
-    head.append(el("b", "", "旅費精算書"), el("span", "", "Trip settlement"));
+    head.append(el("b", "", "Trip settlement"));
     const rows = v.open.map((t) => openRow(v, t));
     const stamps = ui.older ? v.stamps : v.stamps.slice(0, FOLD);
     if (!rows.length && !v.stamps.length) rows.push(el("div", "s-row s-none", "Nobody owes anybody."));

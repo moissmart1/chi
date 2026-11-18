@@ -20,7 +20,7 @@ const NOTHING_YET = "Nothing has changed yet.";
 const INTRO = "Every change, newest first. Undo is on the latest change to each item.";
 
 const MARKUP = `
-<div class="hist-top"><span><i>履歴</i> History</span><button type="button" id="histDone">Done</button></div>
+<div class="hist-top"><span>History</span><button type="button" id="histDone">Done</button></div>
 <p class="hist-p">${INTRO}</p>
 <div class="tape" id="tape" tabindex="-1"></div>`;
 
@@ -101,7 +101,7 @@ export function mountHistory(root, store) {
         if (day) {
           const head = dayHead(day, []);
           const d = el("div", "tp-day");
-          d.append(el("span", "", head.en), el("i", "", head.jp));
+          d.append(el("span", "", head.en));
           nodes.push(d);
         }
       }

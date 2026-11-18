@@ -58,20 +58,18 @@ const setHidden = (page, hidden) => page.evaluate((h) => {
   document.dispatchEvent(new Event("visibilitychange"));
 }, hidden);
 
-// 指定 beside its English on the Sky row, on one line, as large as the detail line.
+// "Fixed time" on the Sky row, on one line, as large as the detail line.
 async function fixedMarkOnOneLine(page) {
   const mark = await page.evaluate((sel) => {
     const fx = document.querySelector(sel + " .r-fx");
-    const [b, en] = [fx.querySelector("b"), fx.querySelector("span")];
-    const rb = b.getBoundingClientRect();
+    const en = fx.querySelector("span");
     const range = document.createRange();
     range.selectNodeContents(en);
     const lines = range.getClientRects().length;
-    return { jp: b.textContent, en: en.textContent, dy: Math.abs(rb.top - en.getBoundingClientRect().top), lines, enH: en.getBoundingClientRect().height, size: parseFloat(getComputedStyle(en).fontSize) };
+    return { text: fx.textContent, en: en.textContent, lines, size: parseFloat(getComputedStyle(en).fontSize) };
   }, row(SKY));
-  assert.equal(mark.jp, "指定");
+  assert.equal(mark.text, "Fixed time", "English only");
   assert.equal(mark.en, "Fixed time");
-  assert.ok(mark.dy <= 2, "指定 and Fixed time share a line: " + JSON.stringify(mark));
   assert.equal(mark.lines, 1, "Fixed time is on one line");
   assert.ok(mark.size >= 12.5, "at least the detail line's size: " + mark.size);
 }
@@ -100,14 +98,14 @@ module.exports = [
       for (const id of [MEIJI, LUNCH]) assert.equal(await has(page, row(id), "is-done"), true, id + " is done");
       await until(async () => (await has(page, row(SKY), "is-next")) && (await has(page, row(SKY), "is-open")), "Sky is next and open");
       const sky = await text(page, row(SKY));
-      assert.ok(sky.includes("こんど"), sky);
+      assert.ok(sky.includes("Next"), sky);
       assert.ok(sky.includes("Leave by 13:30, in 10 min."), sky);
       const dinner = await classes(page, row(DINNER));
       assert.equal(dinner.includes("is-done") || dinner.includes("is-next") || dinner.includes("is-open"), false, dinner.join(" "));
       // An untimed stop is neither past nor next.
       const gloves = await classes(page, row(GLOVES));
       assert.equal(gloves.includes("is-done") || gloves.includes("is-next"), false, gloves.join(" "));
-      assert.equal(await count(page, "#rail .tag"), 1, "one こんど on the rail");
+      assert.equal(await count(page, "#rail .tag"), 1, "one Next tag on the rail");
     },
   },
   {
@@ -115,9 +113,9 @@ module.exports = [
     async run({ page }) {
       await ready(page);
       const sky = await text(page, row(SKY));
-      assert.ok(sky.includes("指定") && sky.includes("Fixed time"), sky);
+      assert.ok(sky.includes("Fixed time") && !sky.includes("指定"), sky);
       const others = await page.evaluate(() => [...document.querySelectorAll("#rail .r[data-id]")].filter((r) => r.dataset.id !== "planstop1203").map((r) => r.textContent));
-      for (const t of others) assert.equal(/指定|Fixed time/.test(t), false, t);
+      for (const t of others) assert.equal(/Fixed time/.test(t), false, t);
       await fixedMarkOnOneLine(page);
     },
   },
@@ -141,7 +139,7 @@ module.exports = [
         text: a.textContent, href: a.getAttribute("href"), target: a.getAttribute("target"), rel: a.getAttribute("rel"),
       })), row(SKY));
       assert.deepEqual(links, [
-        { text: "地図 Directions ↗", href: "https://www.google.com/maps/dir/?api=1&travelmode=transit&origin=Lunch%20in%20Harajuku&destination=Shibuya%20Sky", target: "_blank", rel: "noopener" },
+        { text: "Directions ↗", href: "https://www.google.com/maps/dir/?api=1&travelmode=transit&origin=Lunch%20in%20Harajuku&destination=Shibuya%20Sky", target: "_blank", rel: "noopener" },
         { text: "Ticket or booking ↗", href: "https://example.test/sky-ticket", target: "_blank", rel: "noopener" },
       ]);
       // The open stop's links are on screen and can be reached.
@@ -224,10 +222,10 @@ module.exports = [
       await until(async () => (await text(page, row(SKY) + " .r-lv")) === "Now.", "Sky says Now.");
       const sky = await classes(page, row(SKY));
       assert.ok(sky.includes("is-next") && sky.includes("is-open") && !sky.includes("is-done"), sky.join(" "));
-      assert.ok((await text(page, row(SKY) + " .r-n")).includes("こんど"));
+      assert.ok((await text(page, row(SKY) + " .r-n")).includes("Next"));
       assert.equal(/Leave|min/.test(await text(page, row(SKY) + " .r-s")), false, "no countdown");
       assert.deepEqual(await kept(), [MEIJI, LUNCH, SKY, GLOVES], "no row was made again");
-      assert.equal(await count(page, "#rail .tag"), 1, "one こんど on the rail");
+      assert.equal(await count(page, "#rail .tag"), 1, "one Next tag on the rail");
 
       await advance(page, backend, 29 * 60000); // 14:30, on the ordinary tick
       await until(() => has(page, row(DINNER), "is-next"), "Dinner is next");
@@ -338,7 +336,7 @@ module.exports = [
       const d13 = tk("2026-12-29");
       assert.equal(await count(page, d13 + " .insp"), 0);
       assert.equal(await count(page, d13 + " .is-done"), 0);
-      assert.equal((await text(page, d13)).includes("こんど"), false);
+      assert.equal(await count(page, d13 + " .tag"), 0, "no Next tag tomorrow");
     },
   },
   {
@@ -385,18 +383,18 @@ module.exports = [
       await ready(page, { nowMs: chi("2026-12-01T12:00:00") });
       await expectText(page, "#dayCount", /^Day 1 of 7 ?in 25 days$/);
       const d10 = await text(page, tk("2026-12-26") + " .tk-date");
-      assert.ok(d10.includes("あと25日") && d10.includes("Valid in 25 days"), d10);
-      assert.equal(d10.includes("当日限り有効"), false, d10);
+      assert.ok(d10.includes("Valid in 25 days") && !d10.includes("あと"), d10);
+      assert.equal(d10.includes("Good for this day only"), false, d10);
       assert.equal(await count(page, "#rail .insp"), 0);
       assert.equal(await count(page, "#rail .is-done"), 0);
-      assert.equal((await text(page, "#rail")).includes("こんど"), false);
-      assert.ok((await text(page, tk("2026-12-27") + " .tk-date")).includes("当日限り有効"), "later days keep their line");
+      assert.equal(await count(page, "#rail .tag"), 0, "no Next tag before the trip");
+      assert.ok((await text(page, tk("2026-12-27") + " .tk-date")).includes("Good for this day only"), "later days keep their line");
 
       const eve = await newPhone();
       await ready(eve, { nowMs: chi("2026-12-25T12:00:00") });
       await expectText(eve, "#dayCount", /^Day 1 of 7 ?tomorrow$/);
       const d10eve = await text(eve, tk("2026-12-26") + " .tk-date");
-      assert.ok(d10eve.includes("あと1日"), d10eve);
+      assert.ok(d10eve.includes("Valid tomorrow"), d10eve);
     },
   },
   {

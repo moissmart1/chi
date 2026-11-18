@@ -42,8 +42,8 @@ const waitTape = (page, check, what) =>
   }, what);
 const waitRowsN = (page, n) => waitTape(page, (r) => r.length === n, "the tape shows " + n + " rows");
 const rowFor = (rows, sentence) => rows.find((r) => r.sentence === sentence);
-// Each heading as "English | Japanese".
-const days = (page) => page.$$eval("#tape .tp-day", (els) => els.map((e) => e.querySelector("span").textContent + " | " + e.querySelector("i").textContent));
+// Each heading, in English only.
+const days = (page) => page.$$eval("#tape .tp-day", (els) => els.map((e) => e.textContent));
 const undoBtn = (id) => '#tape .tp-row[data-id="' + id + '"] button.tp-undo';
 
 const receiptTitles = (page) => page.$$eval("#rc .rc-row .rc-t", (els) => els.map((e) => e.firstChild.textContent));
@@ -92,7 +92,7 @@ const SHARED = (n) => ({ id: "bulk" + String(n).padStart(6, "0"), day: "pre", ti
 
 module.exports = [
   {
-    name: "History opens from its button, titled 履歴 History, with … until the ten entries arrive, newest first under day headings",
+    name: "History opens from its button, titled History, with … until the ten entries arrive, newest first under day headings",
     async run({ page }) {
       // Held from before the app starts, so nothing is on the phone yet when History opens.
       const backend = makeBackend(SEED, { now: NOON28 });
@@ -105,7 +105,7 @@ module.exports = [
       await waitHist(page);
       assert.equal(await page.getAttribute("#hist", "role"), "dialog");
       assert.equal(await page.getAttribute("#hist", "aria-modal"), "true");
-      assert.equal(await text(page, "#hist .hist-top span"), "履歴 History");
+      assert.equal(await text(page, "#hist .hist-top span"), "History");
       assert.equal(await page.evaluate(() => document.getElementById("hist").contains(document.activeElement)), true, "focus moves into the sheet");
       assert.equal(await text(page, "#tape"), "…");
       release();
@@ -115,7 +115,7 @@ module.exports = [
       const ids = rows.map((r) => Number(r.id));
       assert.deepEqual(ids, ids.slice().sort((a, b) => b - a), "newest first");
       // Every seeded change was made on 2026-12-06 in Chicago: one heading, in English beside the Japanese date.
-      assert.deepEqual(await days(page), ["Sun Dec 6 | 12月6日(日)"]);
+      assert.deepEqual(await days(page), ["Sun Dec 6"]);
       assert.equal(rows[0].time, "09:00");
 
       assert.ok(rowFor(rows, "Izzah deleted Konbini snacks US$7.80"), "the delete reads as a sentence");
@@ -135,7 +135,7 @@ module.exports = [
       assert.equal(rows[0].sentence, "Izzah renamed Shibuya dinner to Shibuya dinner out (through Claude)");
       assert.equal(rows[0].time, "01:00");
       assert.ok(!rows[1].sentence.includes("through Claude"));
-      assert.deepEqual(await days(page), ["Tue Dec 29 | 12月29日(火)", "Sun Dec 6 | 12月6日(日)"]);
+      assert.deepEqual(await days(page), ["Tue Dec 29", "Sun Dec 6"]);
     },
   },
   {
@@ -151,7 +151,7 @@ module.exports = [
       const rows = await tape(page);
       assert.equal(rows[0].sentence, "Izzah rang up Tempura US$101.00");
       assert.equal(rows[0].time, "23:20");
-      assert.deepEqual(await days(page), ["Sun Dec 27 | 12月27日(日)", "Sun Dec 6 | 12月6日(日)"]);
+      assert.deepEqual(await days(page), ["Sun Dec 27", "Sun Dec 6"]);
       await page.click("#histDone");
       await waitHistClosed(page);
 

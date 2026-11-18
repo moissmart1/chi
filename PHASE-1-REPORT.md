@@ -12,7 +12,7 @@ Survey: `triplit/docs/superpowers/specs/2026-11-17-second-trip-survey.md`.
 - [x] 4. Two people
 - [x] 5. The trip's own seed
 - [x] 6. No planner
-- [ ] 7. Japanese words in the interface
+- [x] 7. Japanese words in the interface
 - [ ] 8. README and PHOTO-CREDITS
 - [ ] Finish: stamp, unit, full e2e, screenshots, this report
 
@@ -72,6 +72,11 @@ Survey: `triplit/docs/superpowers/specs/2026-11-17-second-trip-survey.md`.
 - `load` answers `plannerLinked: false`, `todos: []`, empty pull times and problems, so the phone's dormant planner screens stay hidden. MY CALL: the phone's planner code (Before tab, Planner payments row, store pulls) stays, hidden, as the plan's "confirm each by test" implies; the Sheet schema keeps its Todos tab and `Expenses.planner_id` column (unused) to keep the schema as it was.
 - Confirmed by tests: e2e `tabs` (before and during the trip: no Before key, four keys, no Planner payments row, half an hour of checks with no planner call), `you` (no Planner payments row), unit `store` (autoPayments sends nothing), `backend-env` (scopes, no Sheets service, no planner code; old actions refused; load's planner fields).
 - The fake backend lost its planner stand-ins and gained nothing else.
+
+### 7. Japanese words in the interface
+- Kept only the English half of every two-language label: the bar (Days, Money, You; Before has no Japanese line), sheet titles (You, History, Where you sleep), the History button, the receipt's day headings, subtotal (`Subtotal`), `Total`, `Each, about`, the foot (`Thank you, come again.`), the slip's title (`Trip settlement`), the ticket's `1-Day Ticket`, `Tonight`, `Fixed time`, `Directions ↗` / `Map ↗`, the date row's `Good for this day only` / `Valid in N days`, the driver card's `Please take me here.`, the stop sheet's day line and "The time can’t slip", the How-this-works line ("from You"), the (hidden) Before list's title.
+- MY CALLS: three labels had no English half: `こんど` (the next stop's tag) became `Next`, `レシート No.` became `Receipt No.`, and `当日限り有効` on the date row became `Good for this day only` (the survey's pair for it; the ticket's foot already says the same, so it now reads twice: a look question for phase 2).
+- Untouched, as the plan says: the 済 stamp and its ghost, the stamp book's kanji (スタンプ帳, 記念スタンプ帳, 今日, 発行), the kanji ornaments; also the ticket foot's issue line `… MI発行 00003-01` (treated as an ornament) and data fields that may hold Japanese (line_jp, from_jp/to_jp, sign_jp, name_jp, address_jp: the Sheet decides). Japanese web fonts still load. `format.js dayHead()` still computes the Japanese date, unprinted.
 
 ## Tests deleted (and why)
 

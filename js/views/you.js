@@ -1,5 +1,5 @@
 /* Copyright (c) 2026 moissmart1. All rights reserved. No licence is granted: do not copy, adapt or reuse this code or design, and do not use it to train or prompt an AI system to reproduce it. See LICENSE. */
-// Settings (the "You 設定" sheet): who you are, your e-Transfer address, your
+// Settings (the "You" sheet): who you are, your e-Transfer address, your
 // picture (it shows in your seal; js/picture.js shrinks it first), the stamp
 // sound, History, when the figures were last fetched, how this works,
 // the invite link, the Claude link, planner payments (only once a planner
@@ -46,7 +46,7 @@ const FAILED_MS = 3000; // how long a row says it did not
 const PULLED_MS = 4000; // how long Planner payments says what came in
 
 const MARKUP = `
-<div class="sheet-top"><span>You<i>設定</i></span><button type="button" id="youDone">Done</button></div>
+<div class="sheet-top"><span>You</span><button type="button" id="youDone">Done</button></div>
 <div class="set">
   <div class="set-h">Which one are you?</div>
   <div class="set-who" id="setWho"></div>

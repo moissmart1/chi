@@ -76,7 +76,7 @@ module.exports = [
       assert.match(heads[0], /Dec 28/);
       assert.match(heads[1], /Dec 27/);
       assert.match(heads[2], /Dec 26/);
-      assert.match(heads[3], /出発前/);
+      assert.match(heads[3], /^Before the trip/);
 
       const rows = await page.$$eval("#rc .rc-row[data-id]", (els) => els.map((e) => e.textContent));
       assert.equal(rows.length, 8);
@@ -85,11 +85,11 @@ module.exports = [
       assert.equal(await page.locator('.rc-group[data-day="2026-12-28"] .rc-empty').count(), 1, "Dec 28 is empty");
       assert.equal(await page.locator('.rc-group[data-day="2026-12-28"] [data-addday="2026-12-28"]').count(), 1);
 
-      // Every day's subtotal: 小計, the day's US dollars and its Canadian dollars.
+      // Every day's subtotal: Subtotal, the day's US dollars and its Canadian dollars.
       for (const day of ["pre", "2026-12-26", "2026-12-27"]) {
         const list = exps.filter((e) => e.day === day);
         const sub = await text(page, '.rc-group[data-day="' + day + '"] .rc-sub');
-        assert.ok(sub.includes("小計"), day + " subtotal says 小計");
+        assert.ok(sub.includes("Subtotal"), day + " subtotal says Subtotal");
         assert.ok(sub.includes(tripMoney(list.reduce((a, e) => a + tripCents(e), 0))), day + " subtotal US dollars: " + sub);
         assert.ok(sub.includes(dollars(list.reduce((a, e) => a + cadCents(e), 0))), day + " subtotal dollars: " + sub);
       }
@@ -102,8 +102,8 @@ module.exports = [
       assert.equal(await page.locator("#rc .rc-note").count(), 1, "only the line with a note has .rc-note");
 
       const tot = await text(page, "#rc .rc-tot");
-      assert.ok(tot.includes("合計") && tot.includes("US$2,850.00"), "total: " + tot);
-      assert.ok((await text(page, "#rc .rc-f")).includes("毎度ありがとうございます"));
+      assert.ok(tot.includes("Total") && tot.includes("US$2,850.00"), "total: " + tot);
+      assert.equal(await text(page, "#rc .rc-f"), "Thank you, come again.");
 
       assert.ok(await visible(page, "#nav #youBtn"));
       assert.ok(await visible(page, "#nav #ring"));
@@ -322,7 +322,7 @@ module.exports = [
       assert.deepEqual(lines, ["Ring up what you paid.", "The slip says who pays whom.", "Stamp it the moment you send."]);
       // In a Safari tab (not from the Home Screen), one more line under them, dimmer.
       assert.ok(await visible(page, "#how #howHome"));
-      assert.equal(await text(page, "#howHome"), "Add it to your Home Screen from You 設定, so this phone stays signed in.");
+      assert.equal(await text(page, "#howHome"), "Add it to your Home Screen from You, so this phone stays signed in.");
       const dim = await page.evaluate(() => [getComputedStyle(document.querySelector("#how .how-l")).opacity, getComputedStyle(document.getElementById("howHome")).opacity].map(Number));
       assert.ok(dim[1] < dim[0], "dimmer than the three lines: " + dim);
 

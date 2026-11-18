@@ -43,7 +43,7 @@ const MARKUP = `
   <label class="st-f"><span>A line of detail</span><input id="stDetail" maxlength="120" autocomplete="off" enterkeyhint="next"></label>
   <label class="st-f"><span>How to get there</span><textarea id="stGo" maxlength="300" rows="2"></textarea></label>
   <label class="st-f st-time"><span>Minutes to get there</span><input id="stMin" inputmode="numeric" maxlength="3" autocomplete="off" enterkeyhint="next"></label>
-  <label class="st-sw"><span>The time can’t slip<i>指定</i></span><input id="stFixed" type="checkbox" role="switch"></label>
+  <label class="st-sw"><span>The time can’t slip</span><input id="stFixed" type="checkbox" role="switch"></label>
   <label class="st-f"><span>Place name or pasted Maps link</span><input id="stPlace" maxlength="200" autocomplete="off" enterkeyhint="next"></label>
   <label class="st-f"><span>Link to a ticket or confirmation</span><input id="stLink" type="url" inputmode="url" maxlength="500" autocomplete="off" enterkeyhint="next"></label>
   <label class="st-f"><span>Japanese name on signs</span><input id="stSign" maxlength="20" lang="ja" autocomplete="off" enterkeyhint="done"></label>
@@ -216,7 +216,7 @@ export function mountStopSheet(root, store) {
     tries = 0;
     head.textContent = title;
     const dh = dayHead(day);
-    dayLine.replaceChildren(el("b", "", dh.en), el("i", "", dh.jp));
+    dayLine.replaceChildren(el("b", "", dh.en));
     saveWord = word;
     del.hidden = mode !== "edit";
     sheet.classList.add("is-open");

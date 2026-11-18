@@ -29,7 +29,7 @@ function inView(page) {
   });
 }
 
-// The stop names, without the こんど tag the next stop carries.
+// The stop names, without the Next tag the next stop carries.
 const rowTitles = (page, date) => page.evaluate((sel) => [...document.querySelectorAll(sel + " .r[data-id] .r-n")].map((n) => n.lastChild.textContent), tk(date));
 const rowText = (page, id) => text(page, '.r[data-id="' + id + '"]');
 
@@ -58,7 +58,8 @@ module.exports = [
       for (const s of ["新宿", "Shinjuku", "渋谷", "Shibuya"]) assert.ok(route.includes(s), "the route reads " + s + ": " + route);
       assert.equal(await page.evaluate((sel) => !!document.querySelector(sel + " .tk-route .arr"), t), true, "the arrow");
       const date = await text(page, t + " .tk-date");
-      for (const s of ["Mon Dec 28", "当日限り有効"]) assert.ok(date.includes(s), "the date row reads " + s + ": " + date);
+      for (const s of ["Mon Dec 28", "Good for this day only"]) assert.ok(date.includes(s), "the date row reads " + s + ": " + date);
+      assert.equal(date.includes("当日限り有効"), false, date);
       assert.equal(date.includes("12月"), false, "the date is in English only: " + date);
       await expectText(page, t + " .tk-foot", /^2026\.12\.28 MI発行 00003-01\s*Good for this day only$/);
     },

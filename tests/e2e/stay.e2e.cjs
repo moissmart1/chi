@@ -54,13 +54,14 @@ const links = (page) => page.evaluate(() => [...document.querySelectorAll("#stay
 
 async function expectFullCard(page) {
   const t = await cardText(page);
-  for (const s of ["浅草ホテル", "Asakusa hotel", "東京都台東区浅草1-1-1", "ここまでお願いします", "Please take me here."]) {
+  for (const s of ["浅草ホテル", "Asakusa hotel", "東京都台東区浅草1-1-1", "Please take me here."]) {
     assert.ok(t.includes(s), "the card reads " + s + ": " + t);
   }
   const ls = await links(page);
-  const map = ls.find((l) => l.text.startsWith("地図"));
+  assert.equal(t.includes("ここまでお願いします"), false, "the driver's sentence is in English only");
+  const map = ls.find((l) => l.text.startsWith("Map"));
   assert.ok(map, "a map link: " + JSON.stringify(ls));
-  assert.equal(map.text, "地図 Map ↗");
+  assert.equal(map.text, "Map ↗");
   assert.equal(map.href, "https://www.google.com/maps/search/?api=1&query=Asakusa%20hotel%20Tokyo");
   const booking = ls.find((l) => l.text === "Booking ↗");
   assert.ok(booking, "a booking link: " + JSON.stringify(ls));
@@ -106,7 +107,8 @@ module.exports = [
       await ready(page);
       const d12 = await lastPart(page, "2026-12-28");
       assert.ok(d12 && d12.cls.split(" ").includes("tk-stay"), "Dec 28 ends with the stay: " + JSON.stringify(d12));
-      for (const s of ["宿泊", "Tonight", "Asakusa hotel"]) assert.ok(d12.text.includes(s), "Dec 28's stay reads " + s + ": " + d12.text);
+      for (const s of ["Tonight", "Asakusa hotel"]) assert.ok(d12.text.includes(s), "Dec 28's stay reads " + s + ": " + d12.text);
+      assert.equal(d12.text.includes("宿泊"), false, d12.text);
       assert.equal(await page.evaluate((sel) => document.querySelector(sel + " .tk-stay").tagName, tk("2026-12-28")), "BUTTON");
       assert.equal(await page.evaluate((sel) => document.querySelector(sel + " .tk-stay").dataset.stay, tk("2026-12-28")), "planstay0001");
       const d13 = await lastPart(page, "2026-12-29");
@@ -127,7 +129,7 @@ module.exports = [
       }, tk(date));
       const d13 = await stayOf("2026-12-29");
       assert.equal(d13.id, "planstay0001");
-      for (const s of ["宿泊", "Tonight", "Asakusa hotel"]) assert.ok(d13.text.includes(s), d13.text);
+      for (const s of ["Tonight", "Asakusa hotel"]) assert.ok(d13.text.includes(s), d13.text);
       // Other tickets are as they were.
       assert.equal((await stayOf("2026-12-30")).id, "planstay0002");
       assert.equal((await stayOf("2026-12-28")).id, "planstay0001");
@@ -258,11 +260,11 @@ module.exports = [
       assert.equal(await page.evaluate(() => document.querySelectorAll("#stay .sy-ad").length), 0, "no empty address line");
       assert.equal(await page.evaluate(() => document.querySelectorAll("#stay .sy-en").length), 0, "the name is not printed twice");
       const t = await cardText(page);
-      assert.ok(t.includes("ここまでお願いします") && t.includes("Please take me here."), t);
+      assert.ok(t.includes("Please take me here."), t);
       assert.equal(t.includes("undefined"), false);
       const ls = await links(page);
       assert.equal(ls.some((l) => l.text === "Booking ↗"), false, "no booking link");
-      const map = ls.find((l) => l.text === "地図 Map ↗");
+      const map = ls.find((l) => l.text === "Map ↗");
       assert.ok(map && map.href.endsWith("query=Niseko%20lodge"), JSON.stringify(ls));
       const empty = await page.evaluate(() => [...document.querySelectorAll("#stay *")].filter((n) => !n.children.length && !n.textContent.trim() && n.tagName !== "BR").map((n) => n.tagName + "." + n.className));
       assert.deepEqual(empty, [], "no empty lines on the card");

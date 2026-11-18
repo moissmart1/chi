@@ -48,9 +48,9 @@ const TRIP = [
   { at: "2026-12-28T15:00:00", label: "mid-afternoon in Chicago", day: "2026-12-28", count: /^Day 3 of 7 ?today$/, used: "1100000", next: "zonestop0001", leave: "Leave by 15:30, in 30 min." },
 ];
 const BEFORE = [
-  { at: "2026-12-25T23:50:00", label: "just before Chicago midnight on the eve", count: /^Day 1 of 7 ?tomorrow$/, countdown: "あと1日" },
+  { at: "2026-12-25T23:50:00", label: "just before Chicago midnight on the eve", count: /^Day 1 of 7 ?tomorrow$/, countdown: "Valid tomorrow" },
   { at: "2026-12-26T00:10:00", label: "just after Chicago midnight on Day 1", count: /^Day 1 of 7 ?today$/, countdown: null },
-  { at: "2026-12-01T15:00:00", label: "mid-afternoon in Chicago, weeks before", count: /^Day 1 of 7 ?in 25 days$/, countdown: "あと25日" },
+  { at: "2026-12-01T15:00:00", label: "mid-afternoon in Chicago, weeks before", count: /^Day 1 of 7 ?in 25 days$/, countdown: "Valid in 25 days" },
 ];
 
 const cases = [];
@@ -81,7 +81,7 @@ for (const zone of ["America/Toronto", "Asia/Tokyo"]) {
         assert.equal(await used(page), "0000000");
         const d10 = await text(page, tk("2026-12-26") + " .tk-date");
         if (t.countdown) assert.ok(d10.includes(t.countdown), d10);
-        else assert.equal(/あと\d+日/.test(d10), false, d10);
+        else assert.equal(/Valid (tomorrow|in \d+ days)/.test(d10), false, d10);
       },
     });
   }

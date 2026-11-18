@@ -16,7 +16,7 @@ import { fillSeal } from "../picture.js";
 
 export const HOW_LINES = ["Ring up what you paid.", "The slip says who pays whom.", "Stamp it the moment you send."];
 // Under the three lines, only in Safari (not from the Home Screen).
-const HOW_HOME = "Add it to your Home Screen from You 設定, so this phone stays signed in.";
+const HOW_HOME = "Add it to your Home Screen from You, so this phone stays signed in.";
 const NO_KEY = "This phone needs the trip link. Open it from your chat again, or paste it here.";
 const KEY_REFUSED = "That trip link didn’t work. Ask Mo for the current one.";
 const NOT_CONNECTED = "This app isn’t connected yet.";
