@@ -8,7 +8,8 @@
 import { standing, tripCents, cadCents, shares } from "../money.js";
 import { tripDay } from "../time.js";
 import { mountSlip, viewerOwed } from "./slip.js";
-import { tripMoney, dollars, typed, dayHead, issuer, pt, freshText, sentence, tripSpan } from "../format.js";
+import { tripMoney, dollars, typed, dayHead, pt, freshText, sentence, tripSpan } from "../format.js";
+import { checkDate } from "../plan.js";
 import { fillSeal } from "../picture.js";
 
 const UNREACHABLE = "Couldn’t reach the trip sheet.";
@@ -117,9 +118,24 @@ function drawDay(day, lines, ctx) {
 }
 
 function drawReceipt(rc, s, live, ctx) {
+  // The tab: a guest check for the whole week. The boxes across the top, then
+  // "Guest Check" over the trip's name and dates; where the spindle goes
+  // through it when everything is paid (.rc-spike, css/money.css).
+  const boxes = el("div", "gc-box");
+  const box = (label, value) => {
+    const d = el("div");
+    d.append(el("small", "", label), el("b", "", value));
+    return d;
+  };
+  const people = String(s.people.length);
+  boxes.append(box("Date", checkDate(s.trip.start) + " on"), box("Table", people), box("Guests", people), box("Server", s.people.length === 2 ? "Both" : "All"), box("No.", "TAB"));
+  const spike = el("span", "rc-spike");
+  spike.setAttribute("aria-hidden", "true");
+  spike.innerHTML = '<svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="12" r="11" fill="#2b2b2b"/><circle cx="12" cy="12" r="8.5" fill="#B9BFC2"/><circle cx="9.5" cy="9" r="3.5" fill="#fff" opacity=".7"/><circle cx="12" cy="12" r="1.6" fill="#333"/></svg>';
   const head = el("div", "rc-h");
-  head.append(el("b", "", issuer(s.people)), document.createTextNode([s.trip.name, tripSpan(s.trip)].filter(Boolean).join(", ")));
-  head.append(el("div", "rc-no", "Receipt No." + String(live.length).padStart(4, "0")));
+  const title = el("div", "gc-t", "Guest Check");
+  title.append(el("i", "", "The whole week"));
+  head.append(title, el("div", "rc-trip", [s.trip.name, tripSpan(s.trip)].filter(Boolean).join(", ")));
   if (s.loadedAt !== null) {
     const fresh = el("button", "rc-fresh", freshText(s.loadedAt));
     fresh.type = "button";
@@ -139,10 +155,9 @@ function drawReceipt(rc, s, live, ctx) {
   inDollars.append(el("span", "", "in dollars"), fig("b", "", dollars(sum(live, cadCents))));
   const each = el("div", "rc-sub");
   each.append(el("span", "", "Each, about"), fig("b", "", tripMoney(shares(totalTrip, ctx.names)[ctx.names[0]])));
-  const foot = el("div", "rc-f");
-  foot.append(document.createTextNode("Thank you, come again."), el("div", "bars"));
+  const foot = el("div", "rc-f", "Thank you, call again.");
 
-  rc.replaceChildren(head, el("div", "rule"), ...days, tot, inDollars, each, el("div", "rule"), foot);
+  rc.replaceChildren(boxes, spike, head, el("div", "rule"), ...days, tot, inDollars, each, foot);
 }
 
 export function mountMoney(root, store, { onRing = () => {}, onLine = () => {}, onHistory = () => {}, now = () => Date.now() } = {}) {
@@ -172,7 +187,10 @@ export function mountMoney(root, store, { onRing = () => {}, onLine = () => {}, 
   slip.id = "slip";
   const rc = el("div", "rc");
   rc.id = "rc";
-  root.replaceChildren(top, slip, rc);
+  // The week's tab first, its settling at its foot (the mock-up's order).
+  const title = el("div", "bar money-bar");
+  title.append(el("b", "bar-d", "The tab"));
+  root.replaceChildren(title, top, rc, slip);
   mountSlip(slip, store);
 
   histBtn.addEventListener("click", () => onHistory());
@@ -225,6 +243,13 @@ export function mountMoney(root, store, { onRing = () => {}, onLine = () => {}, 
     histN.hidden = fresh === 0;
 
     drawReceipt(rc, s, live, ctx);
+    // Paid up: nothing left to send and at least one payment stamped. The tab
+    // goes on the spindle; an undo that brings a debt back takes it off.
+    const spiked = list.length === 0 && s.payments.some((p) => !p.removed);
+    if (rc.classList.contains("is-spiked") !== spiked) {
+      rc.classList.toggle("is-spiked", spiked);
+      slip.classList.toggle("is-spiked", spiked);
+    }
   }
 
   render(store.state);

@@ -6,8 +6,19 @@ import { remindText, sentCents } from "../js/views/slip.js";
 test("a stamp is drawn from its seed: the same seed, the same stamp", () => {
   assert.equal(paidStampSVG(42), paidStampSVG(42));
   assert.notEqual(paidStampSVG(42), paidStampSVG(43));
-  assert.ok(paidStampSVG(42).includes("済"));
   assert.ok(paidStampSVG(42).startsWith("<svg"));
+});
+
+test("the paid stamp is the time-clock's PAID print, with the day and time it was stamped", () => {
+  // 13:22 on Dec 28 on the phone's own clock (the test runs in any zone: build the instant locally).
+  const at = new Date(2026, 11, 28, 13, 22).getTime();
+  const svg = paidStampSVG(42, at);
+  assert.ok(svg.includes(">PAID<") && svg.includes("12/28 13:22"), svg.slice(-400));
+  assert.ok(svg.includes("#6B2A8C") && svg.includes("VT323"));
+  assert.equal(/済|Zen|Mincho/.test(svg), false);
+  // No time known: PAID alone.
+  assert.equal(/\d\/\d/.test(paidStampSVG(42, NaN)), false);
+  assert.equal(paidStampSVG(42, "<x>"), paidStampSVG(42, NaN), "the time is read as a number");
 });
 
 test("rng is deterministic and stays between 0 and 1", () => {
@@ -26,12 +37,15 @@ test("the stamp SVG is built only from numbers and constants", () => {
   assert.equal(paidStampSVG("1<x>"), paidStampSVG(1), "a seed is read as a number");
 });
 
-test("the gate stamp prints its place, date and mark, the same from the same seed", () => {
-  const svg = gateStampSVG(1211, "渋谷", "12.11", "MAT");
-  for (const s of ["渋谷", "12.11", "MAT"]) assert.ok(svg.includes(s), s);
+test("the served print says SERVED with its date, place and mark, the same from the same seed", () => {
+  const svg = gateStampSVG(1211, "West Loop", "12.11", "Wendy’s");
+  for (const s of ["SERVED", "West Loop", "12.11", "WENDY’S"]) assert.ok(svg.includes(s), s);
+  // The time-clock print of the guest check: purple ink in the register face, no Japanese face.
+  assert.ok(svg.includes("#6B2A8C") && svg.includes("VT323"), svg.slice(0, 300));
+  assert.equal(/Zen|Hiragino|Mincho/.test(svg), false);
   assert.ok(svg.startsWith("<svg"));
-  assert.equal(gateStampSVG(1211, "渋谷", "12.11", "MAT"), svg);
-  assert.notEqual(gateStampSVG(1212, "渋谷", "12.11", "MAT"), svg);
+  assert.equal(gateStampSVG(1211, "West Loop", "12.11", "Wendy’s"), svg);
+  assert.notEqual(gateStampSVG(1212, "West Loop", "12.11", "Wendy’s"), svg);
 });
 
 test("the gate stamp escapes what it prints", () => {

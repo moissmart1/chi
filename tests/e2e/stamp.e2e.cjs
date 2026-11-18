@@ -29,15 +29,15 @@ const idle = (page) => page.evaluate(() => globalThis.__matTest.store.idle());
 const spot = (key) => '#slip button.spot[data-key="' + key + '"]';
 const armed = (page) => page.$$eval("#slip .spot.is-armed", (els) => els.map((e) => e.dataset.key));
 const ubar = (page) => text(page, "#ubarT");
-// paidStampSVG(seed) as the browser serialises it (innerHTML writes <stop></stop>, not <stop/>).
-const asDrawn = async (page, seed) => {
-  const { paidStampSVG } = await import("../../js/stamp.js");
-  return page.evaluate((svg) => {
-    const d = document.createElement("div");
-    d.innerHTML = svg;
-    return d.innerHTML;
-  }, paidStampSVG(seed));
-};
+// The PAID print as the page draws it for this seed and stamping time (the
+// day and time it prints are on the phone's own clock, so it is drawn in the page,
+// and serialised as the browser does: innerHTML writes <stop></stop>, not <stop/>).
+const asDrawn = (page, seed, at) => page.evaluate(async ([seed, at]) => {
+  const { paidStampSVG } = await import("/js/stamp.js");
+  const d = document.createElement("div");
+  d.innerHTML = paidStampSVG(seed, Date.parse(at));
+  return d.innerHTML;
+}, [seed, at || ""]);
 const otherPhone = (backend, actor, action, args) => backend.handle({ key: "test-key", actor, via: "app", action, args });
 
 async function ready(page, opts = {}) {
@@ -251,7 +251,7 @@ module.exports = [
       const before = await look();
       const row = saved(backend)[0];
       assert.equal(before.rot, row.rot + "deg", "drawn from the stored rot");
-      assert.equal(before.svg, await asDrawn(page, row.seed), "drawn from the stored seed");
+      assert.equal(before.svg, await asDrawn(page, row.seed, row.stampedAt), "drawn from the stored seed and time");
       await page.reload();
       const after = await until(look, "the stamp after the reload");
       assert.deepEqual(after, before);

@@ -1,6 +1,7 @@
 /* Copyright (c) 2026 moissmart1. All rights reserved. No licence is granted: do not copy, adapt or reuse this code or design, and do not use it to train or prompt an AI system to reproduce it. See LICENSE. */
-// The paid stamp (済), drawn from a stored seed so it looks the same on every
-// phone and on every reload. Pure: no DOM, safe to import in Node.
+// The PAID print and the SERVED print (the guest check's time clock), drawn
+// from a stored seed so they look the same on every phone and on every
+// reload. Pure: no DOM, safe to import in Node.
 //
 // paidStampSVG returns a string built only from numbers and constants (the
 // seed is read as a whole number first), so it may be set with innerHTML.
@@ -16,7 +17,7 @@ export function rng(seed) {
   };
 }
 
-const INK = "#D63C1E";
+const PURPLE = "#6B2A8C";
 const f1 = (n) => n.toFixed(1);
 const f2 = (n) => n.toFixed(2);
 
@@ -64,46 +65,57 @@ export function wear(id, r, box = 100) {
   return s + "</mask>";
 }
 
-export function paidStampSVG(seed) {
+// The cashier's time-clock print that says a payment was made: PAID in a
+// ruled box, and under it the day and time it was stamped (M/D HH:MM on the
+// phone's own clock) when `atMs` is a time. Purple ink, the register face.
+export function paidStampSVG(seed, atMs) {
   const n = Number.parseInt(seed, 10);
   const id = n >= 1 && n <= 0xffffffff ? n : 1;
   const r = rng(id);
   const defs = wear(id, r);
-  // The ring squeezes a little ink past its edge on one side.
+  const ms = typeof atMs === "number" ? atMs : NaN;
+  let when = "";
+  if (isFinite(ms)) {
+    const d = new Date(ms);
+    const two = (v) => String(v).padStart(2, "0");
+    when = d.getMonth() + 1 + "/" + d.getDate() + " " + two(d.getHours()) + ":" + two(d.getMinutes());
+  }
+  // The box squeezes a little ink past its edge on one side.
   const sx = (r() - 0.5) * 1.6;
   const sy = (r() - 0.5) * 1.6;
-  const tx = 50 + (r() - 0.5) * 2.4;
   return '<svg viewBox="0 0 100 100" width="100%" height="100%" aria-hidden="true" focusable="false"><defs>' + defs + "</defs>" +
-    '<g mask="url(#pm' + id + ')" fill="' + INK + '">' +
-    '<circle cx="50" cy="50" r="43" fill="none" stroke="' + INK + '" stroke-width="5.5"/>' +
-    '<circle cx="' + f1(50 + sx) + '" cy="' + f1(50 + sy) + '" r="45.4" fill="none" stroke="' + INK + '" stroke-width="1.2" opacity=".4" stroke-linecap="round" stroke-dasharray="' + f1(30 + r() * 60) + " " + f1(20 + r() * 40) + '"/>' +
-    '<text x="' + f1(tx) + '" y="70" text-anchor="middle" font-family="Zen Antique, Hiragino Mincho ProN, Yu Mincho, serif" font-size="58">済</text>' +
+    '<g mask="url(#pm' + id + ')" fill="' + PURPLE + '" font-family="VT323, ui-monospace, Courier New, monospace" text-anchor="middle">' +
+    '<rect x="5" y="' + (when ? 22 : 28) + '" width="90" height="' + (when ? 56 : 44) + '" rx="4" fill="none" stroke="' + PURPLE + '" stroke-width="3"/>' +
+    '<rect x="' + f1(4 + sx) + '" y="' + f1((when ? 21 : 27) + sy) + '" width="92" height="' + (when ? 58 : 46) + '" rx="5" fill="none" stroke="' + PURPLE + '" stroke-width="1" opacity=".4" stroke-dasharray="' + f1(30 + r() * 60) + " " + f1(20 + r() * 40) + '"/>' +
+    '<text x="50" y="' + (when ? 55 : 63) + '" font-size="' + (when ? 34 : 38) + '">PAID</text>' +
+    (when ? '<text x="50" y="71" font-size="15">' + when + "</text>" : "") +
     "</g></svg>";
 }
 
 const ESC = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ESC[c]);
 
-// The round red gate stamp on a used day's ticket: the place, the date and
-// the issuer's mark between two rules, speckled where the ink did not take.
-// The same seed draws the same stamp on every phone. place, date and mark are
-// escaped, so the string may be set with innerHTML.
+// The served print on a used day's guest check: the cashier's time clock
+// in purple ink, SERVED, the date, the place and the issuer's mark in a
+// ruled box, speckled where the ink did not take. The same seed draws the
+// same print on every phone. place, date and mark are escaped, so the string
+// may be set with innerHTML.
 export function gateStampSVG(seed, place, date, mark) {
   const n = Number.parseInt(seed, 10);
   const id = n >= 1 && n <= 0xffffffff ? n : 1;
   const r = rng(id);
   let speckle = "";
-  for (let i = 0; i < 60; i++) {
-    speckle += '<circle cx="' + f1(r() * 100) + '" cy="' + f1(r() * 100) + '" r="' + f1(0.5 + r() * 2.2) + '" fill="#000" opacity="' + f2(0.45 + r() * 0.55) + '"/>';
+  for (let i = 0; i < 70; i++) {
+    speckle += '<circle cx="' + f1(r() * 120) + '" cy="' + f1(r() * 80) + '" r="' + f1(0.4 + r() * 1.6) + '" fill="#000" opacity="' + f2(0.35 + r() * 0.55) + '"/>';
   }
   const p = String(place);
-  const size = [...p].length > 3 ? 13 : 17;
-  return '<svg viewBox="0 0 100 100" width="100%" height="100%" aria-hidden="true" focusable="false"><defs>' +
-    '<mask id="gm' + id + '" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100"><rect width="100" height="100" fill="#fff"/>' + speckle + "</mask></defs>" +
-    '<g mask="url(#gm' + id + ')" fill="' + INK + '" font-family="Zen Kaku Gothic New, Hiragino Sans, sans-serif" font-weight="900" text-anchor="middle">' +
-    '<circle cx="50" cy="50" r="45" fill="none" stroke="' + INK + '" stroke-width="3.5"/>' +
-    '<path d="M9 36h82M9 64h82" stroke="' + INK + '" stroke-width="2.5"/>' +
-    '<text x="50" y="29" font-size="' + size + '">' + esc(p) + '</text>' +
-    '<text x="50" y="58" font-size="21">' + esc(date) + '</text>' +
-    '<text x="50" y="82" font-size="13">' + esc(mark) + "</text></g></svg>";
+  const size = [...p].length > 18 ? 9 : [...p].length > 13 ? 10.5 : 12.5;
+  return '<svg viewBox="0 0 120 80" width="100%" height="100%" aria-hidden="true" focusable="false"><defs>' +
+    '<mask id="gm' + id + '" maskUnits="userSpaceOnUse" x="0" y="0" width="120" height="80"><rect width="120" height="80" fill="#fff"/>' + speckle + "</mask></defs>" +
+    '<g mask="url(#gm' + id + ')" fill="' + PURPLE + '" font-family="VT323, ui-monospace, Courier New, monospace" text-anchor="middle">' +
+    '<rect x="3" y="3" width="114" height="74" rx="5" fill="none" stroke="' + PURPLE + '" stroke-width="2.6"/>' +
+    '<text x="60" y="30" font-size="25">SERVED</text>' +
+    '<text x="60" y="49" font-size="17">' + esc(date) + '</text>' +
+    '<text x="60" y="63" font-size="' + size + '">' + esc(p) + '</text>' +
+    '<text x="60" y="73.5" font-size="10.5">' + esc(String(mark).toUpperCase()) + "</text></g></svg>";
 }

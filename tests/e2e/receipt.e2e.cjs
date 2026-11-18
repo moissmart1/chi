@@ -61,12 +61,12 @@ module.exports = [
       const cents = exps.reduce((a, e) => a + cadCents(e), 0);
       await expectText(page, "#sayP", "The trip so far is " + dollars(cents) + ", about US$2,850.00, across 8 receipts.");
       assert.equal(dollars(cents), "$3,958.33");
-      // Figures in the summary are bold and bright; the words around them stay dim.
+      // Figures in the summary are bold (look C: the words are the same ink, a lighter weight).
       const figs = await page.$$eval("#sayP b", (els) => els.map((b) => [b.textContent, getComputedStyle(b).fontWeight, getComputedStyle(b).color]));
       assert.deepEqual(figs.map((f) => f[0]), ["$3,958.33", "US$2,850.00", "8"]);
       const textColour = await page.evaluate(() => getComputedStyle(document.body).color);
       for (const [, weight, colour] of figs) {
-        assert.equal(weight, "700");
+        assert.equal(weight, "800");
         assert.equal(colour, textColour);
       }
 
@@ -103,7 +103,7 @@ module.exports = [
 
       const tot = await text(page, "#rc .rc-tot");
       assert.ok(tot.includes("Total") && tot.includes("US$2,850.00"), "total: " + tot);
-      assert.equal(await text(page, "#rc .rc-f"), "Thank you, come again.");
+      assert.equal(await text(page, "#rc .rc-f"), "Thank you, call again.");
 
       assert.ok(await visible(page, "#nav #youBtn"));
       assert.ok(await visible(page, "#nav #ring"));

@@ -1,6 +1,7 @@
 /* Copyright (c) 2026 moissmart1. All rights reserved. No licence is granted: do not copy, adapt or reuse this code or design, and do not use it to train or prompt an AI system to reproduce it. See LICENSE. */
-// The settlement slip (Trip settlement): who pays whom right now, the stamp spot on
-// each open transfer, stamped payments (newest first, folded beyond two),
+// The settlement slip (Trip settlement): the foot of the week's tab (look C:
+// the guest check), who pays whom right now, the PAID spot on each open
+// transfer, stamped payments (newest first, folded beyond two),
 // show the working, the routing sentence, the e-Transfer address, Remind and
 // the Simplify switch.
 //
@@ -157,7 +158,8 @@ export function mountSlip(slip, store) {
     const spot = button("spot" + (armed ? " is-armed" : ""));
     spot.dataset.key = t.key;
     spot.setAttribute("aria-label", armed ? "Tap again to stamp it paid" : "Stamp " + t.from + " to " + t.to + " as paid");
-    spot.append(el("span", "ghost", "済"));
+    // The spot is the PAID print's ghost: tap to get it ready, tap again to print it.
+    spot.append(el("span", "ghost", "PAID"));
     row.append(left, spot);
 
     const address = v.address[t.to];
@@ -189,7 +191,7 @@ export function mountSlip(slip, store) {
     const rot = Number(p.rot);
     stamp.style.setProperty("--rot", (isFinite(rot) ? rot : 0) + "deg");
     // Built only from numbers and constants (js/stamp.js), so innerHTML is safe.
-    stamp.innerHTML = paidStampSVG(p.seed);
+    stamp.innerHTML = paidStampSVG(p.seed, Date.parse(p.stampedAt));
     spot.append(stamp);
     if (hit) wetInk(stamp); // just landed: still wet (js/fx.js)
     row.append(left, spot);

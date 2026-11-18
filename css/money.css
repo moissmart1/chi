@@ -1,127 +1,62 @@
 /* Copyright (c) 2026 moissmart1. All rights reserved. No licence is granted: do not copy, adapt or reuse this code or design, and do not use it to train or prompt an AI system to reproduce it. See LICENSE. */
-/* Money: the sentence, the settlement slip, the till receipt and the bottom bar.
-   Ported from the mockup; .rc-note, .rc-city, .rc-cad, .is-new, #histN, #fresh,
-   pending and failed lines are drawn here in the same materials. */
+/* Money (look C): "The tab". The sentence, the week's guest check (#rc:
+   every line rung up, by day, its total) and at its foot the settling
+   (#slip: who pays whom, the PAID spot, the PAID prints). When nothing is
+   left to send the tab goes on the spindle (.is-spiked). From the mock-up:
+   the title line, the sentence, the check's boxes and lines, the total, the
+   owe row, the PAID print and the spindle. Drawn here in the same print:
+   the day headings, subtotals, notes, pending and failed lines, the
+   working, Remind, the e-Transfer address, the Simplify switch. */
 
-.say{padding:18px var(--gr) 16px var(--gl)}
-.say h1{margin:0;font-size:30px;font-weight:900;line-height:1.15;text-wrap:balance;font-variant-numeric:tabular-nums}
-.say p{margin:7px 0 0;color:var(--dim);font-size:13px}
-.say p b{font-weight:700;color:var(--text);font-variant-numeric:tabular-nums}
-.say .say-warn{margin-top:9px;padding-left:10px;border-left:3px solid var(--shu);color:var(--text);font-weight:700;font-size:13.5px;line-height:1.35}
+.money-bar{padding-bottom:0}
+.say{padding:10px var(--gr) 14px var(--gl)}
+.say h1{margin:0;font-size:29px;font-weight:900;line-height:1.12;text-wrap:balance;font-variant-numeric:tabular-nums}
+.say p{margin:6px 0 0;color:var(--text);font-size:13.5px}
+.say p b{font-weight:800;color:var(--text);font-variant-numeric:tabular-nums}
+.say .say-warn{margin-top:9px;padding-left:10px;border-left:3px solid var(--red);color:var(--text);font-weight:700;font-size:13.5px;line-height:1.35}
 /* The arrival of the register's paper slips (#un, the undo bar). */
 @keyframes roll{from{transform:translateY(.55em);opacity:0}}
 /* A count that changed while the app was open (js/fx.js rollIn): the new number rolls in. */
 .rolls{animation:roll .22s ease-out}
 
-.hist-btn{margin-top:12px;height:38px;padding:0 15px;border:1.5px solid var(--key-hi);border-radius:19px;background:none;color:var(--text);
-  font-weight:700;font-size:14px;display:inline-flex;align-items:center;gap:8px;transition:transform .15s ease-out}
+/* History: the dark pill, as Placemat on Days. */
+.hist-btn{margin-top:12px;height:34px;padding:0 13px;border:0;border-radius:17px;background:var(--print);color:var(--stock);
+  font-weight:800;font-size:13.5px;display:inline-flex;align-items:center;gap:8px;transition:transform .15s ease-out}
 .hist-btn:active{transform:scale(.97)}
-.hist-n{min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--shu);color:#fff;
+.hist-n{min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--red);color:#fff;
   font-weight:900;font-size:12px;line-height:20px;text-align:center;font-variant-numeric:tabular-nums}
 
-/* ---------- the settlement slip ---------- */
-.slip{position:relative;margin:0 var(--gr) 0 var(--gl);padding:15px 14px 11px;background:var(--grain), var(--paper);color:var(--print);border-radius:3px;box-shadow:var(--lift)}
-.slip.shake{animation:shake .2s ease-out}
-@keyframes shake{0%{transform:translate(0,4px) rotate(.4deg)}45%{transform:translate(-2px,-1px)}75%{transform:translate(1px,1px)}}
-.slip-t{text-align:center;padding-bottom:9px;border-bottom:3px double var(--print)}
-.slip-t b{display:block;font-size:19px;font-weight:900;letter-spacing:.34em;margin-right:-.34em}
-.slip-t span{font-size:12px;font-weight:700}
-.s-row{display:grid;grid-template-columns:minmax(0,1fr) 84px;align-items:center;min-height:98px;border-bottom:1px solid rgba(21,18,15,.2)}
-.s-row:last-child{border-bottom:0}
-.s-none{min-height:64px}
-.s-who{font-size:15.5px;font-weight:900}
-.s-amt{font-size:33px;line-height:1.12;font-weight:900;letter-spacing:-.01em;margin:1px 0 2px;font-variant-numeric:tabular-nums}
-.s-sub{font-size:13px;font-weight:500}
-.pt{font-variant-numeric:normal}
-.spot{position:relative;width:78px;height:78px;justify-self:end;border:0;background:none;padding:0;display:grid;place-items:center}
-.ghost{width:66px;height:66px;border-radius:50%;border:2px dashed rgba(214,60,30,.55);display:grid;place-items:center;
-  font-family:var(--seal);font-size:32px;color:rgba(214,60,30,.32);transition:transform .15s ease-out,border-color .2s,color .2s}
-.spot:active .ghost{transform:scale(.97)}
-.spot.is-armed .ghost{border-style:solid;border-color:var(--shu);color:rgba(214,60,30,.6)}
-.stamp{position:absolute;inset:0;transform:rotate(var(--rot));mix-blend-mode:multiply;transition:filter 1.8s ease-out}
-/* Wet ink: a stamp that has just landed (js/fx.js adds .wet, then takes it off after 500 ms) is brighter and glows a little,
-   and the ink dries back over the 1.8 s above. Never on a stamp drawn on load. */
-.stamp.wet{filter:saturate(1.35) brightness(1.1) drop-shadow(0 0 2.5px rgba(214,60,30,.55));transition:none}
-.stamp.hit{animation:hit .22s backwards}
-@keyframes hit{
-  0%{transform:rotate(var(--rot)) scale(2.5);opacity:0;animation-timing-function:cubic-bezier(.7,0,1,.7)}
-  62%{transform:rotate(var(--rot)) scale(.92);opacity:1}
-  100%{transform:rotate(var(--rot)) scale(1);opacity:1}}
-.slip-f{padding-top:10px;font-size:13px;font-weight:500}
-
-/* Slip parts the mockup does not draw (Task 10), in its own materials:
-   print-black lines and outlines on paper, vermilion only for the stamp's
-   world (the armed spot, the switch when on, a refusal). */
-.s-l{min-width:0;padding:10px 0}
-.s-amt{display:block}
-button.s-amt{border:0;background:none;padding:0;color:var(--print);text-align:left;font-family:var(--f);
-  text-decoration:underline dotted rgba(21,18,15,.4) 2px;text-underline-offset:6px;transition:transform .15s ease-out}
-button.s-amt:active{transform:scale(.97)}
-.s-amt.is-edit{display:flex;align-items:baseline;gap:1px;cursor:text}
-#stampAmt{width:5.6em;min-width:0;max-width:100%;border:0;border-bottom:2px solid var(--shu);border-radius:0;background:none;padding:0;
-  color:var(--print);font-family:var(--f);font-size:33px;font-weight:900;line-height:1.12;letter-spacing:-.01em;font-variant-numeric:tabular-nums;outline:none}
-#stampAmt:focus-visible{background:rgba(214,60,30,.07)}
-.s-err{color:var(--shu);font-weight:900}
-.s-route{margin:5px 0 0;font-size:13px;font-weight:500;line-height:1.35;max-width:30em}
-.s-row button.remind,.s-send button,.s-rm button,.simp-b button{height:38px;padding:0 14px;border-radius:3px;font-weight:900;font-size:14px;
-  border:1.5px solid var(--print);background:none;color:var(--print);transition:transform .15s ease-out}
-.s-row button.remind{margin-top:8px;height:34px;padding:0 12px;font-size:13.5px;border-color:rgba(21,18,15,.55)}
-.s-row button:active,.simp-b button:active,.s-older:active{transform:scale(.97)}
-.s-send{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;padding:0 0 12px;font-size:13px;font-weight:500}
-.s-send-l{flex:none}
-#sendTo{flex:1 1 auto;min-width:0;font-size:15.5px;font-weight:700;overflow-wrap:anywhere}
-.s-work{grid-column:1/-1;margin:0 0 12px;padding-top:8px;border-top:1.5px dashed rgba(21,18,15,.6);font-size:14.5px}
-.s-wl{display:flex;justify-content:space-between;align-items:baseline;gap:12px;width:100%;min-height:30px;font-weight:500}
-.s-wl b{font-weight:900;font-size:16px;font-variant-numeric:tabular-nums;white-space:nowrap}
-button.s-wl{border:0;background:none;padding:0;color:var(--print);text-align:left;font-size:14.5px}
-button.s-wl > span{text-decoration:underline dotted rgba(21,18,15,.5) 1.5px;text-underline-offset:4px}
-.s-lines{list-style:none;margin:0 0 4px;padding:0 0 0 12px;border-left:2px solid rgba(21,18,15,.2);font-size:13.5px}
-.s-lines li{display:flex;justify-content:space-between;align-items:baseline;gap:12px;min-height:26px;font-weight:700}
-.s-lines li span{min-width:0;overflow-wrap:anywhere}
-.s-lines li b{font-weight:900;font-variant-numeric:tabular-nums;white-space:nowrap}
-.s-lines .s-nil{font-weight:500}
-.s-row.is-paid{cursor:pointer}
-.s-row.is-paid .s-amt{color:rgba(21,18,15,.72)}
-.s-rm{grid-column:1/-1;display:flex;gap:8px;padding:0 0 12px}
-.s-rm .rm-yes{border-color:var(--shu);color:var(--shu)}
-.s-older{display:block;width:100%;min-height:44px;border:0;border-bottom:1px solid rgba(21,18,15,.2);background:none;color:var(--print);
-  font-weight:700;font-size:14px;text-decoration:underline dotted;text-underline-offset:3px;transition:transform .15s ease-out}
-.simp{margin-top:10px;border-top:1.5px dashed rgba(21,18,15,.6)}
-.simp-sw{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;min-height:52px;border:0;background:none;padding:0;
-  color:var(--print);font-weight:700;font-size:15px;text-align:left}
-.simp-t{position:relative;flex:none;width:48px;height:28px;border-radius:14px;border:1.7px solid var(--print);transition:background .2s ease-out,border-color .2s ease-out}
-.simp-t i{position:absolute;top:3px;left:3px;width:19px;height:19px;border-radius:50%;background:var(--print);transition:transform .2s ease-out,background .2s ease-out}
-.simp-sw[aria-checked="true"] .simp-t{background:var(--shu);border-color:var(--shu)}
-.simp-sw[aria-checked="true"] .simp-t i{transform:translateX(20px);background:var(--paper)}
-.simp-ask{padding:2px 0 8px}
-.simp-q{margin:0 0 10px;font-size:15px;font-weight:700;line-height:1.4}
-.simp-b{display:flex;gap:8px}
-.simp-b button{flex:1;height:44px}
-.simp-b .simp-keep{background:var(--print);color:var(--paper)}
-
-/* ---------- the till receipt ---------- */
-.rc{position:relative;margin:26px var(--gr) 10px var(--gl);padding:16px 14px 14px;background:var(--grain), var(--paper);color:var(--print);box-shadow:var(--lift);
-  font-weight:700;font-size:15.5px;line-height:1.3}
+/* ---------- the tab: the week's guest check ---------- */
+.rc{position:relative;margin:4px var(--gr) 0 var(--gl);padding:0;background:var(--stock);color:var(--print);border-radius:2px 2px 0 0;
+  box-shadow:0 1px 1px rgba(0,0,0,.15);font-weight:700;font-size:15px;line-height:1.3}
 .rc:empty{display:none}
-.rc::before,.rc::after{content:"";position:absolute;left:0;right:0;height:8px}
-.rc::before{bottom:100%;background:linear-gradient(45deg,var(--paper) 4px,transparent 0) 0 100%/8px 8px repeat-x,linear-gradient(-45deg,var(--paper) 4px,transparent 0) 0 100%/8px 8px repeat-x}
-.rc::after{top:100%;background:linear-gradient(135deg,var(--paper) 4px,transparent 0) 0 0/8px 8px repeat-x,linear-gradient(-135deg,var(--paper) 4px,transparent 0) 0 0/8px 8px repeat-x}
-.rc-h{text-align:center;font-size:14px}
-.rc-no{font-family:var(--dot);font-weight:400;font-size:14px;opacity:.75;margin-top:2px}
-.rc-h b{display:block;font-family:var(--f);font-weight:900;font-size:24px;letter-spacing:.3em;margin-right:-.3em;line-height:1.3}
-.rc-fresh{margin:6px auto 0;display:block;border:0;background:none;color:var(--print);padding:6px 10px;min-height:32px;
+.rc-h{text-align:center;padding:5px 8px 6px}
+.rc-trip{margin-top:1px;font-size:12px;font-weight:700;color:var(--grn)}
+.rc-fresh{margin:2px auto 0;display:block;border:0;background:none;color:var(--print);padding:6px 10px;min-height:32px;
   font-weight:700;font-size:13px;text-decoration:underline dotted;text-underline-offset:3px;font-variant-numeric:tabular-nums}
 .rc-fresh:active{transform:scale(.97)}
-.rule{border-top:1.5px dashed rgba(21,18,15,.6);margin:11px 0}
-.rc-day{display:flex;align-items:baseline;gap:8px;font-weight:900;font-size:16px;padding-bottom:3px}
-.rc-day i{font-weight:500;font-size:12.5px;opacity:.62}
-.rc-city{margin-left:auto;font-weight:700;font-size:13px;white-space:nowrap}
-.rc-row{display:grid;grid-template-columns:30px minmax(0,1fr) auto;column-gap:9px;align-items:center;min-height:40px;padding:4px 0;
-  border-bottom:1px solid rgba(21,18,15,.1);cursor:pointer;-webkit-tap-highlight-color:transparent}
-.rc-row:active{background:rgba(21,18,15,.07)}
-.rc-t{min-width:0;overflow-wrap:anywhere}
-.rc-amt{font-weight:900;font-size:17px;white-space:nowrap;font-variant-numeric:tabular-nums}
-.rc-row small{display:block;font-size:12.5px;font-weight:500;line-height:1.3;opacity:.7}
+.rc>.rule{border-top:3px double var(--grn)}
+.rc-group .rule{display:none}
+/* Where the spindle goes through: a dashed ring on the counter's colour, then the steel spike once the tab is paid. */
+.rc-spike{position:absolute;right:16px;top:62px;width:30px;height:30px;border-radius:50%;border:2px dashed rgba(19,38,31,.45);background:var(--ground);z-index:1}
+.rc-spike svg{display:none;width:24px;height:24px;margin:1px}
+.rc.is-spiked{animation:spikedown .22s cubic-bezier(.3,.7,.3,1) both}
+@keyframes spikedown{0%{transform:translateY(-10px)}70%{transform:translateY(3px)}100%{transform:none}}
+.rc.is-spiked .rc-spike{border:0;background:none}
+.rc.is-spiked .rc-spike svg{display:block}
+.slip.is-spiked{animation:spikedown .22s cubic-bezier(.3,.7,.3,1) both}
+/* A day's heading: a ruled band across the check. */
+.rc-day{display:flex;align-items:baseline;gap:8px;padding:8px 8px 5px;border-bottom:1px solid var(--rule);background:rgba(46,122,87,.07);font-weight:900;font-size:14px}
+.rc-city{margin-left:auto;font-weight:700;font-size:12.5px;color:var(--grn);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+/* A line: who paid (the seal) | what | the price, ruled in green as the check's columns. */
+.rc-row{display:grid;grid-template-columns:46px minmax(0,1fr) 104px;align-items:center;min-height:46px;padding:0;
+  border-bottom:1px solid var(--rule);cursor:pointer;-webkit-tap-highlight-color:transparent;
+  background:linear-gradient(var(--rule),var(--rule)) 46px 0/1px 100% no-repeat, linear-gradient(var(--rule),var(--rule)) calc(100% - 104px) 0/1px 100% no-repeat}
+.rc-row>.mini{justify-self:center}
+.rc-t{min-width:0;padding:8px 7px;overflow-wrap:anywhere;font-size:15px;font-weight:900;line-height:1.22}
+.rc-amt{padding:8px 7px;text-align:right;font-weight:800;font-size:14.5px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.rc-row:active{background-color:rgba(46,122,87,.08)}
+.rc-row small{display:block;font-size:12.5px;font-weight:500;line-height:1.3}
 .rc-row small b{font-weight:700}
 .rc-row .rc-note{opacity:.85}
 .rc-row.print{overflow:hidden;animation:print .4s steps(5,end) both}
@@ -129,55 +64,142 @@ button.s-wl > span{text-decoration:underline dotted rgba(21,18,15,.5) 1.5px;text
 .rc-row.is-pending{opacity:.55}
 /* A stamp the backend has not confirmed: faded the same way until it is. */
 .s-row.is-paid.is-pending .s-l,.s-row.is-paid.is-pending .stamp{opacity:.55}
-.rc-row.is-failed small.rc-fail{color:var(--shu);opacity:1;font-weight:700}
-.rc-row.is-new .rc-amt::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--shu);margin-right:7px;vertical-align:.18em}
-.mini{width:30px;height:30px;border-radius:50%;border:1.7px solid var(--shu);color:var(--shu);display:grid;place-items:center;
+.rc-row.is-failed small.rc-fail{color:var(--red);opacity:1;font-weight:700}
+.rc-row.is-new .rc-amt::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--red);margin-right:6px;vertical-align:.18em}
+.mini{width:30px;height:30px;border-radius:50%;border:1.6px solid var(--grn);color:var(--grn);display:grid;place-items:center;
   font-weight:900;font-size:11px;letter-spacing:0}
-.rc-sub{display:flex;justify-content:flex-end;align-items:baseline;gap:12px;padding-top:7px;font-size:13px;font-weight:500}
-.rc-sub b{font-weight:900;font-size:17px;font-variant-numeric:tabular-nums}
-.rc-sub .rc-cad{font-size:13.5px;opacity:.7}
-.rc-empty{display:flex;justify-content:space-between;align-items:center;font-weight:500;font-size:14.5px;min-height:40px}
-.rc-empty button{border:1.5px solid var(--print);background:none;color:var(--print);padding:0 13px;height:34px;border-radius:3px;font-weight:900;font-size:14px}
+.rc-sub{display:flex;justify-content:flex-end;align-items:baseline;gap:12px;padding:6px 8px 7px;font-size:13px;font-weight:600;border-bottom:1px solid var(--rule)}
+.rc-sub b{font-weight:900;font-size:15px;font-variant-numeric:tabular-nums}
+.rc-sub .rc-cad{font-size:13px;font-weight:700;color:var(--grn)}
+.rc-empty{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 8px;font-weight:500;font-size:14.5px;min-height:46px;border-bottom:1px solid var(--rule)}
+.rc-empty button{border:1.5px solid var(--print);background:none;color:var(--print);padding:0 12px;height:34px;border-radius:3px;font-weight:800;font-size:13.5px}
 .rc-empty button:active{transform:scale(.97)}
-.rc-tot{display:flex;justify-content:space-between;align-items:baseline;font-size:17px;font-weight:900}
-.rc-tot b{font-size:32px;line-height:1.15;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
-.rc-f{text-align:center;font-size:13.5px}
-.rc-f i{display:block;font-family:var(--dot);font-weight:400;font-size:14px;opacity:.75}
-.bars{width:178px;height:34px;margin:12px auto 2px;background:repeating-linear-gradient(90deg,var(--print) 0 2px,transparent 2px 3px,var(--print) 3px 4px,transparent 4px 7px,var(--print) 7px 10px,transparent 10px 12px,var(--print) 12px 13px,transparent 13px 16px,var(--print) 16px 18px,transparent 18px 19px)}
+/* The total, as the mock-up's: a 2 px green rule under it. */
+.rc-tot{display:flex;justify-content:space-between;align-items:baseline;padding:9px 8px 8px;font-size:14px;font-weight:800;border-top:2px solid var(--grn)}
+.rc-tot b{font-size:21px;font-weight:900;line-height:1.15;font-variant-numeric:tabular-nums}
+.rc-tot ~ .rc-sub{border-bottom:0;padding-top:0}
+.rc-f{padding:6px 8px 10px;text-align:center;font-family:var(--slab);font-weight:600;font-size:12.5px;color:var(--grn)}
+
+/* ---------- the settling, at the tab's foot ---------- */
+.slip{position:relative;margin:0 var(--gr) 0 var(--gl);padding:0 8px 4px;background:var(--stock);color:var(--print);border-radius:0 0 2px 2px;box-shadow:var(--lift);
+  border-top:2px solid var(--grn)}
+.slip.shake{animation:shake .2s ease-out}
+@keyframes shake{0%{transform:translate(0,4px) rotate(.4deg)}45%{transform:translate(-2px,-1px)}75%{transform:translate(1px,1px)}}
+.slip-t{padding:8px 0 0}
+.slip-t b{display:block;font-family:var(--slab);font-weight:600;font-size:12.5px;color:var(--grn)}
+.slip-t span{font-size:12px;font-weight:700}
+.s-row{display:grid;grid-template-columns:minmax(0,1fr) 122px;align-items:center;min-height:96px;border-bottom:1px solid var(--rule)}
+.s-row:has(+ .slip-f){border-bottom:0}
+.s-none{min-height:64px;font-weight:800}
+.s-who{font-size:15.5px;font-weight:900}
+.s-amt{font-size:35px;line-height:1.08;font-weight:900;letter-spacing:-.02em;margin:1px 0 2px;font-variant-numeric:tabular-nums}
+.s-sub{font-size:13px;font-weight:500}
+.pt{font-variant-numeric:normal}
+/* The PAID spot: the print's ghost in a dashed box, tap to get it ready, tap again to print it. */
+.spot{position:relative;width:120px;height:86px;justify-self:end;border:0;background:none;padding:0;display:grid;place-items:center}
+.ghost{width:104px;height:56px;border-radius:5px;border:2px dashed rgba(107,42,140,.5);display:grid;place-items:center;
+  font-family:var(--reg);font-size:36px;line-height:1;color:rgba(107,42,140,.4);transform:rotate(-5deg);transition:transform .15s ease-out,border-color .2s,color .2s}
+.spot:active .ghost{transform:rotate(-5deg) scale(.97)}
+.spot.is-armed .ghost{border-style:solid;border-color:var(--purple);color:rgba(107,42,140,.75)}
+.stamp{position:absolute;inset:0;transform:rotate(var(--rot));mix-blend-mode:multiply;transition:filter 1.8s ease-out}
+/* Wet ink: a stamp that has just landed (js/fx.js adds .wet, then takes it off after 500 ms) is brighter and glows a little,
+   and the ink dries back over the 1.8 s above. Never on a stamp drawn on load. */
+.stamp.wet{filter:saturate(1.35) brightness(1.1) drop-shadow(0 0 2.5px rgba(107,42,140,.55));transition:none}
+.stamp.hit{animation:hit .22s backwards}
+@keyframes hit{
+  0%{transform:rotate(var(--rot)) scale(2.5);opacity:0;animation-timing-function:cubic-bezier(.7,0,1,.7)}
+  62%{transform:rotate(var(--rot)) scale(.92);opacity:1}
+  100%{transform:rotate(var(--rot)) scale(1);opacity:1}}
+/* The stub: how this works, under a tear line. */
+.slip-f{margin:4px -8px 0;padding:10px 8px 8px;border-top:2px dashed rgba(19,38,31,.45);font-size:12.5px;font-weight:600}
+
+/* Slip parts the mock-up does not draw, in its materials: ink lines and
+   outlines on the check, red only for a refusal and the switch when on. */
+.s-l{min-width:0;padding:10px 0}
+.s-amt{display:block}
+button.s-amt{border:0;background:none;padding:0;color:var(--print);text-align:left;font-family:var(--f);
+  text-decoration:underline dotted rgba(19,38,31,.4) 2px;text-underline-offset:6px;transition:transform .15s ease-out}
+button.s-amt:active{transform:scale(.97)}
+.s-amt.is-edit{display:flex;align-items:baseline;gap:1px;cursor:text}
+#stampAmt{width:5.6em;min-width:0;max-width:100%;border:0;border-bottom:2px solid var(--purple);border-radius:0;background:none;padding:0;
+  color:var(--print);font-family:var(--f);font-size:35px;font-weight:900;line-height:1.08;letter-spacing:-.02em;font-variant-numeric:tabular-nums;outline:none}
+#stampAmt:focus-visible{background:rgba(107,42,140,.07)}
+.s-err{color:var(--red);font-weight:900}
+.s-route{margin:5px 0 0;font-size:13px;font-weight:500;line-height:1.35;max-width:30em}
+.s-row button.remind,.s-send button,.s-rm button,.simp-b button{height:38px;padding:0 14px;border-radius:3px;font-weight:800;font-size:14px;
+  border:1.5px solid var(--print);background:none;color:var(--print);transition:transform .15s ease-out}
+.s-row button.remind{margin-top:8px;height:34px;padding:0 12px;font-size:13.5px}
+.s-row button:active,.simp-b button:active,.s-older:active{transform:scale(.97)}
+.s-send{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;padding:0 0 12px;font-size:13px;font-weight:500}
+.s-send-l{flex:none}
+#sendTo{flex:1 1 auto;min-width:0;font-size:15.5px;font-weight:700;overflow-wrap:anywhere}
+.s-work{grid-column:1/-1;margin:0 0 12px;padding-top:8px;border-top:1.5px dashed rgba(19,38,31,.45);font-size:14.5px}
+.s-wl{display:flex;justify-content:space-between;align-items:baseline;gap:12px;width:100%;min-height:30px;font-weight:500}
+.s-wl b{font-weight:900;font-size:16px;font-variant-numeric:tabular-nums;white-space:nowrap}
+button.s-wl{border:0;background:none;padding:0;color:var(--print);text-align:left;font-size:14.5px}
+button.s-wl > span{text-decoration:underline dotted rgba(19,38,31,.5) 1.5px;text-underline-offset:4px}
+.s-lines{list-style:none;margin:0 0 4px;padding:0 0 0 12px;border-left:2px solid var(--rule);font-size:13.5px}
+.s-lines li{display:flex;justify-content:space-between;align-items:baseline;gap:12px;min-height:26px;font-weight:700}
+.s-lines li span{min-width:0;overflow-wrap:anywhere}
+.s-lines li b{font-weight:900;font-variant-numeric:tabular-nums;white-space:nowrap}
+.s-lines .s-nil{font-weight:500}
+.s-row.is-paid{cursor:pointer}
+.s-row.is-paid .s-amt{color:rgba(19,38,31,.72)}
+.s-rm{grid-column:1/-1;display:flex;gap:8px;padding:0 0 12px}
+.s-rm .rm-yes{border-color:var(--red);color:var(--red)}
+.s-older{display:block;width:100%;min-height:44px;border:0;border-bottom:1px solid var(--rule);background:none;color:var(--print);
+  font-weight:700;font-size:14px;text-decoration:underline dotted;text-underline-offset:3px;transition:transform .15s ease-out}
+.simp{margin-top:6px;border-top:1.5px dashed rgba(19,38,31,.45)}
+.simp-sw{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;min-height:52px;border:0;background:none;padding:0;
+  color:var(--print);font-weight:700;font-size:15px;text-align:left}
+.simp-t{position:relative;flex:none;width:48px;height:28px;border-radius:14px;border:1.7px solid var(--print);transition:background .2s ease-out,border-color .2s ease-out}
+.simp-t i{position:absolute;top:3px;left:3px;width:19px;height:19px;border-radius:50%;background:var(--print);transition:transform .2s ease-out,background .2s ease-out}
+.simp-sw[aria-checked="true"] .simp-t{background:var(--grn);border-color:var(--grn)}
+.simp-sw[aria-checked="true"] .simp-t i{transform:translateX(20px);background:var(--stock)}
+.simp-ask{padding:2px 0 8px}
+.simp-q{margin:0 0 10px;font-size:15px;font-weight:700;line-height:1.4}
+.simp-b{display:flex;gap:8px}
+.simp-b button{flex:1;height:44px}
+.simp-b .simp-keep{background:var(--print);color:var(--stock)}
+@media (max-width:350px){
+  .rc-row{grid-template-columns:40px minmax(0,1fr) 92px;background-position:40px 0, calc(100% - 92px) 0}
+  .s-row{grid-template-columns:minmax(0,1fr) 96px}
+  .s-amt,#stampAmt{font-size:30px}
+  .spot{width:96px;height:70px}
+  .ghost{width:84px;height:46px;font-size:30px}
+}
 
 /* ---------- the bottom bar ---------- */
-/* A row of machine keys: Days, Before, Ring up, Money, You. Ring up is the
-   middle key, a little wider and taller, paper-white. Each tab key has a lamp
-   (its ::before) that is lit on the current one. The bar itself paints nothing
-   above or below it. */
+/* A row of cream machine keys on a grey steel bar (the mock-up's): Days,
+   Money, You and Ring up, each with its small second word. Ring up is the
+   red key. Each tab key has a lamp (its ::before) that is lit red on the
+   current one. */
 .nav{position:absolute;left:0;right:0;bottom:0;z-index:6;height:calc(82px + env(safe-area-inset-bottom, 0px));display:flex;align-items:center;gap:6px;
   padding:0 10px env(safe-area-inset-bottom, 0px);
-  background:linear-gradient(var(--bar-top),var(--ground) 60%);transition:opacity .16s;
-  border-top:1px solid #000;box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
-.nav button{position:relative;flex:1 1 0;min-width:0;height:56px;padding:8px 2px 0;border:0;border-radius:10px;background:var(--key);color:var(--dim);
+  background:linear-gradient(var(--bar-top),var(--bar-foot));transition:opacity .16s;
+  border-top:1px solid #9aa39b;box-shadow:inset 0 1px 0 #fff}
+.nav button{position:relative;flex:1 1 0;min-width:0;height:56px;padding:8px 2px 0;border:0;border-radius:10px;background:var(--key);color:var(--key-ink);
   display:grid;justify-items:center;align-content:center;font-weight:900;
   /* 15px, but a word like Before is about 4.2 em wide: on a narrow phone the label scales so it always sits whole inside its key. */
   font-size:min(15px,calc((100vw - 44px) / 21.8 - 1.67px));line-height:1.15;white-space:nowrap;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.1),inset 0 -2px 0 rgba(0,0,0,.4),0 2px 3px rgba(0,0,0,.5);
+  box-shadow:var(--key-edge);
   transition:transform .08s,background .12s,color .12s,box-shadow .08s}
-.nav button:active{transform:translateY(1.5px);box-shadow:inset 0 1px 0 rgba(255,255,255,.06),inset 0 -1px 0 rgba(0,0,0,.4)}
+.nav button:active{transform:translateY(1.5px);box-shadow:var(--key-down)}
 .nav button small{font-size:10.5px;font-weight:700;line-height:1.2;white-space:nowrap}
 /* The lamp: a 5 px dot at the top centre of the key. */
 .nav button::before{content:"";position:absolute;top:6px;left:50%;width:5px;height:5px;margin-left:-2.5px;border-radius:50%;background:var(--lamp-off)}
-.nav button.is-active{background:var(--key-hi);color:var(--text)}
-.nav button.is-active::before{background:var(--text);box-shadow:0 0 0 2px rgba(244,240,234,.12),0 0 8px rgba(244,240,234,.8)}
-/* The open count on the Before key: digits only, on the small line beside 出発前. */
+.nav button.is-active{background:var(--key-hi);color:var(--print)}
+.nav button.is-active::before{background:var(--red);box-shadow:0 0 6px rgba(194,54,43,.8)}
+/* The open count on the Before key: digits only, on its small line. */
 .nav .sub{display:flex;align-items:center;justify-content:center;gap:3px}
-.nav .pill{min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--dim);color:var(--ground);
+.nav .pill{min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--key-ink);color:var(--key);
   font-size:11px;font-weight:900;line-height:16px;text-align:center;font-variant-numeric:tabular-nums}
-.nav button.is-active .pill{background:var(--text)}
-/* Ring up: the middle key, paper-white, no lamp. */
-.nav .ring{flex:1.2 1 0;height:64px;padding:0 2px;background:var(--paper);color:var(--print);
-  box-shadow:inset 0 1px 0 #fff,inset 0 -2px 0 rgba(0,0,0,.22),0 2px 3px rgba(0,0,0,.5)}
+/* Ring up: the red key, a little wider and taller, no lamp. */
+.nav .ring{flex:1.2 1 0;height:64px;padding:0 2px;background:var(--red);color:#fff;box-shadow:var(--paper-edge)}
 .nav .ring::before{display:none}
 /* Four keys (no Before key): Ring up is last and the row is even. */
 .nav #beforeBtn[hidden] ~ .ring{flex:1 1 0}
-.nav .ring:active{box-shadow:inset 0 1px 0 #fff,inset 0 -1px 0 rgba(0,0,0,.22)}
+.nav .ring:active{box-shadow:var(--paper-down)}
 .nav .ring-p{display:block;font-size:22px;line-height:.9;margin-top:-3px}
 .nav .ring[hidden]{display:none}
 /* Narrow phones: the count is a badge on the key's top-right corner, so no word has to give way to it. */
@@ -187,6 +209,7 @@ button.s-wl > span{text-decoration:underline dotted rgba(21,18,15,.5) 1.5px;text
   .nav .sub{display:block}
   .nav .pill{position:absolute;top:1px;right:1px}
 }
+@media (max-width:340px){ .nav button small{font-size:9.5px} }
 @media (prefers-reduced-motion: reduce){ .nav button{transition:none !important} }
 .phone.reg-open .nav{opacity:0;pointer-events:none}
 
@@ -196,7 +219,7 @@ button.s-wl > span{text-decoration:underline dotted rgba(21,18,15,.5) 1.5px;text
 @media (orientation:landscape) and (max-height:520px), (min-width:1000px) and (min-height:521px){
   .nav{left:auto;top:0;width:var(--rail);height:auto;flex-direction:column;align-items:stretch;justify-content:center;gap:6px;
     padding:calc(8px + env(safe-area-inset-top, 0px)) 8px calc(8px + env(safe-area-inset-bottom, 0px));
-    background:var(--ground);border-top:0;border-left:1.5px dashed var(--key-hi);box-shadow:none}
+    background:linear-gradient(90deg,var(--bar-top),var(--bar-foot));border-top:0;border-left:1px solid #9aa39b;box-shadow:inset 1px 0 0 #fff}
   .nav button{flex:1 1 0;min-height:44px;height:auto;max-height:64px}
   .nav .ring{flex:1.2 1 0;max-height:72px;height:auto}
   .nav #beforeBtn[hidden] ~ .ring{flex:1 1 0}
@@ -217,12 +240,12 @@ button.s-wl > span{text-decoration:underline dotted rgba(21,18,15,.5) 1.5px;text
 /* A mouse: keys answer the pointer before they are pressed, on screens that are neither phone shape. */
 @media (hover:hover) and (min-width:481px) and (min-height:521px), (hover:hover) and (min-width:481px) and (orientation:portrait){
   .nav button:not(.ring):hover,.chip:not(.is-on):hover,.key:not(.go):not(:disabled):hover,.who-pick button:hover,.set-who button:not(.is-on):hover,.set-days button:hover,.ln-btns button:hover{background:var(--key-hi);color:var(--text)}
-  .nav .ring:hover,.key.go:not(:disabled):hover,.go-btn:hover{background:#fff}
-  .hist-btn:hover{border-color:var(--dim);background:rgba(255,255,255,.04)}
+  .nav .ring:hover,.key.go:not(:disabled):hover,.go-btn:hover{background:#D3473B}
+  .hist-btn:hover{background:#24392F}
   .sheet-top button:hover,.hist-top button:hover,.reg-top button:hover{color:var(--text)}
   .stop .sheet-top button:hover,.stay .sheet-top button:hover{color:var(--print);text-decoration:underline}
-  .rc-row:hover{background:rgba(21,18,15,.05)}
+  .rc-row:hover{background:rgba(19,38,31,.05)}
   .sq:hover::before{border-color:var(--text)}
-  .r-b:hover{background:rgba(21,18,15,.04)}
-  .tk-stay:hover{background:rgba(21,18,15,.04)}
+  .r-b:hover{background:rgba(19,38,31,.04)}
+  .tk-stay:hover{background:rgba(19,38,31,.04)}
 }
