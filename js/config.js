@@ -14,3 +14,6 @@ export const STORAGE_PREFIX = "chi.";
 // What sw.js says to the page when a new version has taken over; sw.js
 // builds the same string from its own cache prefix ("chi-").
 export const NEW_VERSION_MESSAGE = "chi-new-version";
+// The offline worker's cache names start with this (sw.js PREFIX); Forget this
+// phone removes only these, never the Japan app's on the same origin.
+export const CACHE_PREFIX = "chi-";
