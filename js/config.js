@@ -2,6 +2,9 @@
 // The trip's backend address. Empty until this trip has its own Sheet and
 // script: the app then says plainly that it is not connected yet.
 export const API_URL = "";
+// The app's name wherever a person reads it (Izzah’s word, with a typographic
+// apostrophe). Inside the code the app stays "chi" (keys, caches, the folder).
+export const APP_NAME = "Wendy’s";
 export const APP_VERSION = "1";
 // Every key this app keeps in localStorage or sessionStorage starts with
 // this. Another trip's app can be served from the same origin and so shares

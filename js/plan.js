@@ -228,6 +228,12 @@ export function gateDate(date) {
   return date.slice(5).replace("-", ".");
 }
 
-export function issueLine(date, dayNumber, mark) {
-  return date.replace(/-/g, ".") + " " + mark + "発行 " + String(dayNumber).padStart(5, "0") + "-01";
+// The guest check's date box: "12/28", "1/1".
+export function checkDate(date) {
+  return Number(date.slice(5, 7)) + "/" + Number(date.slice(8, 10));
+}
+
+// The check's tear-off stub: "Guest receipt · 12/28".
+export function issueLine(date) {
+  return "Guest receipt · " + checkDate(date);
 }

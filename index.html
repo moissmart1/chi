@@ -10,7 +10,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://fonts.googleapis.com https://fonts.gstatic.com; img-src 'self' data: blob: https:; manifest-src 'self' blob:; worker-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#1A1614">
+<meta name="theme-color" content="#BFDCD1">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -23,7 +23,7 @@
 <link rel="icon" type="image/png" sizes="180x180" href="icons/icon-180.png">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" crossorigin="anonymous" href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Zen+Antique&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap">
+<link rel="stylesheet" crossorigin="anonymous" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;700;800;900&family=VT323&family=Zilla+Slab:wght@600;700&display=swap">
 <link rel="stylesheet" href="css/base.css">
 <link rel="stylesheet" href="css/days.css">
 <link rel="stylesheet" href="css/money.css">
@@ -41,10 +41,10 @@
     <section class="view" id="vMoney" aria-label="Money" inert></section>
   </div>
   <nav class="nav" id="nav">
-    <button type="button" data-tab="days" class="is-active">Days</button>
+    <button type="button" data-tab="days" class="is-active" aria-label="Days">Days<small aria-hidden="true">Checks</small></button>
     <button type="button" data-tab="before" id="beforeBtn" hidden>Before<span class="sub"><span class="pill" id="beforeN" aria-hidden="true" hidden></span></span></button>
-    <button type="button" data-tab="money">Money</button>
-    <button type="button" id="youBtn">You</button>
+    <button type="button" data-tab="money" aria-label="Money">Money<small aria-hidden="true">The tab</small></button>
+    <button type="button" id="youBtn" aria-label="You">You<small aria-hidden="true">Settings</small></button>
     <button type="button" class="ring" id="ring" aria-label="Ring up"><span class="ring-p" aria-hidden="true">＋</span><small class="ring-w" aria-hidden="true">Ring up</small></button>
   </nav>
 </div>

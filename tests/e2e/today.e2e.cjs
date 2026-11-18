@@ -347,7 +347,7 @@ module.exports = [
       await ready(other, { backend });
       const insp = (p) => p.evaluate(() => document.querySelector('#rail .pg[data-date="2026-12-27"] .insp').outerHTML);
       const a = await insp(page);
-      assert.ok(a.includes("渋谷") && a.includes("12.27") && a.includes("MI"), a.slice(0, 200));
+      assert.ok(a.includes("SERVED") && a.includes("Shibuya") && a.includes("12.27") && a.includes("WENDY’S"), a.slice(0, 400));
       assert.equal(await insp(other), a);
     },
   },
@@ -383,17 +383,18 @@ module.exports = [
       await ready(page, { nowMs: chi("2026-12-01T12:00:00") });
       await expectText(page, "#dayCount", /^Day 1 of 7 ?in 25 days$/);
       const d10 = await text(page, tk("2026-12-26") + " .tk-date");
-      assert.ok(d10.includes("Valid in 25 days") && !d10.includes("あと"), d10);
-      assert.equal(d10.includes("Good for this day only"), false, d10);
+      assert.equal(d10, "Sat Dec 26", d10);
+      const s10 = await text(page, tk("2026-12-26") + " .tk-foot");
+      assert.ok(s10.startsWith("Valid in 25 days") && !s10.includes("Thank you"), s10);
       assert.equal(await count(page, "#rail .insp"), 0);
       assert.equal(await count(page, "#rail .is-done"), 0);
       assert.equal(await count(page, "#rail .tag"), 0, "no Next tag before the trip");
-      assert.ok((await text(page, tk("2026-12-27") + " .tk-date")).includes("Good for this day only"), "later days keep their line");
+      assert.ok((await text(page, tk("2026-12-27") + " .tk-foot")).startsWith("Thank you, call again"), "later days keep their thanks");
 
       const eve = await newPhone();
       await ready(eve, { nowMs: chi("2026-12-25T12:00:00") });
       await expectText(eve, "#dayCount", /^Day 1 of 7 ?tomorrow$/);
-      const d10eve = await text(eve, tk("2026-12-26") + " .tk-date");
+      const d10eve = await text(eve, tk("2026-12-26") + " .tk-foot");
       assert.ok(d10eve.includes("Valid tomorrow"), d10eve);
     },
   },
@@ -425,11 +426,7 @@ module.exports = [
       assert.deepEqual(bad, []);
       const titles = await page.evaluate((sel) => [...document.querySelectorAll(sel + " .r[data-id] .r-n")].map((n) => n.lastChild.textContent), tk("2026-12-28"));
       assert.deepEqual(titles, ["Lunch in Harajuku", "Shibuya Sky", "Dinner", "Meiji Shrine", "Buy gloves"]);
-      const band = await page.evaluate((sel) => {
-        const css = (el, p) => getComputedStyle(el).getPropertyValue(p).trim();
-        return { line: css(document.querySelector(sel + " .tk"), "--line"), keyHi: css(document.documentElement, "--key-hi") };
-      }, tk("2026-12-28"));
-      assert.equal(band.line, band.keyHi, "a neutral band");
+      assert.equal(await page.evaluate((sel) => getComputedStyle(document.querySelector(sel + " .tk")).getPropertyValue("--line").trim(), tk("2026-12-28")), "", "no line colour on the check");
     },
   },
   {

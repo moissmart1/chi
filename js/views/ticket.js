@@ -1,40 +1,43 @@
 /* Copyright (c) 2026 moissmart1. All rights reserved. No licence is granted: do not copy, adapt or reuse this code or design, and do not use it to train or prompt an AI system to reproduce it. See LICENSE. */
-// One day as a railway ticket: the line's band with the day number, the route
-// in large type, the date, a perforation, the day's stops as printed rows and
-// a fine-print footer. Ported from the mockup's ticket(), built node by node:
-// every name, title and note from the Sheet goes in with textContent, and a
-// link or photo from the Sheet becomes an href or src only through safeHref.
+// One day as a diner guest check (look C, "The guest check"): the boxes
+// across the top (date, table, guests, server, check number), "Guest Check"
+// with the day's date and name, a double rule, the day's stops as check
+// lines (time, what, price), the day's total and a tear-off stub. Built node
+// by node: every name, title and note from the Sheet goes in with
+// textContent, and a link or photo from the Sheet becomes an href or src
+// only through safeHref.
 //
 // ticketEl(model) -> HTMLElement (an <article class="tk">), where
-// model = { day, number, count, state, header, stops, stays, total, mark,
-//           stay, nextId, minutes, toGo, tripName, stampOpen }
+// model = { day, number, count, state, header, stops, stays, total, totalHome,
+//           mark, people, server, stay, nextId, minutes, toGo, tripName, stampOpen }
 // - day: the Days row ({ date, city, title, ... }); header: header(day) from
 //   js/plan.js; stops: stopsFor(...) for the day, in order; stays: every stay
 //   (the first stop's directions start from the night before's); number:
-//   1-based; mark: the issuer's mark ("MAT"); tripName: printed when the day
-//   has no route and no city.
+//   1-based, printed as the check's No.; mark: the issuer's mark (the app's
+//   name), printed on a used day's SERVED print; people: how many are on
+//   the trip (the check's Table and Guests); server: who is looking;
+//   tripName: printed when the day has no line, route or city.
 // - state: dayState(...) ("used", "today", "ahead"); minutes: the trip zone's
 //   minutes past midnight; nextId: today's next stop (nextStopId, which keeps
 //   a stop just started for a while, R38), else null;
-//   total: the day's logged spending in trip cents (dayTotalTrip), printed as the fare when above
-//   zero; toGo: days until the trip starts (daysToGo), counted down on Day 1;
-//   stampOpen: today's stamp in the stamp book is open and not yet pressed,
-//   so the ticket carries a line, .tk-stampline, that opens the book.
-// - stay: the night's stay (stayShownFor: on today's ticket before 04:00,
+//   total / totalHome: the day's logged spending in trip and home cents
+//   (dayTotalTrip), printed as the check's total when above zero; toGo: days
+//   until the trip starts (daysToGo), counted down on Day 1's stub;
+//   stampOpen: today's stamp on the placemat is open and not yet pressed,
+//   so the check carries a line, .tk-stampline, that opens the placemat.
+// - stay: the night's stay (stayShownFor: on today's check before 04:00,
 //   last night's), or null. Drawn after the stops as one
 //   button, .tk-stay[data-stay], that opens the hotel card; no stay, no row.
-// After the stops (before the stay) every ticket has ＋ Add a stop, a button
+// After the stops (before the stay) every check has ＋ Add a stop, a button
 // .tk-add[data-date]; each open stop has an Edit button, .r-edit, beside its
 // links. Both open the stop sheet (the Days view sees to the taps).
 // Every row is drawn closed: the Days view opens one (.is-open on the .r, and
 // aria-expanded on its [role=button], and un-inerts its .r-more).
-// A used day's gate stamp is made once per day, place and mark, and reused.
+// A used day's SERVED print is made once per day, place and mark, and reused.
 
-import { minutesOf, issueLine, isPast, nextLine, originFor, mapsUrl, safeHref, gateDate } from "../plan.js";
-import { dayHead, tripMoney } from "../format.js";
+import { minutesOf, issueLine, isPast, nextLine, originFor, mapsUrl, safeHref, gateDate, checkDate } from "../plan.js";
+import { dayHead, tripMoney, dollars } from "../format.js";
 import { rng, gateStampSVG } from "../stamp.js";
-
-const SVG = "http://www.w3.org/2000/svg";
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
@@ -45,69 +48,15 @@ function el(tag, cls, text) {
 
 const str = (v) => (typeof v === "string" ? v.trim() : "");
 
-// The large type shrinks with the name's length, as the mockup's fsFor does.
-// A Latin letter in this heavy face is about seven tenths as wide as a
-// Japanese character, so it counts as that. `wide`: the name has the
-// ticket's whole width to itself (no arrow, no second station), so it may be
-// twice as long. Chicago's station names are English and often long
-// ("Clark/Lake"), hence the two smaller steps; a name longer still is cut
-// with an ellipsis (css/days.css) rather than run into the other station.
-export function fsFor(name, wide = false) {
-  let n = 0;
-  for (const c of name) n += c.codePointAt(0) < 0x2e80 ? 0.7 : 1;
-  if (wide) n /= 2;
-  return n <= 2 ? 46 : n <= 3 ? 38 : n <= 4 ? 31 : n <= 5 ? 26 : n <= 6 ? 22 : n <= 8 ? 16 : 14;
-}
-
-// A station: its name large (Japanese when there is one), English under it.
-function station(jp, en, cls, wide = false) {
-  const s = el("div", cls);
-  const big = jp || en;
-  const b = el("b", "", big);
-  b.style.fontSize = fsFor(big, wide) + "px";
-  s.append(b);
-  if (jp && en) s.append(el("span", "", en));
-  return s;
-}
-
-function arrow() {
-  const svg = document.createElementNS(SVG, "svg");
-  svg.setAttribute("class", "arr");
-  svg.setAttribute("viewBox", "0 0 48 24");
-  svg.setAttribute("aria-hidden", "true");
-  const path = document.createElementNS(SVG, "path");
-  path.setAttribute("d", "M0 8h30V0l18 12-18 12v-8H0z");
-  svg.append(path);
-  return svg;
-}
-
-function band(h, number) {
-  const b = el("div", "tk-band");
-  if (h.line) {
-    const name = el("span", "", h.line.jp || h.line.en);
-    if (h.line.jp && h.line.en) name.append(el("i", "", h.line.en));
-    b.append(name);
-  } else if (h.city) {
-    b.append(el("span", "", h.city));
-  }
-  const num = el("span", "num");
-  num.append(el("small", "", "D"), " " + String(number).padStart(2, "0"));
-  b.append(num);
-  return b;
-}
-
-function route(h, tripName) {
-  const r = el("div", "tk-route");
-  if (h.route) {
-    const { fromJp, fromEn, toJp, toEn } = h.route;
-    r.append(station(fromJp, fromEn, "stn"), arrow(), station(toJp, toEn, "stn to"));
-    return r;
-  }
-  // No route: the city alone, or the trip's name, across the whole ticket.
-  r.classList.add("is-one");
-  const name = h.city || str(tripName);
-  if (name) r.append(station("", name, "stn", true));
-  return r;
+// What the day is about, under its date in the check's heading: the line
+// and its route ("Blue Line · Clark/Lake → Jackson"), else the city, else
+// the trip's name. English first; a name typed only in the Sheet's other
+// column still prints rather than leave the line blank.
+function where(h, tripName) {
+  const line = h.line ? h.line.en || h.line.jp : "";
+  const route = h.route ? (h.route.fromEn || h.route.fromJp) + " → " + (h.route.toEn || h.route.toJp) : "";
+  const text = [line, route].filter(Boolean).join(" · ") || h.city || str(tripName);
+  return text ? el("div", "tk-route", text) : null;
 }
 
 // A photo address that failed to load is not drawn again (this visit).
@@ -193,21 +142,25 @@ function row(stop, i, model) {
     if (detail) s.append(detail);
     body.append(s);
   }
-  r.append(el("div", "r-t", minutesOf(stop.time) === null ? "—" : stop.time), body, el("div", "r-j", str(stop.signJp)), more(stop, originFor(stops, i, stays, day.date)));
+  // The price column of the check: a stop carries no price of its own (what
+  // was paid is rung up on Money), so it holds the check's blank dot.
+  const price = el("div", "r-j", "·");
+  price.setAttribute("aria-hidden", "true");
+  r.append(el("div", "r-t", minutesOf(stop.time) === null ? "—" : stop.time), body, price, more(stop, originFor(stops, i, stays, day.date)));
   return r;
 }
 
 // Drawn once per day, place and mark; a redraw reuses the string.
 const stamps = new Map();
 
-// A used day's gate stamp, the same on every phone: seeded from the date's
+// A used day's SERVED print, the same on every phone: seeded from the date's
 // digits; its place the day's last station, else the city.
 function gate(day, h, mark) {
   const seed = Number(day.date.replace(/-/g, "")) || 1;
-  const place = str(day.toJp) || h.city;
+  const place = str(day.toEn) || str(day.toJp) || h.city;
   const key = seed + "|" + place + "|" + mark;
   if (!stamps.has(key)) {
-    stamps.set(key, { svg: gateStampSVG(seed, place, gateDate(day.date), mark), rot: (-14 + rng(seed)() * 22).toFixed(1) + "deg" });
+    stamps.set(key, { svg: gateStampSVG(seed, place, gateDate(day.date), mark), rot: (-10 + rng(seed)() * 7).toFixed(1) + "deg" });
   }
   const { svg, rot } = stamps.get(key);
   const insp = el("div", "insp");
@@ -216,15 +169,15 @@ function gate(day, h, mark) {
   return insp;
 }
 
-// The right-hand side of the date row: good for this day only, or on Day 1
-// before the trip how many days until it is valid.
+// The stub's left-hand side: on Day 1 before the trip, how many days until
+// the check is good; otherwise the diner's thanks.
 function validity(number, toGo) {
-  if (number === 1 && toGo > 0) return el("span", "", toGo === 1 ? "Valid tomorrow" : "Valid in " + toGo + " days");
-  return el("span", "", "Good for this day only");
+  if (number === 1 && toGo > 0) return el("span", "tk-valid", toGo === 1 ? "Valid tomorrow" : "Valid in " + toGo + " days");
+  return el("span", "tk-valid", "Thank you, call again");
 }
 
-// Under the date, on the day whose stamp is open and not yet pressed: a line
-// that opens the stamp book (the Days view sees to the tap).
+// Under the heading, on the day whose stamp is open and not yet pressed: a
+// line that opens the placemat (the Days view sees to the tap).
 function stampLine() {
   const b = el("button", "tk-stampline");
   b.type = "button";
@@ -246,41 +199,41 @@ function stayRow(stay) {
   return b;
 }
 
+// One box of the row across the top of the check.
+function box(label, value, cls) {
+  const d = el("div", cls);
+  d.append(el("small", "", label), el("b", "", value));
+  return d;
+}
+
 export function ticketEl(model) {
   const { day, number, header: h, stops, mark, tripName, state, total, toGo } = model;
   const date = day.date;
   const tk = el("article", "tk");
-  // The line's colour; without a valid one the band stays neutral (css/days.css).
-  if (h.colour) {
-    tk.style.setProperty("--line", h.colour);
-    tk.style.setProperty("--line-ink", h.ink);
-  }
+
+  const people = String(model.people || 2);
+  const boxes = el("div", "gc-box");
+  boxes.append(box("Date", checkDate(date)), box("Table", people), box("Guests", people), box("Server", str(model.server) || "—"), box("No.", String(number).padStart(4, "0"), "num"));
 
   const head = el("div", "tk-head");
-  const kind = el("div", "tk-kind");
-  const k = el("span", "", "1-Day Ticket");
-  kind.append(k, el("span", "fare", total > 0 ? tripMoney(total) : ""));
-  head.append(kind, route(h, tripName));
-  if (h.title) head.append(el("div", "tk-title", h.title));
-  // The date in English only for now ("Mon Dec 28"); the look is chosen later.
-  const when = el("span", "", dayHead(date).en);
-  const dateRow = el("div", "tk-date");
-  dateRow.append(when, validity(number, toGo));
-  head.append(dateRow);
+  const title = el("div", "gc-t", "Guest Check");
+  const when = el("i", "tk-date");
+  when.append(el("span", "", dayHead(date).en));
+  if (h.title) when.append(" · ", el("span", "tk-title", h.title));
+  title.append(when);
+  head.append(title);
+  const w = where(h, tripName);
+  if (w) head.append(w);
   if (model.stampOpen) head.append(stampLine());
-  if (state === "used") head.append(gate(day, h, mark));
 
   const rows = el("div", "rows");
   if (stops.length) rows.append(...stops.map((stop, i) => row(stop, i, model)));
   else rows.append(el("div", "r-none", "Nothing planned yet."));
 
-  const foot = el("div", "tk-foot");
-  foot.append(el("span", "", issueLine(date, number, mark)), el("span", "", "Good for this day only"));
-
-  // A used day is punched on the perforation, clear of the print.
+  // The double rule under the heading; a used day's check has been on the spindle: a hole through it.
   const perf = el("div", "tk-perf");
   if (state === "used") perf.append(el("span", "punch"));
-  tk.append(band(h, number), head, perf, rows);
+  tk.append(boxes, head, perf, rows);
   // A stay typed into the Sheet by hand with no id cannot be opened: no row.
   const stay = model.stay;
   // ＋ Add a stop: after the day's stops, before the night's stay.
@@ -289,6 +242,19 @@ export function ticketEl(model) {
   add.dataset.date = date;
   tk.append(add);
   if (stay && typeof stay.id === "string" && stay.id) tk.append(stayRow(stay));
+  // The day's total, as a bill's: what was rung up for this day.
+  if (total > 0) {
+    const tot = el("div", "tk-kind");
+    const fig = el("span", "tk-fig");
+    fig.append(el("b", "fare", tripMoney(total)));
+    if (model.totalHome > 0) fig.append(el("small", "", dollars(model.totalHome)));
+    tot.append(el("span", "", "Today, about"), fig);
+    tk.append(tot);
+  }
+  const foot = el("div", "tk-foot");
+  foot.append(validity(number, toGo), el("span", "", issueLine(date)));
   tk.append(foot);
+  // A used day: the cashier's SERVED print, on the stub.
+  if (state === "used") tk.append(gate(day, h, mark));
   return tk;
 }

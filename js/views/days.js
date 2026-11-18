@@ -39,7 +39,9 @@
 // on a minute tick, a sync or a redraw.
 
 import { openDayIndex, dayState, daysToGo, nowIn, stopsFor, nextStopId, header, dayTotalTrip, stayShownFor } from "../plan.js";
-import { issuer, dayShort, dayHead } from "../format.js";
+import { dayShort, dayHead } from "../format.js";
+import { cadCents } from "../money.js";
+import { APP_NAME } from "../config.js";
 import { TRIP_TZ } from "../trip.js";
 import { ticketEl } from "./ticket.js";
 import { summary as bookSummary, countText } from "../stampbook.js";
@@ -57,6 +59,17 @@ function el(tag, cls, text) {
 }
 
 const list = (v) => (Array.isArray(v) ? v : []);
+
+// The day's logged spending in home cents (the check's total, in dollars under the US dollars).
+function dayTotalHome(expenses, date) {
+  let sum = 0;
+  for (const e of expenses) {
+    if (e.day !== date || e.deleted) continue;
+    const v = cadCents(e);
+    if (Number.isFinite(v)) sum += v;
+  }
+  return sum;
+}
 const calm = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 // A row's markup as it was drawn (before it was opened or closed), to tell
@@ -125,17 +138,20 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
   count.id = "dayCount";
   const pager = el("div", "pager");
   pager.id = "pager";
-  // The stamp book's way in: a small ring and how many stamps this person has.
-  // Only while the book has stamps (the Sheet's definitions); see showStamps.
+  // The placemat's way in: the dark pill on the top line (the mock-up's).
+  // Only while the placemat has stamps (the Sheet's definitions); see showStamps.
   const stampBtn = el("button", "bar-stamp");
   stampBtn.type = "button";
   stampBtn.id = "stampBtn";
   stampBtn.hidden = true;
-  const stampN = el("span", "bar-stamp-n");
-  stampBtn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle class="d" cx="12" cy="12" r="9.5"/><circle cx="12" cy="12" r="4.2"/></svg>';
-  stampBtn.append(stampN);
+  stampBtn.textContent = "Placemat";
+  // The day in view's date, large, before its count (the mock-up's top line); a tap lists the days too.
+  const barDate = el("b", "bar-d");
+  barDate.setAttribute("aria-hidden", "true");
+  const head = el("div", "bar-h");
+  head.append(barDate, count);
   const left = el("div", "bar-l");
-  left.append(count, stampBtn);
+  left.append(head, stampBtn);
   const bar = el("div", "bar");
   bar.append(left, pager);
   const rail = el("div", "rail");
@@ -274,6 +290,7 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
     if (word) parts.push(" ", el("i", "", word));
     count.replaceChildren(...parts);
     count.hidden = !dates.length;
+    barDate.textContent = dates.length ? dayHead(dates[cur]).en : "";
     pager.querySelectorAll(".sq").forEach((b, i) => {
       b.classList.toggle("is-cur", i === cur);
       b.classList.toggle("is-done", states[i] === "used");
@@ -334,6 +351,7 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
     if (b) jump(Number(b.dataset.i), true);
   });
   count.addEventListener("click", () => onAllDays());
+  barDate.addEventListener("click", () => onAllDays());
   stampBtn.addEventListener("click", () => onStampBook());
   root.addEventListener("keydown", (ev) => {
     if (ev.target.closest("input, textarea, select")) return;
@@ -427,7 +445,7 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
     demoText.replaceChildren(head, demoTime);
   }
 
-  // The stamp button and its count; the date of today's open stamp for the ticket's line.
+  // The Placemat pill, with the count for a screen reader; the date of today's open stamp for the check's line.
   function showStamps(s) {
     const b = bookSummary(s, Date.now());
     const on = s.status === "ready" && b.total > 0;
@@ -435,8 +453,7 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
     bar.classList.toggle("has-stamp", on);
     if (on) {
       const text = countText(b.n, b.total);
-      stampN.textContent = b.n + "/" + b.total;
-      stampBtn.setAttribute("aria-label", "Stamp book, " + text);
+      stampBtn.setAttribute("aria-label", "Placemat, " + text);
     }
     return on ? b.openToday : "";
   }
@@ -459,7 +476,7 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
     const now = nowIn(tz, nowMs);
     seen = now;
     const toGo = daysToGo({ ...s.trip, tz }, nowMs);
-    const mark = issuer(list(s.people));
+    const mark = APP_NAME;
     // A row typed into the Sheet by hand may be blank or have no id.
     const stops = list(s.stops).filter((x) => x && typeof x.id === "string" && x.id && typeof x.date === "string");
     const stays = list(s.stays).filter((x) => x && typeof x === "object");
@@ -497,7 +514,10 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
         stops: dayStops,
         stays,
         total: dayTotalTrip(expenses, day.date),
+        totalHome: dayTotalHome(expenses, day.date),
         mark,
+        people: list(s.people).length,
+        server: s.me || "",
         // Before 04:00, today's ticket shows last night's stay (R37).
         stay: stayShownFor(stays, day.date, { today: now.date, minutes: now.minutes }),
         nextId,

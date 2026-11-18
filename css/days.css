@@ -1,147 +1,142 @@
 /* Copyright (c) 2026 moissmart1. All rights reserved. No licence is granted: do not copy, adapt or reuse this code or design, and do not use it to train or prompt an AI system to reproduce it. See LICENSE. */
-/* Days: the day counter, the squares and a rail of day tickets.
-   Ported from the mockup; the day title (.tk-title), the neutral band, the
-   one-name route (.tk-route.is-one), the empty day (.r-none), the fixed-time
+/* Days: the day's date and count, the squares and a rail of guest checks
+   (look C, "The guest check"). From the mock-up: the top line (.bar), the
+   check (.tk: .gc-box, .gc-t, the check lines .r, the total .tk-kind and
+   the stub .tk-foot). Drawn here in the same print: the line or route
+   under the heading (.tk-route), the empty day (.r-none), the fixed-time
    mark (.r-fx), the leave-by line (.r-lv), Edit (.r-edit), ＋ Add a stop
-   (.tk-add), the stay row (.tk-stay), the
-   hotel card (#stay) and the day stubs of the all-days list (#allDays) are
-   drawn here in the ticket's own print. */
+   (.tk-add), the stay row (.tk-stay), a used day's SERVED print and spindle
+   hole, the squares, the hotel card (#stay) and the all-days list (#allDays). */
 
-.bar{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:16px var(--gr) 6px var(--gl)}
-.bar-t{font-weight:900;font-size:19px}
-.bar-t i{color:var(--dim);font-weight:700;font-size:14px}
-/* The counter is a button (it lists the days); it still reads as the heading. */
-/* "Day 1 of 11" never breaks; the word after it may go under it on a narrow phone. */
-button.bar-t{border:0;background:none;padding:0;min-height:36px;min-width:0;color:var(--text);text-align:left}
+/* The top line: today's date large, "Day 3 of 7" beside it, Placemat on the right (css/stampbook.css). */
+/* The squares stand on a line of their own under it. */
+.bar{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;column-gap:10px;padding:16px var(--gr) 0 var(--gl)}
+.bar-l{flex:1 1 auto;display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0}
+.bar-h{display:flex;flex-wrap:wrap;align-items:baseline;column-gap:8px;min-width:0}
+.bar>.pager{flex:1 0 100%;margin-left:-3px}
+.bar-d{font-weight:900;font-size:20px;white-space:nowrap;cursor:pointer}
+.bar-t{font-weight:700;font-size:14px}
+.bar-t i{font-weight:700;font-size:14px;opacity:.75}
+/* The counter is a button (it lists the days); it reads as part of the heading. */
+/* "Day 1 of 7" never breaks; the word after it may go under it on a narrow phone. */
+button.bar-t{border:0;background:none;padding:0;min-height:36px;min-width:0;color:var(--text);text-align:left;opacity:.82}
 .bar-t span,.bar-t i{white-space:nowrap}
+/* One small ruled box per day, as the check's boxes: filled in green for a used day, in ink for the day in view. */
 .pager{display:flex;flex:none}
 .sq{width:17px;height:30px;border:0;background:none;padding:0;display:grid;place-items:center}
-.sq::before{content:"";width:10px;height:10px;border:1.5px solid var(--dim);border-radius:1px;transition:transform .2s ease-out,background .2s,border-color .2s,box-shadow .2s}
-.sq.is-done::before{background:var(--dim)}
-.sq.is-cur::before{background:var(--text);border-color:var(--text);transform:scale(1.35);box-shadow:0 0 0 3px rgba(244,240,234,.1), 0 0 10px rgba(244,240,234,.6)}
-@media (max-width:350px){ .sq{width:12.5px} .sq::before{width:9px;height:9px} }
+.sq::before{content:"";width:10px;height:10px;border:1.5px solid var(--grn);border-radius:1px;background:var(--stock);transition:transform .2s ease-out,background .2s,border-color .2s}
+.sq.is-done::before{background:var(--grn)}
+.sq.is-cur::before{background:var(--print);border-color:var(--print);transform:scale(1.3)}
+@media (max-width:350px){ .sq{width:12.5px} .sq::before{width:9px;height:9px} .bar-d{font-size:17px} }
 
 .rail{display:flex;gap:10px;align-items:flex-start;overflow-x:auto;scroll-snap-type:x mandatory;overscroll-behavior-x:contain;
-  padding:8px 22px 30px;scrollbar-width:none}
+  padding:14px 22px 30px;scrollbar-width:none}
 .rail::-webkit-scrollbar{display:none}
 .pg{flex:0 0 100%;min-width:0;scroll-snap-align:center;scroll-snap-stop:always}
 
-/* The ticket stock's MAT pattern: the tickets, the hotel card and the day stubs. */
-:root{--mat-pattern:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='92' height='46'%3E%3Cg fill='%23C2DFE8' font-family='Arial,sans-serif' font-weight='700' font-size='11'%3E%3Ctext x='6' y='15'%3EMAT%3C/text%3E%3Ctext x='52' y='38'%3EMAT%3C/text%3E%3Crect x='64' y='7' width='7' height='7'/%3E%3Crect x='18' y='30' width='7' height='7'/%3E%3C/g%3E%3C/svg%3E")}
-/* A band with no valid line colour is neutral: the key colour, light print. */
-.tk{--line:var(--key-hi);--line-ink:var(--text);position:relative;border-radius:7px;color:var(--print);font-weight:700;
-  background:linear-gradient(104deg, rgba(255,255,255,.26), rgba(255,255,255,0) 42%), var(--grain), var(--stock) var(--mat-pattern);
-  box-shadow:var(--lift)}
+/* ---------- the guest check ---------- */
+.tk{position:relative;border-radius:2px;color:var(--print);font-weight:700;background:var(--stock);box-shadow:var(--lift)}
 @supports (animation-timeline: view()){
   @media (prefers-reduced-motion: no-preference){
     .tk{animation:fan linear both;animation-timeline:view(inline)}
     @keyframes fan{0%{transform:rotate(5deg) translateY(18px) scale(.95)}50%{transform:none}100%{transform:rotate(-5deg) translateY(18px) scale(.95)}}
   }
 }
-.tk-band{display:flex;align-items:center;justify-content:space-between;gap:10px;height:36px;padding:0 8px 0 13px;border-radius:7px 7px 0 0;
-  background:var(--line);color:var(--line-ink);font-size:14px;font-weight:900}
-.tk-band>span:first-child:not(.num){min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.tk-band i{font-weight:700;font-size:12.5px;margin-left:6px}
-.num{display:flex;align-items:baseline;gap:3px;margin-left:auto;background:#fff;color:#15120F;border-radius:4px;padding:1px 7px 2px;font-size:15px;font-weight:900;white-space:nowrap}
-.num small{font-size:10px}
-.tk-head{position:relative;padding:11px 14px 13px}
-.tk-kind{display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px}
-.tk-kind i{font-weight:500;margin-left:4px}
-.fare{font-size:17px;font-weight:900}
-.tk-route{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;margin-top:12px}
-.stn{display:flex;flex-direction:column;min-width:0}
-.stn b{font-weight:900;line-height:1;letter-spacing:.07em;white-space:nowrap}
-/* Two stations share the width evenly; a name too long for its half is cut with an ellipsis, never
-   run into the other one (the padding keeps descenders clear of the cut). */
-.tk-route:not(.is-one) .stn{flex:1 1 0}
-.tk-route:not(.is-one) .stn{flex:1 1 0}
-.tk-route:not(.is-one) .stn b{overflow:hidden;text-overflow:ellipsis;padding-bottom:.15em;margin-bottom:-.15em}
-.stn span{font-size:12.5px;margin-top:7px}
-.stn.to{align-items:flex-end;text-align:right}
-.stn.to b{letter-spacing:.07em;margin-right:-.07em}
-/* One name across the whole ticket (no route): it may wrap rather than run off. */
-.tk-route.is-one .stn b{white-space:normal;overflow-wrap:anywhere;line-height:1.05;letter-spacing:.02em}
-.arr{width:40px;height:20px;flex:none;margin-bottom:22px;fill:var(--print)}
-/* The day's own name, printed under the route like a service name. */
-.tk-title{margin-top:12px;padding-top:9px;border-top:1px solid rgba(21,18,15,.17);font-size:15px;font-weight:900;line-height:1.25}
-.tk-date{display:flex;flex-wrap:wrap;justify-content:space-between;gap:2px 8px;margin-top:13px;font-size:12.5px}
-.tk-date i{font-weight:500;margin-left:4px}
-.tk-perf{position:relative;margin:0 9px;border-top:2px dashed rgba(21,18,15,.38)}
-/* The tear line meets the paper's two side edges in a half-moon cut: a 14 px
-   circle in the table's colour, centred on the edge (9 px out from the line's
-   end) and on the line (the 2 px border sits above the padding box, so its
-   middle is 1 px up), shaded on its upper inside so it reads as a cut. */
-.tk-perf::before,.tk-perf::after,.bw-perf::before,.bw-perf::after{content:"";position:absolute;top:-8px;width:14px;height:14px;border-radius:50%;
-  background:var(--ground);box-shadow:inset 0 1px 1px rgba(0,0,0,.65);pointer-events:none}
-/* Only the half over the paper is drawn: the half over the table is the table. */
-.tk-perf::before,.bw-perf::before{left:-16px;clip-path:inset(0 0 0 50%)}
-.tk-perf::after,.bw-perf::after{right:-16px;clip-path:inset(0 50% 0 0)}
-.rows{padding:3px 14px 2px}
-/* A used day: the gate stamp over the header, a hole punched in the perforation. */
-.insp{position:absolute;left:50%;margin-left:-39px;top:34px;width:78px;height:78px;transform:rotate(var(--rot));mix-blend-mode:multiply;pointer-events:none}
-.punch{position:absolute;right:22px;top:-6px;width:10px;height:10px;border-radius:50%;background:var(--ground);box-shadow:inset 0 1px 2px #000}
-.r{display:grid;grid-template-columns:3.7em minmax(0,1fr) auto;column-gap:8px;padding:10px 0;border-bottom:1px solid rgba(21,18,15,.17);cursor:pointer}
-.r:last-child{border-bottom:0}
-.r-t{font-size:15px;font-weight:900;padding-top:1px;font-variant-numeric:tabular-nums}
-.r-n{font-size:15.5px;font-weight:900;line-height:1.25;overflow-wrap:anywhere}
+/* The boxes across the top: Date, Table, Guests, Server, No. */
+.gc-box{display:grid;grid-template-columns:1.25fr .8fr .8fr 1fr 1fr;border-bottom:2px solid var(--grn)}
+.gc-box>div{padding:5px 6px 4px;border-right:1px solid var(--grn);min-width:0}
+.gc-box>div:last-child{border-right:0}
+.gc-box small{display:block;font-family:var(--slab);font-weight:600;font-size:11px;color:var(--grn);line-height:1.1}
+.gc-box b{display:block;font-size:14.5px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+/* "Guest Check" in the slab, green; the day's date and name under it in ink. */
+.tk-head{position:relative;padding:5px 8px 4px;text-align:center}
+.gc-t{font-family:var(--slab);font-weight:700;font-size:21px;line-height:1.25;color:var(--grn)}
+.gc-t i{display:block;font-family:var(--f);font-weight:800;font-size:13px;line-height:1.3;color:var(--print);margin-top:-2px;overflow-wrap:anywhere}
+/* The line and route, the city or the trip's name: small, in the check's green. */
+.tk-route{margin-top:1px;font-size:12px;font-weight:700;color:var(--grn);line-height:1.3;overflow-wrap:anywhere}
+.tk-perf{position:relative;border-top:3px double var(--grn)}
+/* A used day: the cashier's SERVED print over the heading, and the hole the spindle made. */
+.insp{position:absolute;left:50%;margin-left:-57px;bottom:6px;width:114px;height:76px;transform:rotate(var(--rot));mix-blend-mode:multiply;opacity:.88;pointer-events:none}
+.punch{position:absolute;left:20px;top:-40px;width:14px;height:14px;border-radius:50%;background:var(--ground);box-shadow:inset 0 1.5px 2px rgba(0,0,0,.45)}
+/* The check lines: time | what | price, ruled in green. */
+.rows{padding:0}
+.r{display:grid;grid-template-columns:58px minmax(0,1fr) 78px;border-bottom:1px solid var(--rule);cursor:pointer}
+.r>.r-t,.r>.r-b,.r>.r-j{padding:9px 7px}
+.r-t{font-size:15px;font-weight:900;border-right:1px solid var(--rule);font-variant-numeric:tabular-nums}
+.r-n{font-size:15.5px;font-weight:900;line-height:1.22;overflow-wrap:anywhere}
 .r-s{font-size:12.5px;font-weight:500;margin-top:1px;overflow-wrap:anywhere}
-.r-j{font-size:13px;white-space:nowrap;padding-top:2px}
-.r-j:empty{display:none}
+.r-j{border-left:1px solid var(--rule);text-align:right;font-size:14px;font-weight:800;color:var(--grn)}
 .r-b{min-width:0;border-radius:2px}
 .r.is-done{opacity:.4}
 .tag{display:inline-block;background:var(--print);color:var(--stock);font-size:11px;padding:1px 6px 2px;border-radius:2px;margin-right:6px;vertical-align:2px}
 /* Leave by: the line a person reads first on the next stop. */
 .r-lv{font-weight:900}
-/* 指定: a time that cannot slip, boxed like a reserved seat, beside its English. */
-.r-fx{display:flex;align-items:center;gap:6px;margin-top:3px;font-size:12.5px;font-weight:700;line-height:1.2;white-space:nowrap}
-.r-fx b{border:1.5px solid var(--print);border-radius:2px;padding:0 4px 1px;font-weight:900}
-/* The open stop: a 200 ms height change, nothing else moves. */
-.r-more{grid-column:2 / -1;display:grid;grid-template-rows:0fr;transition:grid-template-rows .2s ease-out}
-.r.is-open .r-more{grid-template-rows:1fr}
+/* A time that cannot slip: boxed in green, like a box of the check. */
+.r-fx{display:flex;align-items:center;gap:6px;margin-top:3px;font-size:12.5px;font-weight:800;line-height:1.2;white-space:nowrap}
+.r-fx span{border:1.5px solid var(--grn);color:var(--grn);border-radius:2px;padding:0 4px 1px}
+/* The open stop: a 200 ms height change, nothing else moves. Under the name only, as the mock-up's. */
+.r-more{grid-column:2 / 3;display:grid;grid-template-rows:0fr;transition:grid-template-rows .2s ease-out;padding:0 7px}
+.r.is-open .r-more{grid-template-rows:1fr;padding-bottom:9px}
 .r-more>div{overflow:hidden;min-height:0}
 @media (prefers-reduced-motion: reduce){ .r-more{transition:none} }
-.r-go{font-size:13.5px;font-weight:500;padding-top:8px;overflow-wrap:anywhere}
-.r-map{display:inline-block;margin:9px 0 2px;background:var(--print);color:var(--stock);font-size:13px;padding:8px 13px;border-radius:3px;text-decoration:none}
+.r-go{font-size:13.5px;font-weight:500;line-height:1.38;overflow-wrap:anywhere}
+.r-map{display:inline-block;margin:9px 0 2px;background:var(--print);color:var(--stock);font-size:13px;font-weight:800;padding:8px 12px;border-radius:3px;text-decoration:none}
 .r-map:active{transform:scale(.97)}
-.r-map.alt{background:none;color:var(--print);border:1.5px solid var(--print);font-weight:700;padding:6.5px 13px}
+.r-map.alt{background:none;color:var(--print);border:1.5px solid var(--print);font-weight:800;padding:6.5px 12px}
 .r-btns{display:flex;flex-wrap:wrap;gap:0 8px}
-.r-ph{display:block;width:100%;height:158px;object-fit:cover;border-radius:3px;margin-top:10px;background:var(--stock-mark)}
+.r-ph{display:block;width:100%;height:158px;object-fit:cover;border-radius:2px;margin:2px 0 8px;background:var(--stock-mark)}
 .r-note{font-size:13.5px;font-weight:500;padding-top:5px;overflow-wrap:anywhere}
-/* A day with no stops: one line in plain print where the rows would be. */
-.r-none{padding:14px 0 12px calc(3.7em + 8px);font-size:15px;font-weight:700}
-.tk-foot{display:flex;justify-content:space-between;gap:8px;padding:9px 14px 12px;font-size:10.5px;font-weight:500;border-top:1px solid rgba(21,18,15,.17)}
-
+/* A day with no stops: one line in plain print where the lines would be. */
+.r-none{padding:14px 7px 12px 65px;font-size:15px;font-weight:700;border-bottom:1px solid var(--rule)}
 /* Edit on an open stop: outlined, like the stop's own link. */
-.r-edit{margin:9px 0 2px;border:1.5px solid var(--print);border-radius:3px;background:none;color:var(--print);font-size:13px;font-weight:700;padding:6.5px 13px}
+.r-edit{margin:9px 0 2px;border:1.5px solid var(--print);border-radius:3px;background:none;color:var(--print);font-size:13px;font-weight:800;padding:6.5px 12px}
 .r-edit:active{transform:scale(.97)}
-/* ＋ Add a stop: a blank line after the day's stops, in the stop's print. */
-.tk-add{display:block;width:calc(100% - 28px);min-height:44px;margin:0 14px;padding:10px 0 11px calc(3.7em + 8px);border:0;border-top:1px solid rgba(21,18,15,.17);
-  background:none;color:var(--print);text-align:left;font-size:15px;font-weight:900}
-.tk-add:active{background:rgba(21,18,15,.06)}
+/* ＋ Add a stop: a blank line after the day's stops, written in the what column. */
+.tk-add{display:block;width:100%;min-height:44px;margin:0;padding:10px 7px 11px 65px;border:0;border-bottom:1px solid var(--rule);
+  background:none;color:var(--grn);text-align:left;font-size:15px;font-weight:900}
+.tk-add:active{background:rgba(46,122,87,.08)}
 
-/* Tonight's stay: the last line of the ticket, after the stops. A button that
-   opens the hotel card; 宿泊 boxed like 指定, the name in the stop's print. */
-.tk-stay{display:grid;grid-template-columns:3.7em minmax(0,1fr);column-gap:8px;align-items:center;width:calc(100% - 28px);margin:0 14px;padding:11px 0 12px;
-  border:0;border-top:1.5px dashed rgba(21,18,15,.38);background:none;color:var(--print);text-align:left;font-weight:700}
-.tk-stay:active{background:rgba(21,18,15,.06)}
-.tk-stay-l{display:grid;justify-items:start;gap:2px;font-size:11.5px;font-weight:700;line-height:1.2}
-.tk-stay-l b{border:1.5px solid var(--print);border-radius:2px;padding:0 4px 1px;font-size:12.5px;font-weight:900}
-.tk-stay-n{font-size:15.5px;font-weight:900;line-height:1.25;overflow-wrap:anywhere}
+/* Tonight's stay: the last line of the check, after the stops. A button that
+   opens the hotel card; Tonight in the time column, the name in the what column. */
+.tk-stay{display:grid;grid-template-columns:58px minmax(0,1fr);align-items:stretch;width:100%;margin:0;padding:0;
+  border:0;border-bottom:1px solid var(--rule);background:none;color:var(--print);text-align:left;font-weight:700}
+.tk-stay:active{background:rgba(46,122,87,.08)}
+.tk-stay-l{display:grid;align-content:center;padding:9px 7px;border-right:1px solid var(--rule);font-size:12px;font-weight:800;line-height:1.2;color:var(--grn)}
+.tk-stay-n{padding:9px 7px;font-size:15.5px;font-weight:900;line-height:1.25;overflow-wrap:anywhere}
 
-/* The hotel card (#stay): a sheet cut from the ticket stock, to hold up to a
-   driver. The name and the address are the largest print in the app. */
-.sheet.stay{background:var(--grain), var(--stock) var(--mat-pattern);color:var(--print);border-top:0;padding-top:14px;box-shadow:var(--lift)}
+/* The day's total, as a bill's. */
+.tk-kind{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:8px 8px 9px;font-weight:800;font-size:14px;border-bottom:2px solid var(--grn)}
+.tk-fig{text-align:right}
+.tk-fig .fare{display:block;font-size:19px;font-weight:900;font-variant-numeric:tabular-nums}
+.tk-fig small{display:block;font-size:12px;font-weight:600;font-variant-numeric:tabular-nums}
+/* The tear-off stub. */
+.tk-foot{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:10px 8px;border-top:2px dashed rgba(19,38,31,.45);margin-top:8px;font-size:11.5px;font-weight:700}
+.tk-foot .tk-valid{font-family:var(--slab);font-weight:600;color:var(--grn);font-size:12.5px}
+.tk-foot span:last-child{text-align:right;white-space:nowrap}
+/* A used day's stub has room under its two lines for the SERVED print. */
+.tk:has(.insp) .tk-foot{min-height:96px;align-items:flex-start}
+@media (max-width:350px){
+  .r{grid-template-columns:50px minmax(0,1fr) 34px}
+  .r>.r-t{font-size:14px}
+  .r-none,.tk-add{padding-left:57px}
+  .tk-stay{grid-template-columns:50px minmax(0,1fr)}
+  .gc-box>div{padding:4px 4px 3px}
+  .gc-box b{font-size:13px}
+}
+
+/* The hotel card (#stay): a sheet of check paper under a double green rule,
+   to hold up to a driver. The name and the address are the largest print in the app. */
+.sheet.stay{background:var(--stock);color:var(--print);border-top:3px double var(--grn);padding-top:14px;box-shadow:var(--lift)}
 /* Open, it also keeps the shadow every open sheet casts upward. */
-.sheet.stay.is-open{box-shadow:var(--lift), 0 -24px 40px -10px #000}
+.sheet.stay.is-open{box-shadow:var(--lift), 0 -24px 40px -10px rgba(19,38,31,.5)}
 .stay .sheet-top i{color:var(--print);opacity:.6}
-.stay .sheet-top button{color:var(--print);height:44px}
 .sy{padding:2px 0 4px}
 .sy-ph{display:block;width:100%;max-width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:3px;margin:0 0 14px;background:var(--stock-mark)}
 @media (orientation:landscape) and (max-height:520px){ .sy-ph{max-height:38vh} }
 .sy-name{font-size:31px;font-weight:900;line-height:1.2;letter-spacing:.03em;overflow-wrap:anywhere}
 .sy-en{font-size:15px;font-weight:700;margin-top:4px;overflow-wrap:anywhere}
-.sy-ad{font-size:23px;font-weight:900;line-height:1.35;margin-top:14px;padding-top:12px;border-top:1px solid rgba(21,18,15,.17);overflow-wrap:anywhere}
-.sy-ask{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;margin-top:14px;padding-top:12px;border-top:2px dashed rgba(21,18,15,.38)}
+.sy-ad{font-size:23px;font-weight:900;line-height:1.35;margin-top:14px;padding-top:12px;border-top:1px solid var(--rule);overflow-wrap:anywhere}
+.sy-ask{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;margin-top:14px;padding-top:12px;border-top:2px dashed rgba(19,38,31,.45)}
 .sy-ask b{font-size:21px;font-weight:900}
 .sy-ask span{font-size:14px;font-weight:500}
 .sy-note{font-size:14px;font-weight:500;margin-top:10px;overflow-wrap:anywhere}
@@ -149,14 +144,15 @@ button.bar-t{border:0;background:none;padding:0;min-height:36px;min-width:0;colo
 .sy .r-map{font-size:15px;padding:11px 16px}
 .sy .r-map.alt{padding:9.5px 16px}
 
-/* The all-days list (#allDays): one stub per day, torn from its ticket, its
-   line's colour down the left edge (the key colour where there is none). */
+/* The all-days list (#allDays): one stub per day, torn from its guest
+   check: the check's number boxed, a green edge down the left. */
 .ad{display:grid;gap:6px}
-.ad-row{--line:var(--key-hi);display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;column-gap:11px;width:100%;min-height:56px;
-  padding:8px 12px 8px 10px;border:0;border-left:7px solid var(--line);border-radius:4px;background:var(--grain), var(--stock) var(--mat-pattern);color:var(--print);box-shadow:var(--lift);
+.ad-row{--line:var(--grn);display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;column-gap:11px;width:100%;min-height:56px;
+  padding:8px 12px 8px 10px;border:0;border-left:5px solid var(--grn);border-radius:2px;background:var(--stock);color:var(--print);box-shadow:var(--lift);
   text-align:left;font-weight:700;transition:transform .12s ease-out}
 .ad-row:active{transform:scale(.98)}
-.ad-row .num{margin:0;background:var(--print);color:var(--stock)}
+.ad-row .num{display:flex;align-items:baseline;gap:3px;margin:0;padding:2px 7px;border:1.5px solid var(--grn);border-radius:2px;color:var(--grn);font-size:15px;font-weight:900;white-space:nowrap}
+.ad-row .num small{font-family:var(--slab);font-weight:600;font-size:11px}
 .ad-main{display:grid;min-width:0;gap:1px}
 .ad-top{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 8px;font-size:15px}
 .ad-top b{font-weight:900;white-space:nowrap}
@@ -164,17 +160,17 @@ button.bar-t{border:0;background:none;padding:0;min-height:36px;min-width:0;colo
 .ad-title{font-size:13.5px;font-weight:700;line-height:1.3;overflow-wrap:anywhere}
 .ad-st{font-size:12.5px;font-weight:900;white-space:nowrap}
 .ad-row.is-used{opacity:.55}
-.ad-row.is-today{box-shadow:0 0 0 2px var(--text), var(--lift)}
+.ad-row.is-today{box-shadow:0 0 0 2px var(--red), var(--lift)}
 
-/* The demo banner (#demo): plain ground and text like the no-signal strip,
+/* The demo banner (#demo): a slip of check paper with a red edge,
    in the Days screen's flow above the bar, and kept at the top while Days is
    scrolled (z-index 5: under the nav, the no-signal strip, every sheet, the
    undo bar, the veil and the gate). */
 .demo{position:sticky;top:calc(env(safe-area-inset-top, 0px) + var(--net-h, 0px));z-index:5;display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px var(--gr) 0 var(--gl);padding:4px 4px 4px 13px;border-radius:8px;
-  background:var(--key);border-bottom:1.5px dashed var(--key-hi);font-weight:700;font-size:14px;line-height:1.3}
+  background:var(--stock);border-left:4px solid var(--red);box-shadow:var(--lift);font-weight:700;font-size:14px;line-height:1.3}
 .demo-t{min-width:0;font-variant-numeric:tabular-nums}
 .demo-time{font-weight:900;white-space:nowrap}
-.demo-stop{flex:none;height:44px;padding:0 18px;border:0;border-radius:6px;background:var(--paper);color:var(--print);font-weight:900;font-size:15px;
+.demo-stop{flex:none;height:44px;padding:0 18px;border:0;border-radius:22px;background:var(--print);color:var(--stock);font-weight:900;font-size:15px;
   box-shadow:var(--paper-edge);transition:transform .12s ease-out,box-shadow .12s}
 .demo-stop:active{transform:translateY(1.5px);box-shadow:var(--paper-down)}
 
@@ -185,7 +181,7 @@ button.bar-t{border:0;background:none;padding:0;min-height:36px;min-width:0;colo
    the fetch line as the ticket's fine print. Ticking lands the settle
    slip's 済 stamp (css/money.css .stamp, .ghost) where the tap was. */
 .bw{margin:14px 22px 4px}
-.bw-card{position:relative;border-radius:7px;color:var(--print);font-weight:700;background:var(--grain), var(--stock) var(--mat-pattern);
+.bw-card{position:relative;border-radius:7px;color:var(--print);font-weight:700;background:var(--grain), var(--stock);
   box-shadow:var(--lift)}
 .bw-band{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:36px;padding:0 8px 0 13px;border-radius:7px 7px 0 0;
   background:var(--print);color:var(--stock)}
@@ -193,22 +189,22 @@ button.bar-t{border:0;background:none;padding:0;min-height:36px;min-width:0;colo
 .bw-title i{font-weight:700;font-size:12.5px;letter-spacing:0;margin-left:7px}
 .bw-band .num{background:var(--stock);color:var(--print)}
 .bw-rows{padding:2px 14px 2px}
-.bw-r{display:grid;grid-template-columns:3.7em minmax(0,1fr);column-gap:8px;padding:10px 0;border-bottom:1px solid rgba(21,18,15,.17)}
+.bw-r{display:grid;grid-template-columns:3.7em minmax(0,1fr);column-gap:8px;padding:10px 0;border-bottom:1px solid rgba(19,38,31,.17)}
 .bw-r:last-child{border-bottom:0}
 .bw-r.is-pending{opacity:.6}
-.bw-seal{width:34px;height:34px;margin-top:1px;border-radius:50%;display:grid;place-items:center;border:1.7px solid var(--shu);color:var(--shu);
+.bw-seal{width:34px;height:34px;margin-top:1px;border-radius:50%;display:grid;place-items:center;border:1.7px solid var(--red);color:var(--red);
   font-size:11.5px;font-weight:900;line-height:1}
-.bw-seal.is-empty{border:1.7px dashed rgba(21,18,15,.38)}
+.bw-seal.is-empty{border:1.7px dashed rgba(19,38,31,.38)}
 .bw-seal.has-pic{overflow:hidden;border-width:2px}
 .bw-seal img{display:block;width:100%;height:100%;border-radius:50%;object-fit:cover;pointer-events:none}
-.bw-seal.is-booked{border-color:rgba(21,18,15,.5);color:var(--print);font-family:var(--seal);font-size:15px}
+.bw-seal.is-booked{border-color:rgba(19,38,31,.5);color:var(--print);font-family:var(--slab);font-size:15px}
 .bw-b{display:grid;align-content:center;min-height:44px;gap:2px;min-width:0;border:0;background:none;padding:0;color:var(--print);text-align:left;font-weight:700;border-radius:2px}
-button.bw-b:active{background:rgba(21,18,15,.06)}
+button.bw-b:active{background:rgba(19,38,31,.06)}
 .bw-n{font-size:15.5px;font-weight:900;line-height:1.25;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 .bw-r.is-open .bw-n{display:block;-webkit-line-clamp:unset}
 .bw-due{font-size:12.5px;font-weight:500;font-variant-numeric:tabular-nums}
 .bw-due b{font-weight:900}
-.bw-due.is-late{color:var(--shu);font-weight:900;font-size:13.5px}
+.bw-due.is-late{color:var(--red);font-weight:900;font-size:13.5px}
 .bw-vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}
 /* The open row: the same 200 ms height change as a ticket's stop. */
 .bw-more{grid-column:2 / -1;display:grid;grid-template-rows:0fr;transition:grid-template-rows .2s ease-out}
@@ -219,10 +215,10 @@ button.bw-b:active{background:rgba(21,18,15,.06)}
 .bw-ctl{display:flex;flex-wrap:wrap;align-items:center;gap:0 8px}
 .bw-ctl .r-map,.bw-ctl .r-edit{margin:9px 0 2px;min-height:44px;display:inline-flex;align-items:center;justify-content:center}
 /* Tick it off: the slip's empty stamp spot, the rarest and boldest act here. */
-.bw-tick{display:flex;align-items:center;gap:9px;margin:4px 0 0 auto;min-height:60px;border:0;background:none;padding:0 0 0 6px;color:var(--shu);
+.bw-tick{display:flex;align-items:center;gap:9px;margin:4px 0 0 auto;min-height:60px;border:0;background:none;padding:0 0 0 6px;color:var(--red);
   font-size:17px;font-weight:900;letter-spacing:.01em;border-radius:4px}
 .bw-spot{position:relative;flex:none;width:56px;height:56px;display:grid;place-items:center}
-.bw-spot .ghost{width:52px;height:52px;font-size:27px;border:2px solid var(--shu);color:rgba(214,60,30,.62)}
+.bw-spot .ghost{width:52px;height:52px;font-size:27px;border:2px solid var(--red);color:rgba(194,54,43,.62)}
 .bw-tick:active .ghost{transform:scale(.97)}
 .bw-tick.is-stamped{cursor:default}
 /* The stamp lands from above the paper: never clipped by the row. */
@@ -230,19 +226,19 @@ button.bw-b:active{background:rgba(21,18,15,.06)}
 .bw-pl{margin:6px 0 0;font-size:12.5px;font-weight:500;line-height:1.3}
 .bw-ctl .bw-pl{flex:1 1 9em}
 .bw-none{padding:14px 0 13px calc(3.7em + 8px);font-size:15px;font-weight:900}
-.bw-none b{color:var(--shu);font-family:var(--seal);font-weight:400;margin-right:2px}
-.bw-perf{position:relative;margin:0 9px;border-top:2px dashed rgba(21,18,15,.38)}
+.bw-none b{color:var(--red);font-family:var(--slab);font-weight:400;margin-right:2px}
+.bw-perf{position:relative;margin:0 9px;border-top:2px dashed rgba(19,38,31,.38)}
 /* The done group: one line that opens the plain list of what is done. */
 .bw-dn{display:block;width:calc(100% - 28px);min-height:44px;margin:0 14px;padding:10px 0 11px calc(3.7em + 8px);border:0;background:none;
   color:var(--print);text-align:left;font-size:14.5px;font-weight:900}
-.bw-dn:active{background:rgba(21,18,15,.06)}
+.bw-dn:active{background:rgba(19,38,31,.06)}
 .bw-done{padding:0 14px 4px}
-.bw-d{display:grid;grid-template-columns:3.7em minmax(0,1fr);column-gap:8px;align-items:start;padding:8px 0;border-top:1px solid rgba(21,18,15,.17)}
+.bw-d{display:grid;grid-template-columns:3.7em minmax(0,1fr);column-gap:8px;align-items:start;padding:8px 0;border-top:1px solid rgba(19,38,31,.17)}
 .bw-d .bw-seal{width:28px;height:28px;font-size:10px;margin-left:3px}
 .bw-dm{display:grid;gap:1px;min-width:0}
 .bw-d .bw-n{font-size:14px;font-weight:700}
 .bw-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:2px 6px 2px 14px;font-size:11.5px;font-weight:500;
-  border-top:1px solid rgba(21,18,15,.17)}
+  border-top:1px solid rgba(19,38,31,.17)}
 .bw-fetch{flex:none;min-height:44px;min-width:44px;border:0;background:none;padding:0 8px;color:var(--print);font-size:13px;font-weight:900;
-  text-decoration:underline dotted rgba(21,18,15,.45) 2px;text-underline-offset:4px}
+  text-decoration:underline dotted rgba(19,38,31,.45) 2px;text-underline-offset:4px}
 .bw-fetch:disabled{text-decoration:none;opacity:.7}

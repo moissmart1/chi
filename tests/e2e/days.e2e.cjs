@@ -51,17 +51,19 @@ module.exports = [
     async run({ page }) {
       await ready(page);
       const t = tk("2026-12-28");
-      await expectText(page, t + " .tk-band", /山手線\s*Yamanote Line/);
-      await expectText(page, t + " .num", "D 03");
-      assert.equal(await page.evaluate((sel) => getComputedStyle(document.querySelector(sel + " .tk")).getPropertyValue("--line").trim(), t), "#9ACD32");
-      const route = await text(page, t + " .tk-route");
-      for (const s of ["新宿", "Shinjuku", "渋谷", "Shibuya"]) assert.ok(route.includes(s), "the route reads " + s + ": " + route);
-      assert.equal(await page.evaluate((sel) => !!document.querySelector(sel + " .tk-route .arr"), t), true, "the arrow");
+      // The guest check's boxes: date, table, guests, server (who is looking), the check's number.
+      await expectText(page, t + " .gc-box", "Date12/28Table2Guests2ServerMoNo.0003");
+      await expectText(page, t + " .num", "No.0003");
+      await expectText(page, t + " .gc-t", /^Guest Check/);
+      // The line and route in English, in one small line (no Japanese, no line colour).
+      await expectText(page, t + " .tk-route", "Yamanote Line · Shinjuku → Shibuya");
+      assert.equal(await page.evaluate((sel) => getComputedStyle(document.querySelector(sel + " .tk")).getPropertyValue("--line").trim(), t), "");
       const date = await text(page, t + " .tk-date");
-      for (const s of ["Mon Dec 28", "Good for this day only"]) assert.ok(date.includes(s), "the date row reads " + s + ": " + date);
-      assert.equal(date.includes("当日限り有効"), false, date);
-      assert.equal(date.includes("12月"), false, "the date is in English only: " + date);
-      await expectText(page, t + " .tk-foot", /^2026\.12\.28 MI発行 00003-01\s*Good for this day only$/);
+      assert.equal(date, "Mon Dec 28", date);
+      // The stub: the diner's thanks and the guest receipt, once; no Japanese issue line, no "Good for this day only".
+      await expectText(page, t + " .tk-foot", "Thank you, call againGuest receipt · 12/28");
+      const all = await text(page, t);
+      assert.equal(/Good for this day only|発行|[\u3040-\u30ff\u4e00-\u9fff]/.test(all), false, all);
     },
   },
   {
@@ -69,6 +71,7 @@ module.exports = [
     async run({ page }) {
       await ready(page);
       await expectText(page, tk("2026-12-27") + " .tk-title", "Temples, then the view");
+      await expectText(page, tk("2026-12-27") + " .tk-date", "Sun Dec 27 · Temples, then the view");
       assert.equal(await page.evaluate((sel) => document.querySelector(sel + " .tk-title"), tk("2026-12-28")), null);
     },
   },
@@ -78,22 +81,15 @@ module.exports = [
       // Dec 30 with no city: the ticket falls back to the trip's name.
       await ready(page, { seed: { ...WITH_PLAN, days: { ...WITH_PLAN.days, "2026-12-30": { city: "" } } } });
       const d13 = tk("2026-12-29");
-      await expectText(page, d13 + " .tk-band", /^Niseko\s*D 04$/);
+      await expectText(page, d13 + " .num", "No.0004");
       await expectText(page, d13 + " .tk-route", "Niseko");
-      assert.equal(await page.evaluate((sel) => !!document.querySelector(sel + " .arr"), d13), false, "no arrow");
       const d14 = tk("2026-12-30");
-      await expectText(page, d14 + " .tk-band", "D 05");
+      await expectText(page, d14 + " .num", "No.0005");
       await expectText(page, d14 + " .tk-route", "Chicago 2026");
       for (const t of [d13, d14]) {
         const all = await text(page, t);
         assert.equal(/undefined|null|NaN/.test(all), false, t + ": " + all);
         await expectText(page, t + " .rows", "Nothing planned yet.");
-        // The neutral band: the key colour (--key-hi), whatever it is.
-        const band = await page.evaluate((sel) => {
-          const css = (el, p) => getComputedStyle(el).getPropertyValue(p).trim();
-          return { line: css(document.querySelector(sel + " .tk"), "--line"), keyHi: css(document.documentElement, "--key-hi") };
-        }, t);
-        assert.equal(band.line, band.keyHi, t + ": a neutral band");
       }
     },
   },
@@ -103,7 +99,8 @@ module.exports = [
       await ready(page);
       assert.deepEqual(await rowTitles(page, "2026-12-28"), ["Meiji Shrine", "Lunch in Harajuku", "Shibuya Sky", "Dinner", "Buy gloves"]);
       await expectText(page, '.r[data-id="planstop1203"] .r-t', "14:00");
-      await expectText(page, '.r[data-id="planstop1203"] .r-j', "渋谷");
+      // The check's price column: a stop has no price of its own, so the blank dot (the sign name is not printed).
+      await expectText(page, '.r[data-id="planstop1203"] .r-j', "·");
       // On today's ticket the next stop's leave-by line comes first.
       await expectText(page, '.r[data-id="planstop1203"] .r-s', /^(Leave by 13:30, in 10 min\. )?Booked for 14:00$/);
       await expectText(page, '.r[data-id="planstop1205"] .r-t', "—");

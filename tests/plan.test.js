@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { minutesOf, nowIn, instantOf, openDayIndex, dayState, daysToGo, stopsFor, nextStopId, isPast, nextLine, stayFor, stayShownFor, NEXT_GRACE_MIN, NIGHT_ENDS_MIN, safeHref, originFor, mapsUrl, stayMapsUrl, inkFor, header, dayTotalTrip, gateDate, issueLine } from "../js/plan.js";
+import { minutesOf, nowIn, instantOf, openDayIndex, dayState, daysToGo, stopsFor, nextStopId, isPast, nextLine, stayFor, stayShownFor, NEXT_GRACE_MIN, NIGHT_ENDS_MIN, safeHref, originFor, mapsUrl, stayMapsUrl, inkFor, header, dayTotalTrip, gateDate, issueLine, checkDate } from "../js/plan.js";
 
 const TZ = "America/Chicago";
 const TRIP = { start: "2026-12-26", end: "2027-01-01", tz: TZ };
@@ -83,7 +83,10 @@ test("the fare and the small print", () => {
   assert.equal(dayTotalTrip(ex, "2026-12-27"), 3720); // US$30.00 + US$7.20, in cents
   assert.equal(gateDate("2026-12-27"), "12.27");
   assert.equal(gateDate("2027-01-01"), "01.01");
-  assert.equal(issueLine("2026-12-27", 2, "MI"), "2026.12.27 MI発行 00002-01");
+  // The guest check's own date box and its tear-off stub (no Japanese issue line).
+  assert.equal(checkDate("2026-12-27"), "12/27");
+  assert.equal(checkDate("2027-01-01"), "1/1");
+  assert.equal(issueLine("2026-12-27"), "Guest receipt · 12/27");
 });
 
 test("a place from the Sheet is only a link when safeHref says so", () => {

@@ -79,7 +79,7 @@ for (const zone of ["America/Toronto", "Asia/Tokyo"]) {
         await ready(page, chi(t.at));
         await expectText(page, "#dayCount", t.count);
         assert.equal(await used(page), "0000000");
-        const d10 = await text(page, tk("2026-12-26") + " .tk-date");
+        const d10 = await text(page, tk("2026-12-26") + " .tk-foot");
         if (t.countdown) assert.ok(d10.includes(t.countdown), d10);
         else assert.equal(/Valid (tomorrow|in \d+ days)/.test(d10), false, d10);
       },
