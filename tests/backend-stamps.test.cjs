@@ -16,8 +16,8 @@ const DEFS = [
   { id: "d2", date: "2030-01-06", name_ja: "二", name_en: "Second", place: "Second Place", motif: "tower", ink: "ai", shape: "square" },
   { id: "iss", date: "", name_ja: "発行", name_en: "Issued", place: "", motif: "crest", ink: "shu", shape: "round" },
 ];
-// Jan 5 in Japan is 15:00 UTC on Jan 4 to 18:00 UTC on Jan 5.
-const IN_D1 = "2030-01-05T01:00:00.000Z";
+// Jan 5 in Chicago is 06:00 UTC on Jan 5 to 09:00 UTC on Jan 6.
+const IN_D1 = "2030-01-05T16:00:00.000Z";
 
 function book({ over = {}, defs = DEFS, now = IN_D1 } = {}) {
   const at = { now };
@@ -68,11 +68,11 @@ test("the same press twice is one row and one History line, and the second answe
   assert.equal(rows(call).length, 1);
   assert.equal(lines(call).length, 1);
   // a resend that arrives after the window closed still answers the first
-  call.at.now = "2030-01-07T00:00:00.000Z";
+  call.at.now = "2030-01-07T15:00:00.000Z";
   assert.deepEqual((await call("pressStamp", { def: "d1", at: IN_D1 })).data.stamp, a.data.stamp);
   assert.equal(lines(call).length, 1);
   // a different `at` the same day is still the one stamp
-  assert.deepEqual((await call("pressStamp", { def: "d1", at: "2030-01-05T05:00:00.000Z" })).data.stamp, a.data.stamp);
+  assert.deepEqual((await call("pressStamp", { def: "d1", at: "2030-01-05T20:00:00.000Z" })).data.stamp, a.data.stamp);
   assert.equal(rows(call).length, 1);
 });
 
@@ -84,7 +84,7 @@ test("two people stamping the same day are two rows", async () => {
 });
 
 test("pressed offline, arriving 30 hours later (window closed): accepted, stored with the time it was pressed", async () => {
-  const call = book({ now: "2030-01-06T07:00:00.000Z" }); // 30 hours after IN_D1
+  const call = book({ now: "2030-01-06T22:00:00.000Z" }); // 30 hours after IN_D1
   const r = await call("pressStamp", { def: "d1", at: IN_D1 });
   assert.equal(r.ok, true);
   assert.equal(r.data.stamp.at, IN_D1);
@@ -95,9 +95,9 @@ test("pressed offline, arriving 30 hours later (window closed): accepted, stored
 test("not_open, closed, late, future and no_such_stamp are refused with no write", async () => {
   const cases = [
     ["not_open", { def: "d2", at: IN_D1 }, IN_D1],
-    ["closed", { def: "d1", at: "2030-01-05T18:00:00.000Z" }, "2030-01-05T18:00:00.000Z"],
-    ["late", { def: "d1", at: IN_D1 }, "2030-01-07T01:00:01.000Z"],
-    ["future", { def: "d1", at: "2030-01-05T01:06:00.000Z" }, IN_D1],
+    ["closed", { def: "d1", at: "2030-01-06T09:00:00.000Z" }, "2030-01-06T09:00:00.000Z"],
+    ["late", { def: "d1", at: IN_D1 }, "2030-01-07T16:00:01.000Z"],
+    ["future", { def: "d1", at: "2030-01-05T16:06:00.000Z" }, IN_D1],
     ["no_such_stamp", { def: "nope", at: IN_D1 }, IN_D1],
   ];
   for (const [code, args, now] of cases) {
@@ -145,10 +145,10 @@ test("undo lifts the press: load no longer lists it; pressing again inside the w
   assert.deepEqual((await call("load")).data.stamps, []);
   assert.equal((await call("history")).data.entries[0].summary, "undid: stamped Jan 5");
 
-  call.at.now = "2030-01-05T03:00:00.000Z";
-  const again = await call("pressStamp", { def: "d1", at: "2030-01-05T03:00:00.000Z" });
+  call.at.now = "2030-01-05T18:00:00.000Z";
+  const again = await call("pressStamp", { def: "d1", at: "2030-01-05T18:00:00.000Z" });
   assert.equal(again.ok, true);
-  assert.equal(again.data.stamp.at, "2030-01-05T03:00:00.000Z");
+  assert.equal(again.data.stamp.at, "2030-01-05T18:00:00.000Z");
   assert.notEqual(again.data.stamp.seed, first.stamp.seed);
   assert.equal(rows(call).length, 1);
   assert.equal(rows(call)[0].gone, "");
@@ -169,10 +169,10 @@ test("a lifted stamp's old press, resent, is not a new press", async () => {
 test("after the window, a lifted stamp cannot be pressed again, and undoing the lift is refused too", async () => {
   const call = book();
   const first = (await call("pressStamp", { def: "d1", at: IN_D1 })).data;
-  call.at.now = "2030-01-05T18:30:00.000Z"; // closed
+  call.at.now = "2030-01-06T09:30:00.000Z"; // closed
   const lift = await call("undo", { logId: first.logId });
   assert.equal(lift.ok, true, "lifting is always allowed");
-  const again = await call("pressStamp", { def: "d1", at: "2030-01-05T18:20:00.000Z" });
+  const again = await call("pressStamp", { def: "d1", at: "2030-01-06T09:20:00.000Z" });
   assert.deepEqual([again.ok, again.error], [false, "closed"]);
   const put = await call("undo", { logId: lift.data.logId });
   assert.deepEqual([put.ok, put.error], [false, "closed"]);
@@ -344,7 +344,7 @@ function sheetsVm(tabs, tz) {
 }
 
 test("a definition's date that Sheets turned into a Date is the same day as the text, in the script's zone", () => {
-  for (const [tz, iso] of [["Asia/Tokyo", "2030-12-11T15:00:00.000Z"], ["America/Los_Angeles", "2030-12-12T08:00:00.000Z"], ["UTC", "2030-12-12T00:00:00.000Z"]]) {
+  for (const [tz, iso] of [["America/Chicago", "2030-12-12T06:00:00.000Z"], ["Asia/Tokyo", "2030-12-11T15:00:00.000Z"], ["America/Los_Angeles", "2030-12-12T08:00:00.000Z"], ["UTC", "2030-12-12T00:00:00.000Z"]]) {
     const { ctx } = sheetsVm({}, tz);
     const dateCell = vm.runInContext("new Date(" + JSON.stringify(iso) + ")", ctx); // as Sheets hands it back, made in the script's own realm
     const asDate = ctx.stampDefFromRow({ id: "d", date: dateCell });
@@ -353,7 +353,7 @@ test("a definition's date that Sheets turned into a Date is the same day as the 
     const a = ctx.stampWindow({ id: "d", date: dateCell }, []);
     const b = ctx.stampWindow({ id: "d", date: "2030-12-12" }, []);
     assert.deepEqual([a.opens, a.closes], [b.opens, b.closes], tz + ": the same window");
-    assert.equal(a.opens, Date.UTC(2030, 11, 11, 15));
+    assert.equal(a.opens, Date.UTC(2030, 11, 12, 6)); // 00:00 on Dec 12 in Chicago
   }
 });
 

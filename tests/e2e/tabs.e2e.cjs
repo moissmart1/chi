@@ -4,7 +4,7 @@
 const assert = require("node:assert/strict");
 const { WITH_PLAN, open, until, expectText, visible } = require("./helpers.cjs");
 
-const NOV15 = Date.parse("2026-11-15T12:00:00+09:00");
+const NOV15 = Date.parse("2026-11-15T12:00:00-06:00");
 
 const isActive = (page, sel) => page.evaluate((s) => document.querySelector(s).classList.contains("is-active"), sel);
 const isInert = (page, sel) => page.evaluate((s) => document.querySelector(s).inert === true, sel);

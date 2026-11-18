@@ -18,16 +18,17 @@ const SEED = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "fixtures", "
 // A small plan (days, stops, stays) to lay over the seed: WITH_PLAN.
 const PLAN = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "fixtures", "plan.json"), "utf8"));
 const WITH_PLAN = { ...SEED, ...PLAN };
-// 2026-12-12 13:20 in Japan.
-const NOON12 = Date.parse("2026-12-12T13:20:00+09:00");
+// 2026-12-12 13:20 in Chicago.
+const NOON12 = Date.parse("2026-12-12T13:20:00-06:00");
 // When seed items without an addedAt / stampedAt were made: before the trip,
-// so they are never "new" to a viewer who has looked since.
-const SEEDED_AT = "2026-11-20T00:00:00.000Z";
+// so they are never "new" to a viewer who has looked since. 09:00 on Nov 20
+// in Chicago.
+const SEEDED_AT = "2026-11-20T15:00:00.000Z";
 
 const copy = (v) => JSON.parse(JSON.stringify(v));
 
-// "YYYY-MM-DD" in Japan at this instant.
-const japanDate = (ms) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(ms));
+// "YYYY-MM-DD" in Chicago (the trip's zone) at this instant.
+const tripDate = (ms) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(ms));
 
 // backend = { handle(body) -> Promise<envelope>, fake, requests, failWith, now }.
 // failWith: null (normal), "network" (handle rejects, so the page's call
@@ -68,7 +69,7 @@ function makeBackend(seed, { clock, now = Date.now() } = {}) {
 //   already, so a reload keeps whatever the app stored.
 // - hash: appended to the address (for example "#k=test-key").
 // - tab: the screen the app last showed, put into localStorage as chi.tab,
-//   with chi.tabDay the Japan date of nowMs (as if it was shown today), so
+//   with chi.tabDay the Chicago date of nowMs (as if it was shown today), so
 //   the app opens on it. Default "money"; "days" for the Days screen; null
 //   writes neither (the app then decides, from whatever `storage` holds).
 // Time: the page's clock is installed and paused at nowMs, and a backend
@@ -93,7 +94,7 @@ async function open(page, { seed = SEED, key = "test-key", me = "Mo", how = "1",
     };
   });
 
-  const own = { "chi.key": key, "chi.me": me, "chi.how": how, "chi.tab": tab, "chi.tabDay": tab === null ? null : japanDate(nowMs) };
+  const own = { "chi.key": key, "chi.me": me, "chi.how": how, "chi.tab": tab, "chi.tabDay": tab === null ? null : tripDate(nowMs) };
   const entries = Object.entries({ ...own, ...storage })
     .filter(([, v]) => v !== null && v !== undefined)
     .map(([k, v]) => [k, String(v)]);

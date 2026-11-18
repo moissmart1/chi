@@ -10,7 +10,7 @@ const { WITH_PLAN, NOON12, makeBackend, open, advance, until, text, expectText, 
 
 const HOUR = 3600000;
 const KEY = "test-key";
-const FIRST = Date.parse("2026-12-10T00:00:00+09:00");
+const FIRST = Date.parse("2026-12-10T00:00:00-06:00");
 // An arbitrary spread of drawings and inks over the eleven days (invented).
 const MOTIF = ["record", "sake", "tower", "lamp", "books", "snow", "mountain", "lantern", "onsen", "temple", "plane"];
 const INK = ["ai", "shu", "matsu"];
@@ -138,7 +138,7 @@ module.exports = [
       assert.equal(await isOpen(page), true);
       assert.equal(await page.locator("#book .bk-look").count(), 0, "the second tap did not hold the stamp up");
       assert.match(await cellClass(page, TODAY), /is-have/);
-      // the Today row: me at 13:20 Japan time, the others not yet
+      // the Today row: me at 13:20 Chicago time, the others not yet
       assert.equal(await text(page, "#bookTH"), "今日 Today");
       assert.equal(await who(page, 1), "You|13:20");
       assert.equal(await who(page, 2), "Ajen|not yet");
@@ -172,8 +172,8 @@ module.exports = [
   {
     name: "the issue stamp can be pressed before any day (and shows the book's year); the Today row then follows it",
     async run({ page }) {
-      // Dec 1 in Japan: before the trip
-      const nowMs = Date.parse("2026-12-01T12:00:00+09:00");
+      // Dec 1 in Chicago: before the trip
+      const nowMs = Date.parse("2026-12-01T12:00:00-06:00");
       const be = await ready(page, { nowMs });
       await openBook(page);
       assert.equal(await text(page, "#bookTH"), "発行 The book");
@@ -314,7 +314,7 @@ module.exports = [
       await idle(page);
       await page.click("#bookDone");
       await until(async () => !(await isOpen(page)), "closed");
-      // 03:20 on Dec 13 in Japan: Dec 12's window closed at 03:00
+      // 03:20 on Dec 13 in Chicago: Dec 12's window closed at 03:00
       await advance(page, be, 14 * HOUR);
       await page.click("#youBtn");
       await page.click("#setHist");
@@ -392,24 +392,24 @@ module.exports = [
     },
   },
   {
-    name: "a phone still on Toronto time: today's stamp is the Japan day's, not the phone's",
-    timezoneId: "America/Toronto",
+    name: "a phone still on Tokyo time: today's stamp is the Chicago day's, not the phone's",
+    timezoneId: "Asia/Tokyo",
     async run({ page }) {
-      // 20:00Z Dec 12 is 15:00 on Dec 12 in Toronto and 05:00 on Dec 13 in Japan.
+      // 20:00Z Dec 12 is 14:00 on Dec 12 in Chicago and 05:00 on Dec 13 in Tokyo.
       const nowMs = Date.parse("2026-12-12T20:00:00Z");
       const be = await ready(page, { nowMs });
       await openBook(page);
-      assert.match(await cellClass(page, "s04"), /is-open/, "Dec 13 is open");
-      assert.match(await cellClass(page, TODAY), /is-missed/, "Dec 12 closed at 03:00 in Japan");
+      assert.match(await cellClass(page, TODAY), /is-open/, "Dec 12 is open in Chicago");
+      assert.match(await cellClass(page, "s04"), /is-soon/, "Dec 13 has not begun in Chicago");
       assert.equal(await text(page, "#bookTH"), "今日 Today");
-      await page.click(cell(TODAY));
-      assert.equal(await text(page, "#bookSay"), "Dec 12 has closed.");
       await page.click(cell("s04"));
-      await until(() => stampsDrawn(page).then((n) => n === 1), "Dec 13's stamp is pressed");
+      assert.equal(await text(page, "#bookSay"), "Dec 13 opens on the day.");
+      await page.click(cell(TODAY));
+      await until(() => stampsDrawn(page).then((n) => n === 1), "Dec 12's stamp is pressed");
       await idle(page);
-      assert.equal(be.fake.tables.Stamps[0].id, "s04|Mo");
-      // the time shown is Japan time
-      assert.equal(await who(page, 1), "You|05:00");
+      assert.equal(be.fake.tables.Stamps[0].id, TODAY + "|Mo");
+      // the time shown is Chicago time
+      assert.equal(await who(page, 1), "You|14:00");
     },
   },
   {

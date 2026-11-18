@@ -59,9 +59,9 @@ async function keys(page, seq) {
   for (const k of seq.split(" ")) await page.click('#pad .key[data-k="' + k + '"]');
 }
 
-// The seed lines were rung up at SEEDED_AT; the phone is on Japan time.
+// The seed lines were rung up at SEEDED_AT; the phone is on Chicago time.
 const SEEDED_DAY = (() => {
-  const f = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", weekday: "short", month: "short", day: "numeric" }).formatToParts(new Date(SEEDED_AT));
+  const f = new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", weekday: "short", month: "short", day: "numeric" }).formatToParts(new Date(SEEDED_AT));
   const v = (t) => f.find((x) => x.type === t).value;
   return v("weekday") + " " + v("month") + " " + v("day");
 })();

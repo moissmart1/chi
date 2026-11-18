@@ -3,14 +3,14 @@
 //
 // An e2e file exports an array of cases, { name, run(ctx), timezoneId?, serviceWorkers?, viewport? }
 // (viewport: { width, height } in place of 390x844, for a Safari tab or a
-// smaller phone; mobile: false for a computer, a mouse and no touch; timezoneId: open the case's pages in that zone instead of Asia/Tokyo;
+// smaller phone; mobile: false for a computer, a mouse and no touch; timezoneId: open the case's pages in that zone instead of America/Chicago;
 // serviceWorkers: "allow" lets the app's service worker register, which every
 // other case blocks), or one async
 // function (a single case named after the file). ctx = { page, context,
 // browser, newPhone() }; newPhone() opens a second page in a context of its
 // own (another phone: its own storage), watched the same way.
 //
-// Each case gets a fresh browser context: 390x844, mobile, touch, Japan time,
+// Each case gets a fresh browser context: 390x844, mobile, touch, Chicago time,
 // clipboard allowed, service workers blocked unless the case allows them. Every request to a host other than localhost is answered
 // here (Google Fonts get a small stand-in stylesheet), so nothing needs the network.
 // That holds for a case that allows the service worker too: this Playwright
@@ -67,7 +67,7 @@ const CONTEXT = {
   viewport: { width: 390, height: 844 },
   isMobile: true,
   hasTouch: true,
-  timezoneId: "Asia/Tokyo",
+  timezoneId: "America/Chicago",
   permissions: ["clipboard-read", "clipboard-write"],
   serviceWorkers: "block",
 };

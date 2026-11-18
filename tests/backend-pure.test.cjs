@@ -383,15 +383,15 @@ test("hand-typed stop times and minutes read as the app writes them (I5)", () =>
 test("a Date time cell on Apps Script is read in the script's zone, and a seconds offset (an old zone's local mean time) counts as no time", () => {
   const saved = { U: global.Utilities, S: global.Session };
   try {
-    global.Session = { getScriptTimeZone: () => "Asia/Tokyo" };
+    global.Session = { getScriptTimeZone: () => "America/Chicago" };
     global.Utilities = { formatDate: (d, tz, fmt) => {
       const parts = new Intl.DateTimeFormat("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).formatToParts(d);
       const get = (t) => parts.find((p) => p.type === t).value;
       return fmt.replace("HH", get("hour")).replace("mm", get("minute")).replace("ss", get("second"));
     } };
-    // 09:30 on Sheets' zero day in Tokyo.
-    assert.equal(P.stopFromRow({ id: "h1", time: new Date(Date.UTC(1899, 11, 30, 0, 30)) }).time, "09:30");
-    assert.equal(P.stopFromRow({ id: "h1", time: new Date(Date.UTC(1899, 11, 30, 0, 30, 28)) }).time, "");
+    // 09:30 on Sheets' zero day in Chicago (UTC−6 by then).
+    assert.equal(P.stopFromRow({ id: "h1", time: new Date(Date.UTC(1899, 11, 30, 15, 30)) }).time, "09:30");
+    assert.equal(P.stopFromRow({ id: "h1", time: new Date(Date.UTC(1899, 11, 30, 15, 30, 28)) }).time, "");
     assert.equal(P.stopFromRow({ id: "h1", time: new Date(NaN) }).time, "");
   } finally {
     global.Utilities = saved.U;
@@ -671,9 +671,9 @@ test("paymentIdOf: the note's first part when it is an id", () => {
 const SDEFS = [{ id: "d1", date: "2030-01-05" }, { id: "d2", date: "2030-01-06" }, { id: "iss", date: "" }];
 const [SD1, , SISS] = SDEFS;
 
-test("stampWindow: a day stamp is open 27 hours from 00:00 Japan time; the issue stamp until the last day closes", () => {
-  assert.deepEqual(P.stampWindow(SD1, SDEFS), { opens: Date.UTC(2030, 0, 4, 15), closes: Date.UTC(2030, 0, 5, 18) });
-  assert.deepEqual(P.stampWindow(SISS, SDEFS), { opens: 0, closes: Date.UTC(2030, 0, 6, 18) });
+test("stampWindow: a day stamp is open 27 hours from 00:00 Chicago time; the issue stamp until the last day closes", () => {
+  assert.deepEqual(P.stampWindow(SD1, SDEFS), { opens: Date.UTC(2030, 0, 5, 6), closes: Date.UTC(2030, 0, 6, 9) });
+  assert.deepEqual(P.stampWindow(SISS, SDEFS), { opens: 0, closes: Date.UTC(2030, 0, 7, 9) });
   // no day stamps at all: the issue stamp does not close
   assert.equal(P.stampWindow(SISS, [SISS]).closes, Infinity);
   // a date that is not a day is never open
@@ -681,19 +681,19 @@ test("stampWindow: a day stamp is open 27 hours from 00:00 Japan time; the issue
   assert.ok(bad.opens > bad.closes);
 });
 
-test("pressRefusal: the window edges, in Japan time", () => {
-  const at = (h, m = 0, s = 0, day = 5) => Date.UTC(2030, 0, day, h, m, s);
+test("pressRefusal: the window edges, in Chicago time", () => {
+  const at = (h, m = 0, s = 0, day = 6) => Date.UTC(2030, 0, day, h, m, s);
   const same = (ms) => P.pressRefusal(SD1, SDEFS, ms, ms);
-  assert.equal(same(at(17, 59, 59)), "");
-  assert.equal(same(at(18)), "closed");
-  assert.equal(same(Date.UTC(2030, 0, 4, 14, 59, 59)), "not_open");
-  assert.equal(same(Date.UTC(2030, 0, 4, 15)), "");
+  assert.equal(same(at(8, 59, 59)), "");
+  assert.equal(same(at(9)), "closed");
+  assert.equal(same(Date.UTC(2030, 0, 5, 5, 59, 59)), "not_open");
+  assert.equal(same(Date.UTC(2030, 0, 5, 6)), "");
 });
 
 test("pressRefusal: late after 48 hours, future past 5 minutes", () => {
-  const at = Date.UTC(2030, 0, 5, 10);
-  assert.equal(P.pressRefusal(SD1, SDEFS, at, Date.UTC(2030, 0, 7, 10, 0, 1)), "late");
-  assert.equal(P.pressRefusal(SD1, SDEFS, at, Date.UTC(2030, 0, 7, 10)), "");
+  const at = Date.UTC(2030, 0, 5, 16);
+  assert.equal(P.pressRefusal(SD1, SDEFS, at, Date.UTC(2030, 0, 7, 16, 0, 1)), "late");
+  assert.equal(P.pressRefusal(SD1, SDEFS, at, Date.UTC(2030, 0, 7, 16)), "");
   assert.equal(P.pressRefusal(SD1, SDEFS, at + 6 * 60000, at), "future");
   assert.equal(P.pressRefusal(SD1, SDEFS, at + 5 * 60000, at), "");
   assert.equal(P.pressRefusal(SD1, SDEFS, NaN, at), "future");
@@ -701,8 +701,8 @@ test("pressRefusal: late after 48 hours, future past 5 minutes", () => {
 
 test("pressRefusal: the issue stamp is open from the start until the last day closes", () => {
   assert.equal(P.pressRefusal(SISS, SDEFS, Date.UTC(2029, 5, 1), Date.UTC(2029, 5, 1)), "");
-  assert.equal(P.pressRefusal(SISS, SDEFS, Date.UTC(2030, 0, 6, 17, 59), Date.UTC(2030, 0, 6, 17, 59)), "");
-  assert.equal(P.pressRefusal(SISS, SDEFS, Date.UTC(2030, 0, 6, 18), Date.UTC(2030, 0, 6, 18)), "closed");
+  assert.equal(P.pressRefusal(SISS, SDEFS, Date.UTC(2030, 0, 7, 8, 59), Date.UTC(2030, 0, 7, 8, 59)), "");
+  assert.equal(P.pressRefusal(SISS, SDEFS, Date.UTC(2030, 0, 7, 9), Date.UTC(2030, 0, 7, 9)), "closed");
 });
 
 test("stamp rows and the History sentence", () => {

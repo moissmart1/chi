@@ -40,6 +40,7 @@
 
 import { openDayIndex, dayState, daysToGo, nowIn, stopsFor, nextStopId, header, dayTotalYen, stayShownFor } from "../plan.js";
 import { issuer, dayShort, dayHead } from "../format.js";
+import { TRIP_TZ } from "../trip.js";
 import { ticketEl } from "./ticket.js";
 import { summary as bookSummary, countText } from "../stampbook.js";
 import { isPhone } from "../shape.js";
@@ -417,7 +418,7 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
     demo.hidden = !date;
     if (!date) return;
     const s = store.state;
-    const m = nowIn((s.trip && s.trip.tz) || "Asia/Tokyo", clock.now()).minutes;
+    const m = nowIn(TRIP_TZ, clock.now()).minutes;
     const hhmm = String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
     // The time is kept with the date: it never wraps onto a line alone.
     const head = "Pretending it’s " + dayHead(date, []).en + ", ";
@@ -453,7 +454,7 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
       return;
     }
     const days = list(s.days).filter((d) => d && typeof d.date === "string" && d.date);
-    const tz = s.trip.tz || "Asia/Tokyo";
+    const tz = TRIP_TZ;
     const nowMs = clock.now();
     const now = nowIn(tz, nowMs);
     seen = now;
@@ -538,7 +539,7 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
     }
   }
 
-  const tzOf = (s) => s.trip.tz || "Asia/Tokyo";
+  const tzOf = () => TRIP_TZ;
   const tripReady = (s) => s.status === "ready" && s.trip && s.trip.start;
 
   // Ask the clock again: redraw when the trip zone's minute or day moved on.

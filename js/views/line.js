@@ -8,8 +8,9 @@
 // Text from people or the Sheet goes in with textContent only.
 
 import { expenseShares, cadCents, jpyOf } from "../money.js";
-import { dollars, yen, typed, dayHead, pt, localDay, historySentence } from "../format.js";
+import { dollars, yen, typed, dayHead, pt, historySentence } from "../format.js";
 import { fillSeal } from "../picture.js";
+import { tripDate } from "../time.js";
 
 const NO_HISTORY = "History needs a connection.";
 const UNSAVED = "Not saved yet.";
@@ -34,11 +35,11 @@ function fig(tag, cls, str) {
   return n;
 }
 
-// "Fri Dec 11" for a moment, in the phone's own time zone.
+// "Fri Dec 11" for a moment, on the trip's calendar (as History groups it).
 function dateOf(iso) {
   const t = Date.parse(iso);
   if (!isFinite(t)) return "";
-  return dayHead(localDay(t), []).en;
+  return dayHead(tripDate(t), []).en;
 }
 
 // The part of a line that decides what the sheet shows, so history is fetched

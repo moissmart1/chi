@@ -34,6 +34,7 @@
 // safeHref.
 
 import { safeHref, nowIn } from "../plan.js";
+import { TRIP_TZ } from "../trip.js";
 import { fillSeal } from "../picture.js";
 import { paidStampSVG } from "../stamp.js";
 import { wetInk, rollingCount } from "../fx.js";
@@ -297,7 +298,7 @@ export function mountTodos(root, store, { clock, now = () => Date.now(), onState
   function beforeTrip(s) {
     const trip = s.trip;
     if (!trip || typeof trip.start !== "string" || !trip.start) return true;
-    return nowIn(trip.tz || "Asia/Tokyo", clock ? clock.now() : now()).date < trip.start;
+    return nowIn(TRIP_TZ, clock ? clock.now() : now()).date < trip.start;
   }
 
   function fetchedText(s) {

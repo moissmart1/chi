@@ -1,6 +1,6 @@
 // Days: a rail of eleven day tickets, the day counter and the squares.
 // The plan is tests/fixtures/plan.json over the seed; the clock is 13:20 on
-// Dec 12 in Japan, Day 3.
+// Dec 12 in Chicago, Day 3.
 
 const assert = require("node:assert/strict");
 const { WITH_PLAN, NOON12, makeBackend, open, advance, until, text, expectText } = require("./helpers.cjs");

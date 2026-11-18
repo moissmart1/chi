@@ -2,27 +2,27 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { minutesOf, nowIn, instantOf, openDayIndex, dayState, daysToGo, stopsFor, nextStopId, isPast, nextLine, stayFor, stayShownFor, NEXT_GRACE_MIN, NIGHT_ENDS_MIN, safeHref, originFor, mapsUrl, stayMapsUrl, inkFor, header, dayTotalYen, gateDate, issueLine } from "../js/plan.js";
 
-const TZ = "Asia/Tokyo";
+const TZ = "America/Chicago";
 const TRIP = { start: "2026-12-10", end: "2026-12-20", tz: TZ };
 const DAYS = Array.from({ length: 11 }, (_, i) => ({ date: "2026-12-" + (10 + i) }));
 const at = (iso) => Date.parse(iso);
 const stop = (id, time, more = {}) => ({ id, date: "2026-12-12", time, title: id, place: "", travelMin: 0, deleted: false, ...more });
 
-test("Japan time, whatever the phone thinks", () => {
-  // 13:20 on Dec 12 in Japan is 23:20 on Dec 11 in Toronto.
-  assert.deepEqual(nowIn(TZ, at("2026-12-12T13:20:00+09:00")), { date: "2026-12-12", minutes: 800 });
-  assert.equal(instantOf(TZ, "2026-12-12", 800), at("2026-12-12T13:20:00+09:00"));
+test("Chicago time, whatever the phone thinks", () => {
+  // 13:20 on Dec 12 in Chicago is 14:20 in Toronto and 04:20 on Dec 13 in Tokyo.
+  assert.deepEqual(nowIn(TZ, at("2026-12-12T13:20:00-06:00")), { date: "2026-12-12", minutes: 800 });
+  assert.equal(instantOf(TZ, "2026-12-12", 800), at("2026-12-12T13:20:00-06:00"));
 });
 test("which day opens", () => {
-  assert.equal(openDayIndex(TRIP, DAYS, at("2026-11-15T12:00:00+09:00")), 0);
-  assert.equal(openDayIndex(TRIP, DAYS, at("2026-12-12T13:20:00+09:00")), 2);
-  assert.equal(openDayIndex(TRIP, DAYS, at("2026-12-13T00:30:00+09:00")), 3); // just past midnight
-  assert.equal(openDayIndex(TRIP, DAYS, at("2026-12-25T12:00:00+09:00")), 10);
+  assert.equal(openDayIndex(TRIP, DAYS, at("2026-11-15T12:00:00-06:00")), 0);
+  assert.equal(openDayIndex(TRIP, DAYS, at("2026-12-12T13:20:00-06:00")), 2);
+  assert.equal(openDayIndex(TRIP, DAYS, at("2026-12-13T00:30:00-06:00")), 3); // just past midnight
+  assert.equal(openDayIndex(TRIP, DAYS, at("2026-12-25T12:00:00-06:00")), 10);
 });
 test("days to go", () => {
-  assert.equal(daysToGo(TRIP, at("2026-11-15T12:00:00+09:00")), 25);
-  assert.equal(daysToGo(TRIP, at("2026-12-09T23:59:00+09:00")), 1);
-  assert.equal(daysToGo(TRIP, at("2026-12-10T00:00:00+09:00")), 0);
+  assert.equal(daysToGo(TRIP, at("2026-11-15T12:00:00-06:00")), 25);
+  assert.equal(daysToGo(TRIP, at("2026-12-09T23:59:00-06:00")), 1);
+  assert.equal(daysToGo(TRIP, at("2026-12-10T00:00:00-06:00")), 0);
 });
 test("a day's stops: timed in order, untimed last, deleted and bad times handled", () => {
   const all = [stop("c", "19:00"), stop("x", ""), stop("a", "09:00"), stop("gone", "10:00", { deleted: true }), stop("odd", "9:5"), stop("other", "08:00", { date: "2026-12-13" })];
@@ -110,9 +110,9 @@ test("blank or missing fields never print undefined", () => {
 });
 test("the open day when today is inside the trip but missing from the list", () => {
   const some = [{ date: "2026-12-10" }, { date: "2026-12-14" }];
-  assert.equal(openDayIndex(TRIP, some, at("2026-12-12T12:00:00+09:00")), 0);
-  assert.equal(openDayIndex(TRIP, some, at("2026-12-16T12:00:00+09:00")), 1);
-  assert.equal(openDayIndex(TRIP, [{ date: "2026-12-15" }], at("2026-12-12T12:00:00+09:00")), 0);
+  assert.equal(openDayIndex(TRIP, some, at("2026-12-12T12:00:00-06:00")), 0);
+  assert.equal(openDayIndex(TRIP, some, at("2026-12-16T12:00:00-06:00")), 1);
+  assert.equal(openDayIndex(TRIP, [{ date: "2026-12-15" }], at("2026-12-12T12:00:00-06:00")), 0);
   assert.equal(dayState("2026-12-11", "2026-12-12"), "used");
   assert.equal(dayState("2026-12-12", "2026-12-12"), "today");
   assert.equal(dayState("2026-12-13", "2026-12-12"), "ahead");

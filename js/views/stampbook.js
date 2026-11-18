@@ -8,7 +8,7 @@
 // - root is the phone. now() is the real time (the phone's clock; a press is
 //   judged by it, so the demo clock is never used here).
 // - A stamp is open, not yet open, closed or held: js/stampbook.js stateOf, in
-//   Japan time whatever zone the phone is in. Tapping an open ring presses it
+//   Chicago time whatever zone the phone is in. Tapping an open ring presses it
 //   (store.pressStamp: shown at once, kept on the phone until the backend has
 //   it); a held stamp is held up large; a ring that is not open says so in one
 //   line under the page and shakes a little. Nothing is sent for those.
@@ -21,7 +21,7 @@
 //   state or stamp did, so a press landing keeps its landing and a person
 //   holding a stamp up is left alone.
 
-import { bookStampSVG, countText, dayNumber, japanClock, japanDay, lockedLine, monthDay, spanText, stateOf, tiltOf, usableDefs, weekdayOf } from "../stampbook.js";
+import { bookStampSVG, countText, dayNumber, lockedLine, monthDay, spanText, stateOf, tiltOf, tripClock, tripDate, usableDefs, weekdayOf } from "../stampbook.js";
 import { calm, wetInk } from "../fx.js";
 import { thud, primeSound } from "../sound.js";
 import { fillSeal } from "../picture.js";
@@ -173,7 +173,7 @@ export function mountStampBook(root, store, { now = () => Date.now() } = {}) {
 
   function drawToday(m) {
     const issue = m.defs.find((d) => !d.date) || null;
-    const today = japanDay(m.t);
+    const today = tripDate(m.t);
     const day = m.defs.find((d) => d.date === today) || null;
     const d = day || issue;
     const row = $("bookToday");
@@ -189,7 +189,7 @@ export function mountStampBook(root, store, { now = () => Date.now() } = {}) {
       const seal = el("i", "bk-seal");
       fillSeal(seal, p, p.name);
       const text = el("span");
-      text.append(el("b", "", p.name === m.s.me ? "You" : p.name), el("i", "", x && isFinite(isoMs(x.at)) ? japanClock(isoMs(x.at)) : "not yet"));
+      text.append(el("b", "", p.name === m.s.me ? "You" : p.name), el("i", "", x && isFinite(isoMs(x.at)) ? tripClock(isoMs(x.at)) : "not yet"));
       item.append(seal, text);
       return item;
     });
@@ -252,8 +252,8 @@ export function mountStampBook(root, store, { now = () => Date.now() } = {}) {
     t.append([d.name_ja, d.name_en].filter(Boolean).join(" ") || "Stamp");
     if (d.place) t.append(el("i", "", d.place));
     const at = isoMs(stamp.at);
-    const day = d.date || (isFinite(at) ? japanDay(at) : "");
-    const when = (day ? weekdayOf(day) + " " + monthDay(day) : "") + (isFinite(at) ? (day ? " · " : "") + "stamped " + japanClock(at) : "");
+    const day = d.date || (isFinite(at) ? tripDate(at) : "");
+    const when = (day ? weekdayOf(day) + " " + monthDay(day) : "") + (isFinite(at) ? (day ? " · " : "") + "stamped " + tripClock(at) : "");
     if (when) t.append(el("i", "", when));
     card.append(t);
     b.append(card, el("span", "bk-lx", LOOK_BACK));

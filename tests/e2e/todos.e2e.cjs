@@ -19,7 +19,7 @@ const ITEMS = [
   { "#": 4, Item: "Airport bus tickets", Status: "" },
   { "#": 5, Item: "Pocket wifi pickup", "Book by": "2026-11-10", Status: "Booked" },
 ];
-// 14:00 on Mon Nov 16 in Toronto (04:00 on the 17th in Japan): before the trip.
+// 14:00 on Mon Nov 16 in Toronto (13:00 in Chicago): before the trip.
 const BEFORE = Date.parse("2026-11-16T19:00:00Z");
 const MIN = 60000;
 
@@ -66,8 +66,8 @@ const rowIds = (page, box = "#bwOpen") => page.evaluate((b) => [...document.quer
 const row = (id) => '#bwOpen .bw-r[data-id="' + id + '"]';
 const sent = (backend, action) => backend.requests.filter((r) => r.action === action);
 const stored = (backend, id) => backend.fake.tables.Todos.find((r) => r.id === id);
-// The day of an instant in Japan (the test phone's own zone), as "Nov 17".
-const phoneDay = (ms) => new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", month: "short", day: "numeric" }).format(new Date(ms));
+// The day of an instant in Chicago (the test phone’s own zone), as "Nov 17".
+const phoneDay = (ms) => new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", month: "short", day: "numeric" }).format(new Date(ms));
 
 // The thud's audio, counted: window.__thuds goes up each time it sounds.
 function stubSound(page) {
@@ -453,7 +453,7 @@ module.exports = [
       release();
       await expectText(page, "#bwFetch", "Up to date ✓");
       assert.deepEqual(sent(backend, "syncTodos").map((r) => r.args), [{ force: true }]);
-      const clock = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(BEFORE + 3 * MIN));
+      const clock = new Intl.DateTimeFormat("en-GB", { timeZone: "America/Chicago", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(BEFORE + 3 * MIN));
       await expectText(page, "#bwAt", "From the planner · fetched " + clock);
       await advance(page, backend, 4000);
       await expectText(page, "#bwFetch", "Fetch");
@@ -592,7 +592,7 @@ module.exports = [
       // Within 30 seconds of the last pull the backend answers the stored list: the line shows when that was.
       const pulled = await page.evaluate(() => window.__matTest.store.state.todosPulledAt);
       assert.ok(pulled);
-      const clock = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(Date.parse(pulled)));
+      const clock = new Intl.DateTimeFormat("en-GB", { timeZone: "America/Chicago", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(Date.parse(pulled)));
       await expectText(page, "#bwAt", "From the planner · fetched " + clock);
     },
   },

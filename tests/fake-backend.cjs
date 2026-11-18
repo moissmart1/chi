@@ -246,8 +246,8 @@ function createFakeBackend(seed, { clock, lockFails, keepsApostrophe = false } =
     sheetUrl_: () => SHEET_URL,
     // Same as Env.js: 20 letters and digits, starting with a letter.
     newId_: () => "m" + crypto.randomBytes(16).toString("hex").slice(0, 19),
-    // Today in the Trip tab's zone, by this backend's clock.
-    today_: () => dayIn(now(), world.tripInfo_().tz || "Asia/Tokyo"),
+    // Today in the trip's zone (Env.js), by this backend's clock.
+    today_: () => dayIn(now(), world.TRIP_TZ_),
     claudeToken_: () => (Object.prototype.hasOwnProperty.call(props, "CLAUDE_TOKEN") && props.CLAUDE_TOKEN) || null,
     ensureClaudeToken_() {
       if (!primitives.claudeToken_()) props.CLAUDE_TOKEN = crypto.randomBytes(16).toString("hex");

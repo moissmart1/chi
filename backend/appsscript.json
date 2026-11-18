@@ -1,5 +1,5 @@
 {
-  "timeZone": "Asia/Tokyo",
+  "timeZone": "America/Chicago",
   "runtimeVersion": "V8",
   "webapp": {
     "executeAs": "USER_DEPLOYING",

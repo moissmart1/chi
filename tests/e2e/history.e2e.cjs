@@ -114,7 +114,7 @@ module.exports = [
       assert.equal(histRequests(backend), 2, "the one after starting and the one for this opening");
       const ids = rows.map((r) => Number(r.id));
       assert.deepEqual(ids, ids.slice().sort((a, b) => b - a), "newest first");
-      // Every seeded change was made on 2026-11-20 in Japan: one heading, in English beside the Japanese date.
+      // Every seeded change was made on 2026-11-20 in Chicago: one heading, in English beside the Japanese date.
       assert.deepEqual(await days(page), ["Fri Nov 20 | 11月20日(金)"]);
       assert.equal(rows[0].time, "09:00");
 
@@ -124,11 +124,11 @@ module.exports = [
     },
   },
   {
-    name: "an entry made through Claude ends with (through Claude); days are the day in Japan, newest day first",
+    name: "an entry made through Claude ends with (through Claude); days are the day in Chicago, newest day first",
     async run({ page }) {
       const backend = await ready(page);
-      // 01:00 on Dec 13 in Japan, still Dec 12 in UTC.
-      backend.now = Date.parse("2026-12-12T16:00:00Z");
+      // 01:00 on Dec 13 in Chicago.
+      backend.now = Date.parse("2026-12-13T07:00:00Z");
       await otherPhone(backend, "updateExpense", { id: idOfSeed("Shibuya dinner"), patch: { title: "Shibuya dinner out" } }, { via: "claude" });
       await openTape(page, 11);
       const rows = await tape(page);
@@ -139,18 +139,19 @@ module.exports = [
     },
   },
   {
-    name: "on a phone in Toronto a change made at 13:20 Japan time reads 23:20 under Fri Dec 11, here and in the line sheet",
+    name: "on a phone in Toronto a change made at 23:20 Chicago time (00:20 Saturday in Toronto) reads 23:20 under Fri Dec 11, here and in the line sheet",
     timezoneId: "America/Toronto",
     async run({ page }) {
       const backend = await ready(page);
-      // 13:20 on Sat Dec 12 in Japan is 23:20 on Fri Dec 11 in Toronto.
+      // History and the line sheet go by the trip's clock, not the phone's.
+      backend.now = Date.parse("2026-12-11T23:20:00-06:00");
       await otherPhone(backend, "addExpense", { expense: { ...SHARED(1), id: "torontoline1", title: "Tempura", day: "2026-12-11", paidBy: "Ajen", splitMode: "equal", splitVals: [], note: "", kind: "" } });
       await page.evaluate(() => globalThis.__matTest.store.refresh());
       await openTape(page, 11);
       const rows = await tape(page);
       assert.equal(rows[0].sentence, "Ajen rang up Tempura ¥101");
       assert.equal(rows[0].time, "23:20");
-      assert.deepEqual(await days(page), ["Fri Dec 11 | 12月11日(金)", "Thu Nov 19 | 11月19日(木)"]);
+      assert.deepEqual(await days(page), ["Fri Dec 11 | 12月11日(金)", "Fri Nov 20 | 11月20日(金)"]);
       await page.click("#histDone");
       await waitHistClosed(page);
 

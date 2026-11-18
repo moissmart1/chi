@@ -508,7 +508,7 @@ function mcpTools_() {
         amount: arg("number", "The amount, in the currency given.", true),
         currency: arg("string", "JPY for yen or CAD for Canadian dollars.", true, ["JPY", "CAD"]),
         paid_by: arg("string", "The name of the one who paid.", true),
-        day: arg("string", "The day, YYYY-MM-DD, or pre for before the trip; by default today in Japan."),
+        day: arg("string", "The day, YYYY-MM-DD, or pre for before the trip; by default today in Chicago."),
         split: arg("array", "The names of those who share it; by default everyone."),
         note: arg("string", "A note, under 200 letters."),
         kind: arg("string", "food, transport, stay, activity or shopping.", false, ["food", "transport", "stay", "activity", "shopping"]),

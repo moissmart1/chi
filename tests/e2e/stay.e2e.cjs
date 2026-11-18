@@ -1,7 +1,7 @@
 // Where you sleep, and the shape of the trip: the stay row at the foot of a
 // ticket, the hotel card it opens (#stay), and the list of every day (#allDays)
 // opened from the day counter. The plan is tests/fixtures/plan.json over the
-// seed; the clock is 13:20 on Dec 12 in Japan, Day 3.
+// seed; the clock is 13:20 on Dec 12 in Chicago, Day 3.
 
 const assert = require("node:assert/strict");
 const { WITH_PLAN, open, advance, until, text, expectText } = require("./helpers.cjs");
@@ -119,7 +119,7 @@ module.exports = [
   {
     name: "after midnight on a hotel-change day, last night's stay (R37)",
     async run({ page }) {
-      const backend = await ready(page, { nowMs: Date.parse("2026-12-13T00:30:00+09:00") });
+      const backend = await ready(page, { nowMs: Date.parse("2026-12-13T00:30:00-06:00") });
       await expectText(page, "#dayCount", /^Day 4 of 11 ?today$/);
       const stayOf = (date) => page.evaluate((sel) => {
         const b = document.querySelector(sel + " .tk-stay");
@@ -146,8 +146,8 @@ module.exports = [
     name: "after midnight on a phone in Toronto, last night's stay (R37)",
     timezoneId: "America/Toronto",
     async run({ page }) {
-      await ready(page, { nowMs: Date.parse("2026-12-13T00:30:00+09:00") });
-      assert.notEqual(await page.evaluate(() => Intl.DateTimeFormat().resolvedOptions().timeZone), "Asia/Tokyo");
+      await ready(page, { nowMs: Date.parse("2026-12-13T00:30:00-06:00") });
+      assert.equal(await page.evaluate(() => Intl.DateTimeFormat().resolvedOptions().timeZone), "America/Toronto");
       await expectText(page, "#dayCount", /^Day 4 of 11 ?today$/);
       assert.equal(await page.evaluate((sel) => document.querySelector(sel + " .tk-stay").dataset.stay, tk("2026-12-13")), "planstay0001");
     },
@@ -300,7 +300,7 @@ module.exports = [
   {
     name: "the list's today and used follow the clock when it opens",
     async run({ page }) {
-      const backend = await ready(page, { nowMs: Date.parse("2026-12-12T23:40:00+09:00") });
+      const backend = await ready(page, { nowMs: Date.parse("2026-12-12T23:40:00-06:00") });
       await page.click("#dayCount");
       await until(() => isOpen(page, "allDays"), "the list opens");
       assert.ok((await dayRows(page))[2].includes("today"));

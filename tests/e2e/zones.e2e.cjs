@@ -1,14 +1,15 @@
-// A phone set to a Canadian time zone (final review M4): Days still follows
-// Japan. For America/Toronto and America/Vancouver, at three instants in the
-// trip (just before and just after Tokyo midnight, mid-afternoon in Tokyo)
-// and three before it: today's ticket, the used days, leave-by and the
-// countdown. Toronto and Vancouver are still on the earlier calendar day at
-// every one of these instants, so a phone-zone date would show the wrong day.
+// A phone set to another time zone: Days still follows Chicago. For a phone
+// in Toronto (Eastern, one hour ahead) and one in Tokyo (fifteen hours
+// ahead), at three instants in the trip (just before and just after Chicago
+// midnight, mid-afternoon in Chicago) and three before it: today's ticket,
+// the used days, leave-by and the countdown. At most of these instants one
+// phone or the other is already on the next calendar day, so a phone-zone
+// date would show the wrong day.
 
 const assert = require("node:assert/strict");
 const { WITH_PLAN, open, until, text, expectText } = require("./helpers.cjs");
 
-const jp = (iso) => Date.parse(iso + "+09:00");
+const chi = (iso) => Date.parse(iso + "-06:00");
 const tk = (date) => '#rail .pg[data-date="' + date + '"]';
 const row = (id) => '.r[data-id="' + id + '"]';
 
@@ -42,25 +43,25 @@ const inView = (page) =>
   });
 
 const TRIP = [
-  { at: "2026-12-12T23:50:00", label: "just before Tokyo midnight", day: "2026-12-12", count: /^Day 3 of 11 ?today$/, used: "11000000000", next: "zonestop0002", leave: "Leave by 23:53, in 3 min." },
-  { at: "2026-12-13T00:10:00", label: "just after Tokyo midnight", day: "2026-12-13", count: /^Day 4 of 11 ?today$/, used: "11100000000", next: "zonestop0003", leave: "Leave by 00:20, in 10 min." },
-  { at: "2026-12-12T15:00:00", label: "mid-afternoon in Tokyo", day: "2026-12-12", count: /^Day 3 of 11 ?today$/, used: "11000000000", next: "zonestop0001", leave: "Leave by 15:30, in 30 min." },
+  { at: "2026-12-12T23:50:00", label: "just before Chicago midnight", day: "2026-12-12", count: /^Day 3 of 11 ?today$/, used: "11000000000", next: "zonestop0002", leave: "Leave by 23:53, in 3 min." },
+  { at: "2026-12-13T00:10:00", label: "just after Chicago midnight", day: "2026-12-13", count: /^Day 4 of 11 ?today$/, used: "11100000000", next: "zonestop0003", leave: "Leave by 00:20, in 10 min." },
+  { at: "2026-12-12T15:00:00", label: "mid-afternoon in Chicago", day: "2026-12-12", count: /^Day 3 of 11 ?today$/, used: "11000000000", next: "zonestop0001", leave: "Leave by 15:30, in 30 min." },
 ];
 const BEFORE = [
-  { at: "2026-12-09T23:50:00", label: "just before Tokyo midnight on the eve", count: /^Day 1 of 11 ?tomorrow$/, countdown: "あと1日" },
-  { at: "2026-12-10T00:10:00", label: "just after Tokyo midnight on Day 1", count: /^Day 1 of 11 ?today$/, countdown: null },
-  { at: "2026-11-15T15:00:00", label: "mid-afternoon in Tokyo, weeks before", count: /^Day 1 of 11 ?in 25 days$/, countdown: "あと25日" },
+  { at: "2026-12-09T23:50:00", label: "just before Chicago midnight on the eve", count: /^Day 1 of 11 ?tomorrow$/, countdown: "あと1日" },
+  { at: "2026-12-10T00:10:00", label: "just after Chicago midnight on Day 1", count: /^Day 1 of 11 ?today$/, countdown: null },
+  { at: "2026-11-15T15:00:00", label: "mid-afternoon in Chicago, weeks before", count: /^Day 1 of 11 ?in 25 days$/, countdown: "あと25日" },
 ];
 
 const cases = [];
-for (const zone of ["America/Toronto", "America/Vancouver"]) {
+for (const zone of ["America/Toronto", "Asia/Tokyo"]) {
   for (const t of TRIP) {
     cases.push({
-      name: zone + ", " + t.label + ": today's ticket, used days and leave-by follow Japan",
+      name: zone + ", " + t.label + ": today's ticket, used days and leave-by follow Chicago",
       timezoneId: zone,
       async run({ page }) {
-        await ready(page, jp(t.at));
-        assert.notEqual(await page.evaluate(() => Intl.DateTimeFormat().resolvedOptions().timeZone), "Asia/Tokyo");
+        await ready(page, chi(t.at));
+        assert.equal(await page.evaluate(() => Intl.DateTimeFormat().resolvedOptions().timeZone), zone);
         await expectText(page, "#dayCount", t.count);
         await until(async () => (await inView(page)) === t.day, "today's ticket is in view");
         assert.equal(await used(page), t.used);
@@ -72,10 +73,10 @@ for (const zone of ["America/Toronto", "America/Vancouver"]) {
   }
   for (const t of BEFORE) {
     cases.push({
-      name: zone + ", " + t.label + ": the countdown follows Japan",
+      name: zone + ", " + t.label + ": the countdown follows Chicago",
       timezoneId: zone,
       async run({ page }) {
-        await ready(page, jp(t.at));
+        await ready(page, chi(t.at));
         await expectText(page, "#dayCount", t.count);
         assert.equal(await used(page), "00000000000");
         const d10 = await text(page, tk("2026-12-10") + " .tk-date");

@@ -43,7 +43,7 @@ const plain = (cents) => Math.floor(cents / 100) + "." + String(cents % 100).pad
 export function remindText(me, transfer, people) {
   const mine = (people || []).find((p) => p.name === me);
   const address = mine && mine.etransfer ? String(mine.etransfer).trim() : "";
-  return transfer.from + ", you owe me " + dollars(transfer.cents) + " for the Japan trip." + (address ? " e-Transfer: " + address : "");
+  return transfer.from + ", you owe me " + dollars(transfer.cents) + " for the Chicago trip." + (address ? " e-Transfer: " + address : "");
 }
 
 function el(tag, cls, text) {

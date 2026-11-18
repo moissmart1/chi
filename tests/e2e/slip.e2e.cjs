@@ -178,7 +178,7 @@ module.exports = [
         const s = await page.evaluate(() => globalThis.__shared);
         return s.length ? s : null;
       }, "share is called");
-      assert.deepEqual(shared, [{ text: "Mo, you owe me $10.00 for the Japan trip. e-Transfer: t@example.com" }]);
+      assert.deepEqual(shared, [{ text: "Mo, you owe me $10.00 for the Chicago trip. e-Transfer: t@example.com" }]);
       assert.equal(await visible(page, "#ubar"), false, "a share says nothing on the bar");
     },
   },
@@ -202,7 +202,7 @@ module.exports = [
       await waitRows(page, ["Mo → you $10.00"]);
       await page.click('#slip button.remind[data-key="Mo>Trenton"]');
       await expectText(page, "#ubarT", "Copied. Paste it in your chat.");
-      assert.equal(await page.evaluate(() => navigator.clipboard.readText()), "Mo, you owe me $10.00 for the Japan trip.");
+      assert.equal(await page.evaluate(() => navigator.clipboard.readText()), "Mo, you owe me $10.00 for the Chicago trip.");
     },
   },
   {

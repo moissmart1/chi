@@ -78,9 +78,10 @@ function newId_() {
   return "m" + Utilities.getUuid().replace(/-/g, "").slice(0, 19);
 }
 
-// Today, "YYYY-MM-DD", in the Trip tab's time zone.
+// Today, "YYYY-MM-DD", in the trip's time zone (TRIP_TZ_ in Pure.js; the
+// Trip tab's tz must agree with it).
 function today_() {
-  return Utilities.formatDate(new Date(), tripInfo_().tz || "Asia/Tokyo", "yyyy-MM-dd");
+  return Utilities.formatDate(new Date(), TRIP_TZ_, "yyyy-MM-dd");
 }
 
 // The token the Claude connector checks (Mcp.js), or null when there is none.

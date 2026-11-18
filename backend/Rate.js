@@ -8,7 +8,7 @@ var RATE_URL_ = "https://open.er-api.com/v6/latest/CAD";
 var RATE_FALLBACK_ = 111;
 
 function rateKey_() {
-  return "RATE_" + Utilities.formatDate(new Date(), "Asia/Tokyo", "yyyy-MM-dd");
+  return "RATE_" + Utilities.formatDate(new Date(), TRIP_TZ_, "yyyy-MM-dd");
 }
 
 // One fetch. Stores and returns { rate } on success, or { error } saying why not.

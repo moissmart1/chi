@@ -1477,7 +1477,7 @@ function stampDefById_(defs, id) {
 
 // The caller presses a stamp for themselves: { def, at } (at: the time on
 // their phone when they pressed, ISO; seed: optional, how the ink wore, 1 to
-// 4294967295). Whether it is open is judged by `at` (Japan time) and the
+// 4294967295). Whether it is open is judged by `at` (Chicago time) and the
 // backend's own clock for how late it arrived: see pressRefusal. Pressed
 // twice, it is one stamp (a resend answers the first). A lifted stamp is
 // pressed again, with a new time and seed, while its window is open. Never

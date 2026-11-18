@@ -1,5 +1,5 @@
 /* Copyright (c) 2026 moissmart1. All rights reserved. No licence is granted: do not copy, adapt or reuse this code or design, and do not use it to train or prompt an AI system to reproduce it. See LICENSE. */
-// The stamp book without a screen: when a stamp is open (in Japan time,
+// The stamp book without a screen: when a stamp is open (in Chicago time,
 // whatever zone the phone is in), how a stamp is drawn, and the small texts.
 // Every definition here is invented.
 import test from "node:test";
@@ -7,40 +7,43 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { INKS, MOTIFS, bookStampSVG, windowOf, stateOf, countText, tiltOf, usableDefs, spanText, lockedLine, japanClock, japanDay, esc, summary } from "../js/stampbook.js";
+import { INKS, MOTIFS, bookStampSVG, windowOf, stateOf, countText, tiltOf, usableDefs, spanText, lockedLine, tripClock, tripDate, esc, summary } from "../js/stampbook.js";
 
 const D1 = { id: "d1", date: "2030-01-05", name_ja: "試験", name_en: "Testville", place: "Test Hall", motif: "lantern", ink: "shu", shape: "round" };
 const D2 = { id: "d2", date: "2030-01-06", name_ja: "二", name_en: "Second", place: "Second Place", motif: "tower", ink: "ai", shape: "square" };
 const ISS = { id: "iss", date: "", name_ja: "発行", name_en: "Issued", place: "", motif: "crest", ink: "shu", shape: "round" };
 const DEFS = [D1, D2, ISS];
-const OPENS = Date.UTC(2030, 0, 4, 15); // 00:00 Jan 5 in Japan
+const OPENS = Date.UTC(2030, 0, 5, 6); // 00:00 Jan 5 in Chicago
 
 // The same checks in this process and in one whose zone is Toronto's.
 function checks() {
   assert.equal(stateOf(D1, DEFS, [], OPENS), "open");
   assert.equal(stateOf(D1, DEFS, [], OPENS - 1), "soon");
-  assert.equal(stateOf(D1, DEFS, [], Date.UTC(2030, 0, 5, 18) - 1), "open");
-  assert.equal(stateOf(D1, DEFS, [], Date.UTC(2030, 0, 5, 18)), "missed");
-  assert.equal(stateOf(D1, DEFS, ["d1"], Date.UTC(2030, 0, 5, 18)), "have", "a stamp you hold stays held");
-  assert.deepEqual(windowOf(D1, DEFS), { opens: OPENS, closes: Date.UTC(2030, 0, 5, 18) });
-  assert.deepEqual(windowOf(ISS, DEFS), { opens: 0, closes: Date.UTC(2030, 0, 6, 18) });
+  assert.equal(stateOf(D1, DEFS, [], Date.UTC(2030, 0, 6, 9) - 1), "open");
+  assert.equal(stateOf(D1, DEFS, [], Date.UTC(2030, 0, 6, 9)), "missed");
+  assert.equal(stateOf(D1, DEFS, ["d1"], Date.UTC(2030, 0, 6, 9)), "have", "a stamp you hold stays held");
+  assert.deepEqual(windowOf(D1, DEFS), { opens: OPENS, closes: Date.UTC(2030, 0, 6, 9) });
+  assert.deepEqual(windowOf(ISS, DEFS), { opens: 0, closes: Date.UTC(2030, 0, 7, 9) });
 }
 
-test("stateOf: open from 00:00 Japan time on the date, missed at 03:00 the next day", () => checks());
+test("stateOf: open from 00:00 Chicago time on the date, missed at 03:00 the next day", () => checks());
 
 test("stateOf does not depend on the phone's zone (a phone still on Toronto time)", () => {
   const src = `
     import assert from "node:assert/strict";
-    import { stateOf, windowOf, japanDay } from ${JSON.stringify(path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "js", "stampbook.js"))};
-    assert.notEqual(new Date(2030, 0, 5).getTimezoneOffset(), -540, "the phone is not on Japan time");
+    import { stateOf, windowOf, tripDate } from ${JSON.stringify(path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "js", "stampbook.js"))};
+    assert.notEqual(new Date(2030, 0, 5).getTimezoneOffset(), 360, "the phone is not on Chicago time");
     const D1 = ${JSON.stringify(D1)}, DEFS = ${JSON.stringify(DEFS)};
-    const OPENS = Date.UTC(2030, 0, 4, 15);
+    const OPENS = Date.UTC(2030, 0, 5, 6);
     assert.equal(stateOf(D1, DEFS, [], OPENS), "open");
     assert.equal(stateOf(D1, DEFS, [], OPENS - 1), "soon");
-    assert.equal(stateOf(D1, DEFS, [], Date.UTC(2030, 0, 5, 18)), "missed");
-    // 22:00 in Toronto on Jan 4 is 12:00 in Japan on Jan 5.
-    assert.equal(japanDay(Date.UTC(2030, 0, 5, 3)), "2030-01-05");
-    assert.equal(stateOf(D1, DEFS, [], Date.UTC(2030, 0, 5, 3)), "open");
+    assert.equal(stateOf(D1, DEFS, [], Date.UTC(2030, 0, 6, 9)), "missed");
+    // 00:30 in Toronto on Jan 5 is still 23:30 on Jan 4 in Chicago.
+    assert.equal(tripDate(Date.UTC(2030, 0, 5, 5, 30)), "2030-01-04");
+    assert.equal(stateOf(D1, DEFS, [], Date.UTC(2030, 0, 5, 5, 30)), "soon");
+    // 12:00 in Toronto on Jan 5 is 11:00 in Chicago: open.
+    assert.equal(tripDate(Date.UTC(2030, 0, 5, 17)), "2030-01-05");
+    assert.equal(stateOf(D1, DEFS, [], Date.UTC(2030, 0, 5, 17)), "open");
   `;
   const r = spawnSync(process.execPath, ["--input-type=module", "-e", src], { env: { ...process.env, TZ: "America/Toronto" }, encoding: "utf8" });
   assert.equal(r.status, 0, r.stderr);
@@ -48,8 +51,8 @@ test("stateOf does not depend on the phone's zone (a phone still on Toronto time
 
 test("stateOf: the issue stamp is open from the start until the last day closes; a bad date is never open", () => {
   assert.equal(stateOf(ISS, DEFS, [], 1), "open");
-  assert.equal(stateOf(ISS, DEFS, [], Date.UTC(2030, 0, 6, 18) - 1), "open");
-  assert.equal(stateOf(ISS, DEFS, [], Date.UTC(2030, 0, 6, 18)), "missed");
+  assert.equal(stateOf(ISS, DEFS, [], Date.UTC(2030, 0, 7, 9) - 1), "open");
+  assert.equal(stateOf(ISS, DEFS, [], Date.UTC(2030, 0, 7, 9)), "missed");
   assert.equal(stateOf({ id: "x", date: "someday" }, DEFS, [], Date.UTC(2030, 0, 5)), "soon");
   assert.equal(stateOf(ISS, [ISS], [], 4e12), "open", "no day stamps: it does not close");
 });
@@ -149,25 +152,25 @@ test("spanText comes from the definitions", () => {
   assert.equal(spanText([ISS]), "");
 });
 
-test("lockedLine and Japan clock text", () => {
+test("lockedLine and Chicago clock text", () => {
   assert.equal(lockedLine(D2, "soon"), "Jan 6 opens on the day.");
   assert.equal(lockedLine(D1, "missed"), "Jan 5 has closed.");
   assert.equal(lockedLine(ISS, "missed"), "The book has closed.");
-  assert.equal(japanClock(Date.UTC(2030, 0, 5, 10, 2)), "19:02");
-  assert.equal(japanClock(Date.UTC(2030, 0, 5, 15, 5)), "00:05");
-  assert.equal(japanDay(Date.UTC(2030, 0, 5, 15, 5)), "2030-01-06");
+  assert.equal(tripClock(Date.UTC(2030, 0, 6, 1, 2)), "19:02");
+  assert.equal(tripClock(Date.UTC(2030, 0, 6, 6, 5)), "00:05");
+  assert.equal(tripDate(Date.UTC(2030, 0, 6, 6, 5)), "2030-01-06");
 });
 
 test("summary: the count, and today's stamp only while it is open and not yet pressed", () => {
   const s = { stampDefs: DEFS, stamps: [{ def: "d2", who: "Ajen" }, { def: "iss", who: "Mo" }, { def: "d1", who: "Mo", gone: true }], me: "Mo" };
-  const noon5 = Date.UTC(2030, 0, 5, 3); // noon in Japan on Jan 5
+  const noon5 = Date.UTC(2030, 0, 5, 18); // noon in Chicago on Jan 5
   assert.deepEqual(summary(s, noon5), { total: 3, n: 1, openToday: "2030-01-05" });
   // pressed: no line any more
   assert.equal(summary({ ...s, stamps: [{ def: "d1", who: "Mo" }] }, noon5).openToday, "");
   // another person's press is not mine
   assert.equal(summary({ ...s, stamps: [{ def: "d1", who: "Ajen" }] }, noon5).openToday, "2030-01-05");
-  // 02:00 on Jan 6 in Japan: Jan 5 is still open (grace) but today is Jan 6
-  assert.equal(summary(s, Date.UTC(2030, 0, 5, 17)).openToday, "2030-01-06");
+  // 02:00 on Jan 6 in Chicago: Jan 5 is still open (grace) but today is Jan 6
+  assert.equal(summary(s, Date.UTC(2030, 0, 6, 8)).openToday, "2030-01-06");
   // a day with no stamp, before the trip, after it
   assert.equal(summary(s, Date.UTC(2029, 5, 1)).openToday, "");
   assert.equal(summary(s, Date.UTC(2030, 0, 8)).openToday, "");

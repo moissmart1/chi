@@ -1,14 +1,14 @@
 // Today on the ticket: used days, the faded and the next stop, leave-by,
 // fixed times, the open stop, and the countdown before the trip.
 // The plan is tests/fixtures/plan.json over the seed; the clock is 13:20 on
-// Dec 12 in Japan (Day 3) unless a case says otherwise.
+// Dec 12 in Chicago (Day 3) unless a case says otherwise.
 
 const assert = require("node:assert/strict");
 const path = require("path");
 const { pathToFileURL } = require("url");
 const { WITH_PLAN, SEED, NOON12, makeBackend, open, advance, until, text, expectText } = require("./helpers.cjs");
 
-const jp = (iso) => Date.parse(iso + "+09:00");
+const chi = (iso) => Date.parse(iso + "-06:00");
 
 async function ready(page, opts = {}) {
   const backend = await open(page, { seed: WITH_PLAN, tab: "days", ...opts });
@@ -209,7 +209,7 @@ module.exports = [
     // closes (the browser itself pulls a page back up that got shorter).
     viewport: { width: 390, height: 600 },
     async run({ page }) {
-      const backend = await ready(page, { nowMs: jp("2026-12-12T13:59:00") });
+      const backend = await ready(page, { nowMs: chi("2026-12-12T13:59:00") });
       await until(async () => (await has(page, row(SKY), "is-next")) && (await has(page, row(SKY), "is-open")), "Sky is next and open");
       await settled(page, "2026-12-12");
       // Scrolled down a little, as someone reading the ticket would be.
@@ -243,7 +243,7 @@ module.exports = [
   {
     name: "a stop opened by hand stays open when a late stop stops being next (R38, R32)",
     async run({ page }) {
-      const backend = await ready(page, { nowMs: jp("2026-12-12T14:01:00") });
+      const backend = await ready(page, { nowMs: chi("2026-12-12T14:01:00") });
       await until(async () => (await text(page, row(SKY) + " .r-lv")) === "Now.", "Sky says Now.");
       await settled(page, "2026-12-12");
       await tap(page, MEIJI);
@@ -259,8 +259,8 @@ module.exports = [
     name: "a late stop on a phone in Toronto (R38)",
     timezoneId: "America/Toronto",
     async run({ page }) {
-      await ready(page, { nowMs: jp("2026-12-12T14:20:00") });
-      assert.notEqual(await page.evaluate(() => Intl.DateTimeFormat().resolvedOptions().timeZone), "Asia/Tokyo");
+      await ready(page, { nowMs: chi("2026-12-12T14:20:00") });
+      assert.equal(await page.evaluate(() => Intl.DateTimeFormat().resolvedOptions().timeZone), "America/Toronto");
       await until(() => has(page, row(SKY), "is-next"), "Sky is next");
       assert.equal(await text(page, row(SKY) + " .r-lv"), "Now.");
       assert.equal(await has(page, row(SKY), "is-done"), false);
@@ -354,8 +354,8 @@ module.exports = [
     },
   },
   {
-    name: "Japan time on a phone in Toronto",
-    timezoneId: "America/Toronto",
+    name: "Chicago time on a phone in Tokyo (already the next morning there)",
+    timezoneId: "Asia/Tokyo",
     async run({ page }) {
       await ready(page);
       await expectText(page, "#dayCount", /^Day 3 of 11/);
@@ -366,7 +366,7 @@ module.exports = [
   {
     name: "midnight",
     async run({ page }) {
-      const backend = await ready(page, { nowMs: jp("2026-12-12T23:40:00") });
+      const backend = await ready(page, { nowMs: chi("2026-12-12T23:40:00") });
       assert.equal(await has(page, row(DINNER), "is-done"), true);
       await expectText(page, "#dayCount", /^Day 3 of 11/);
       assert.equal(await count(page, tk("2026-12-12") + " .insp"), 0);
@@ -382,7 +382,7 @@ module.exports = [
   {
     name: "before the trip",
     async run({ page, newPhone }) {
-      await ready(page, { nowMs: jp("2026-11-15T12:00:00") });
+      await ready(page, { nowMs: chi("2026-11-15T12:00:00") });
       await expectText(page, "#dayCount", /^Day 1 of 11 ?in 25 days$/);
       const d10 = await text(page, tk("2026-12-10") + " .tk-date");
       assert.ok(d10.includes("あと25日") && d10.includes("Valid in 25 days"), d10);
@@ -393,7 +393,7 @@ module.exports = [
       assert.ok((await text(page, tk("2026-12-11") + " .tk-date")).includes("当日限り有効"), "later days keep their line");
 
       const eve = await newPhone();
-      await ready(eve, { nowMs: jp("2026-12-09T12:00:00") });
+      await ready(eve, { nowMs: chi("2026-12-09T12:00:00") });
       await expectText(eve, "#dayCount", /^Day 1 of 11 ?tomorrow$/);
       const d10eve = await text(eve, tk("2026-12-10") + " .tk-date");
       assert.ok(d10eve.includes("あと1日"), d10eve);
@@ -402,7 +402,7 @@ module.exports = [
   {
     name: "after the trip",
     async run({ page }) {
-      await ready(page, { nowMs: jp("2026-12-25T12:00:00") });
+      await ready(page, { nowMs: chi("2026-12-25T12:00:00") });
       await expectText(page, "#dayCount", /^Day 11 of 11/);
       assert.equal(await count(page, "#rail .tk .insp"), 11);
     },
@@ -462,7 +462,7 @@ module.exports = [
   {
     name: "the clock rests while Money is showing",
     async run({ page }) {
-      const backend = await ready(page, { nowMs: jp("2026-12-12T13:20:50") });
+      const backend = await ready(page, { nowMs: chi("2026-12-12T13:20:50") });
       await until(async () => (await text(page, row(SKY) + " .r-s")).includes("in 10 min."), "Sky reads 10 min");
       await page.click('[data-tab="money"]');
       await until(() => page.evaluate(() => document.getElementById("vMoney").classList.contains("is-active")), "Money shows");
@@ -523,7 +523,7 @@ module.exports = [
   {
     name: "back after a night away, on today's ticket",
     async run({ page }) {
-      const backend = await ready(page, { nowMs: jp("2026-12-12T23:40:00") });
+      const backend = await ready(page, { nowMs: chi("2026-12-12T23:40:00") });
       await expectText(page, "#dayCount", /^Day 3 of 11 ?today$/);
       await setHidden(page, true);
       await advance(page, backend, 50 * 60000);
@@ -535,7 +535,7 @@ module.exports = [
   {
     name: "back on Days after a night on Money, on today's ticket",
     async run({ page }) {
-      const backend = await ready(page, { nowMs: jp("2026-12-12T23:40:00") });
+      const backend = await ready(page, { nowMs: chi("2026-12-12T23:40:00") });
       await expectText(page, "#dayCount", /^Day 3 of 11 ?today$/);
       await page.click('[data-tab="money"]');
       await until(() => page.evaluate(() => document.getElementById("vMoney").classList.contains("is-active")), "Money shows");
@@ -548,7 +548,7 @@ module.exports = [
   {
     name: "opened on Money, Days first tapped the next day, on today's ticket",
     async run({ page }) {
-      const backend = await open(page, { seed: WITH_PLAN, tab: "money", nowMs: jp("2026-12-12T23:40:00") });
+      const backend = await open(page, { seed: WITH_PLAN, tab: "money", nowMs: chi("2026-12-12T23:40:00") });
       await until(() => page.evaluate(() => document.getElementById("vMoney").classList.contains("is-active")), "Money shows");
       await until(() => page.evaluate(() => document.querySelectorAll("#rail .pg .tk").length === 11), "the tickets draw");
       await advance(page, backend, 50 * 60000);

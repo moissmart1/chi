@@ -2750,8 +2750,8 @@ const SDEFS = [
   { id: "d2", date: "2030-01-06", name_ja: "二", name_en: "Second", place: "Second Place", motif: "tower", ink: "ai", shape: "square" },
   { id: "iss", date: "", name_ja: "発行", name_en: "Issued", place: "", motif: "crest", ink: "shu", shape: "round" },
 ];
-// 10:00 in Japan on Jan 5 2030, inside d1's window.
-const IN_D1 = Date.UTC(2030, 0, 5, 1);
+// 10:00 in Chicago on Jan 5 2030, inside d1’s window.
+const IN_D1 = Date.UTC(2030, 0, 5, 16);
 const HOUR = 3600000;
 const CLOSED_LINE = "That stamp’s day has closed.";
 

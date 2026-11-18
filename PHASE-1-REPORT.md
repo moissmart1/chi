@@ -7,7 +7,7 @@ Survey: `triplit/docs/superpowers/specs/2026-11-17-second-trip-survey.md`.
 
 - [x] 0. Isolation commit (storage prefix, sw caches, manifest, titles, API_URL empty, changes.html gone, isolation test)
 - [x] 1. One place for the trip's constants (js/trip.js, backend/Pure.js top, tripMismatch in load and setup)
-- [ ] 2. Time zone
+- [x] 2. Time zone
 - [ ] 3. Currency
 - [ ] 4. Two people
 - [ ] 5. The trip's own seed
@@ -33,6 +33,14 @@ Survey: `triplit/docs/superpowers/specs/2026-11-17-second-trip-survey.md`.
 - `load` refuses a Trip tab whose `tz`/`home`/`currency` disagree (`wrong_trip`, a sentence naming each); the phone shows that sentence on the gate (`state.tripProblem`). `setup` throws the same sentence.
 - MY CALL: the seed's Trip `tz`/`home`/`currency` were set from the constants in this commit (not in item 5), because with the check in place the Japan seed would refuse to load. Two connector tests that judged "today" moved to Chicago instants here.
 - `tests/trip.test.js`: phone/backend agreement, the facts, every hour from the first day to 03:00 after the last has offset −6 h, tripMismatch, seed agrees.
+
+### 2. Time zone
+- One trip clock: `TRIP_TZ` for every "today" (time.js `tripDay` no longer reads `trip.tz`), the demo clock, the remembered tab day, Days, All days, the Before tab's pre-trip check. The `|| "Asia/Tokyo"` fallbacks are gone.
+- `js/time.js` `tripDate`/`tripClock` (fixed offset); the stamp book uses them (was `japanDay`/`japanClock`); `backend/Pure.js` stamp window uses `TRIP_UTC_OFFSET_MS_`. `tests/trip.test.js` feeds both sides the same instants around every trip day (and New Year's Eve to 03:00 Jan 1).
+- Backend: `today_` (Env.js) and the rate's day key (Rate.js) use `TRIP_TZ_`; `appsscript.json` timeZone `America/Chicago`; connector text "today in Chicago".
+- History: day headings and times on the trip's clock (plan). MY CALL: the line sheet's "Rung up by …, <day>" follows History (the two were pinned together by a test); the slip's "Paid <day>." stays the phone's own day (an explicit earlier rule, not named in the plan).
+- Wording: "Japan time" → "Chicago time" in comments and test names; the remind message says "for the Chicago trip."
+- Tests: unit instants moved from +09:00 to −06:00 (stamp windows shifted 15 h). e2e: phones default to America/Chicago; `NOON12` is 13:20 Chicago; `SEEDED_AT` is 09:00 Nov 20 Chicago; `zones` rewritten for a phone in Toronto and one in Tokyo; the Toronto cases that relied on a 14-hour gap now use a Tokyo phone (stamp "Paid", stamp book "today") or a late Chicago instant (History).
 
 ## Tests deleted (and why)
 

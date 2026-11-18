@@ -46,10 +46,10 @@ test("Remind says who, how much and where to send it", () => {
   const people = [{ name: "Mo", etransfer: "mo@example.com" }];
   assert.equal(
     remindText("Mo", { from: "Ajen", to: "Mo", cents: 25030 }, people),
-    "Ajen, you owe me $250.30 for the Japan trip. e-Transfer: mo@example.com",
+    "Ajen, you owe me $250.30 for the Chicago trip. e-Transfer: mo@example.com",
   );
-  assert.equal(remindText("Mo", { from: "Ajen", to: "Mo", cents: 25030 }, [{ name: "Mo", etransfer: "" }]), "Ajen, you owe me $250.30 for the Japan trip.");
-  assert.equal(remindText("Mo", { from: "Ajen", to: "Mo", cents: 25030 }, []), "Ajen, you owe me $250.30 for the Japan trip.");
+  assert.equal(remindText("Mo", { from: "Ajen", to: "Mo", cents: 25030 }, [{ name: "Mo", etransfer: "" }]), "Ajen, you owe me $250.30 for the Chicago trip.");
+  assert.equal(remindText("Mo", { from: "Ajen", to: "Mo", cents: 25030 }, []), "Ajen, you owe me $250.30 for the Chicago trip.");
 });
 
 test("what was sent is read as dollars and cents, on the string", () => {

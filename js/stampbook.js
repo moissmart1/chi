@@ -12,15 +12,17 @@
 // the last day stamp closes). Every text here goes into markup only through
 // esc(), so a name that holds markup is shown as text.
 //
-// When a stamp is open is decided in Japan time (fixed UTC+9), never in the
-// phone's own zone, and by the same numbers as the backend's stampWindow
-// (backend/Pure.js): 00:00 on its date until 03:00 the next day, 27 hours.
+// When a stamp is open is decided in the trip's time (Chicago, fixed UTC−6:
+// js/trip.js), never in the phone's own zone, and by the same numbers as the
+// backend's stampWindow (backend/Pure.js): 00:00 on its date until 03:00 the
+// next day, 27 hours.
 
 import { rng, wear } from "./stamp.js";
+import { TRIP_UTC_OFFSET_MS } from "./trip.js";
+import { tripDate, tripClock } from "./time.js";
 
 export const INKS = { shu: "#D63C1E", matsu: "#2B6A4C", ai: "#28408F" };
 
-const JAPAN_MS = 9 * 3600000;
 const OPEN_MS = 27 * 3600000;
 const DAY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const WD = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -66,7 +68,7 @@ export const MOTIFS = {
   crest: crest(),
 };
 
-// ---- dates and Japan time ----
+// ---- dates and the trip's time ----
 
 const validDay = (s) => {
   const m = typeof s === "string" ? DAY_RE.exec(s) : null;
@@ -74,20 +76,11 @@ const validDay = (s) => {
   const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
   return d.getUTCFullYear() === Number(m[1]) && d.getUTCMonth() === Number(m[2]) - 1 && d.getUTCDate() === Number(m[3]);
 };
-const dayStart = (s) => Date.UTC(Number(s.slice(0, 4)), Number(s.slice(5, 7)) - 1, Number(s.slice(8, 10))) - JAPAN_MS;
+const dayStart = (s) => Date.UTC(Number(s.slice(0, 4)), Number(s.slice(5, 7)) - 1, Number(s.slice(8, 10))) - TRIP_UTC_OFFSET_MS;
 const dateOf = (def) => (def && typeof def.date === "string" ? def.date : "");
 
-// The Japan calendar day of a moment, "YYYY-MM-DD".
-export function japanDay(ms) {
-  const d = new Date(ms + JAPAN_MS);
-  return d.getUTCFullYear() + "-" + String(d.getUTCMonth() + 1).padStart(2, "0") + "-" + String(d.getUTCDate()).padStart(2, "0");
-}
-
-// The Japan clock time of a moment, "19:02".
-export function japanClock(ms) {
-  const d = new Date(ms + JAPAN_MS);
-  return String(d.getUTCHours()).padStart(2, "0") + ":" + String(d.getUTCMinutes()).padStart(2, "0");
-}
+// The trip's calendar day and clock time of a moment (js/time.js).
+export { tripDate, tripClock };
 
 // "Dec 13", "Sat Dec 12", "Sat", "12" and "12.13" (M.D) of a YYYY-MM-DD.
 export const monthDay = (s) => MON[Number(s.slice(5, 7)) - 1] + " " + Number(s.slice(8, 10));
@@ -239,12 +232,12 @@ export function bookStampSVG(seed, def, defs) {
 // time: { total, n, openToday } where total is the stamps the book has (0:
 // nothing to show), n how many of them this person has, and openToday the
 // date of today's stamp when it is open and not pressed yet (else "").
-// Today is the Japan calendar day, whatever zone the phone is in.
+// Today is the trip's calendar day, whatever zone the phone is in.
 export function summary(s, nowMs) {
   const defs = usableDefs(s && s.stampDefs);
   const mine = new Set();
   for (const x of Array.isArray(s && s.stamps) ? s.stamps : []) if (x && x.who === s.me && !x.gone) mine.add(x.def);
-  const today = japanDay(nowMs);
+  const today = tripDate(nowMs);
   const day = defs.find((d) => dateOf(d) === today);
   return {
     total: defs.length,

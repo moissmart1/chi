@@ -10,7 +10,7 @@ const { SEED, NOON12, open, advance, until, text, expectText, visible } = requir
 // ---- small tools for this file ----
 
 const NAMES = ["Mo", "Ajen", "Trenton"];
-const TODAY = "Sat Dec 12"; // NOON12, on Japan time
+const TODAY = "Sat Dec 12"; // NOON12, on Chicago time
 const money = () => import("../../js/money.js");
 const fmt = () => import("../../js/format.js");
 
@@ -453,8 +453,8 @@ module.exports = [
     },
   },
   {
-    name: "on a phone in Toronto a stamp made at 13:20 on Sat Dec 12 in Japan reads 'Paid Fri Dec 11.' (the phone's own day)",
-    timezoneId: "America/Toronto",
+    name: "on a phone in Tokyo a stamp made at 13:20 on Sat Dec 12 in Chicago reads 'Paid Sun Dec 13.' (the phone's own day)",
+    timezoneId: "Asia/Tokyo",
     async run({ page }) {
       const backend = await ready(page);
       await waitOpen(page, 2);
@@ -462,9 +462,9 @@ module.exports = [
       await page.click(spot("Ajen>Mo"));
       await until(async () => (await paidRows(page)).length === 1, "a stamped row");
       await idle(page);
-      // 13:20 Sat Dec 12 in Japan is 23:20 Fri Dec 11 in Toronto.
+      // 13:20 Sat Dec 12 in Chicago is 04:20 Sun Dec 13 in Tokyo.
       const [paid] = await paidRows(page);
-      assert.equal(paid.sub, "Paid Fri Dec 11. Nothing more to send.");
+      assert.equal(paid.sub, "Paid Sun Dec 13. Nothing more to send.");
       assert.equal(new Date(saved(backend)[0].stampedAt).getTime(), NOON12);
     },
   },

@@ -2,7 +2,7 @@
 // next stop is brought on screen when Days opens and on a deliberate jump,
 // never on a minute tick or a sync; a swipe to a short day after scrolling
 // down a long one shows the new ticket's top, not blank ground.
-// Dec 12 has ten stops; at 13:20 in Japan the next is the 8th (13:30).
+// Dec 12 has ten stops; at 13:20 in Chicago the next is the 8th (13:30).
 // Dec 11 has two.
 
 const assert = require("node:assert/strict");

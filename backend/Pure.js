@@ -1157,9 +1157,9 @@ function todoFromRow(o) {
 
 // ---- the stamp book ----
 
-// Japan time is fixed UTC+9 (no daylight saving). A day stamp is open from
-// 00:00 on its date until 03:00 the next day: 27 hours.
-var JAPAN_OFFSET_MS_ = 9 * 3600000;
+// Judged in the trip's time at its fixed offset (TRIP_UTC_OFFSET_MS_ above;
+// js/stampbook.js does the same). A day stamp is open from 00:00 on its date
+// until 03:00 the next day: 27 hours.
 var STAMP_OPEN_MS_ = 27 * 3600000;
 var STAMP_LATE_MS_ = 48 * 3600000;
 var STAMP_AHEAD_MS_ = 5 * 60000;
@@ -1172,7 +1172,7 @@ function shortDay_(date) {
 }
 
 // When a stamp can be pressed, as epoch ms { opens, closes }. A day stamp
-// (date YYYY-MM-DD): from 00:00 Japan time on that date for 27 hours. The
+// (date YYYY-MM-DD): from 00:00 Chicago time on that date for 27 hours. The
 // issue stamp (date ""): from the beginning until the last day stamp closes
 // (never, when the book has no day stamps). Any other date: never open.
 function stampWindow(def, defs) {
@@ -1183,13 +1183,13 @@ function stampWindow(def, defs) {
     for (var i = 0; i < list.length; i++) {
       var d = cellDate_(list[i] && list[i].date);
       if (d === "" || !validDay_(d)) continue;
-      var c = Date.UTC(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8, 10))) - JAPAN_OFFSET_MS_ + STAMP_OPEN_MS_;
+      var c = Date.UTC(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8, 10))) - TRIP_UTC_OFFSET_MS_ + STAMP_OPEN_MS_;
       if (latest === null || c > latest) latest = c;
     }
     return { opens: 0, closes: latest === null ? Infinity : latest };
   }
   if (!validDay_(date)) return { opens: Infinity, closes: -Infinity };
-  var opens = Date.UTC(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, Number(date.slice(8, 10))) - JAPAN_OFFSET_MS_;
+  var opens = Date.UTC(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, Number(date.slice(8, 10))) - TRIP_UTC_OFFSET_MS_;
   return { opens: opens, closes: opens + STAMP_OPEN_MS_ };
 }
 

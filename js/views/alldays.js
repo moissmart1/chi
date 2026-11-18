@@ -14,6 +14,7 @@
 
 import { dayState, nowIn, header } from "../plan.js";
 import { dayHead } from "../format.js";
+import { TRIP_TZ } from "../trip.js";
 
 const MARKUP = `
 <div class="sheet-top"><span>All days</span><button type="button" id="allDaysDone">Done</button></div>
@@ -73,7 +74,7 @@ export function mountAllDays(root, store, { clock, onPick = () => {} } = {}) {
   function draw() {
     const s = store.state;
     const days = list(s.days).filter((d) => d && typeof d.date === "string" && d.date);
-    const tz = (s.trip && s.trip.tz) || "Asia/Tokyo";
+    const tz = TRIP_TZ;
     const today = nowIn(tz, clock.now()).date;
     // Everything a row prints: its number and date, city, title, colour, today/used.
     const sig = JSON.stringify(days.map((d) => {

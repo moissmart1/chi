@@ -1,7 +1,7 @@
 // Adding, changing and removing stops: the ＋ Add a stop row on each ticket,
 // the Edit button on an open stop, the stop sheet (#stop) they open, the undo
 // bar and History. The plan is tests/fixtures/plan.json over the seed; the
-// clock is 13:20 on Dec 12 in Japan, Day 3 (Shibuya Sky at 14:00 is next).
+// clock is 13:20 on Dec 12 in Chicago, Day 3 (Shibuya Sky at 14:00 is next).
 
 const assert = require("node:assert/strict");
 const { WITH_PLAN, open, advance, until, text, expectText } = require("./helpers.cjs");
@@ -543,7 +543,7 @@ module.exports = [
   {
     name: "back after a night away with the stop sheet open: the rail and the sheet stay (R32)",
     async run({ page }) {
-      const backend = await ready(page, { nowMs: Date.parse("2026-12-12T23:40:00+09:00") });
+      const backend = await ready(page, { nowMs: Date.parse("2026-12-12T23:40:00-06:00") });
       await expectText(page, "#dayCount", /^Day 3 of 11 ?today$/);
       await openAdd(page);
       await page.fill("#stWhat", "Late ramen");

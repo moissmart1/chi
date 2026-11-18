@@ -8,7 +8,7 @@ const fs = require("fs");
 const { WITH_PLAN, NOON12, makeBackend, open, until } = require("./helpers.cjs");
 
 const HOUR = 3600000;
-const FIRST = Date.parse("2026-12-10T00:00:00+09:00");
+const FIRST = Date.parse("2026-12-10T00:00:00-06:00");
 const MOTIF = ["record", "sake", "tower", "lamp", "books", "snow", "mountain", "lantern", "onsen", "temple", "plane"];
 const DEFS = [
   ...MOTIF.map((motif, i) => ({

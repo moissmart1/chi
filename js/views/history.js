@@ -10,7 +10,8 @@
 // showing the notice and loading the first page again. Text from people or
 // the Sheet goes in with textContent only.
 
-import { clock, dayHead, localDay, viaText } from "../format.js";
+import { dayHead, viaText } from "../format.js";
+import { tripClock, tripDate } from "../time.js";
 
 const LOADING = "…";
 const NO_HISTORY = "History needs a connection.";
@@ -55,7 +56,7 @@ export function mountHistory(root, store) {
     const row = el("div", "tp-row" + (en.undoneBy ? " is-undone" : ""));
     row.dataset.id = en.id;
     const ms = Date.parse(en.at);
-    const when = el("time", "", isFinite(ms) ? clock(ms) : "");
+    const when = el("time", "", isFinite(ms) ? tripClock(ms) : "");
     const said = el("span", "tp-s");
     said.append(el("b", "", en.who), " " + en.summary);
     if (viaText(en.via)) said.append(el("i", "", viaText(en.via)));
@@ -93,7 +94,8 @@ export function mountHistory(root, store) {
     const nodes = [];
     let last = null;
     for (const en of h.entries) {
-      const day = localDay(Date.parse(en.at));
+      const at = Date.parse(en.at);
+      const day = isFinite(at) ? tripDate(at) : "";
       if (day !== last) {
         last = day;
         if (day) {

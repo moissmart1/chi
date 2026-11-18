@@ -62,3 +62,27 @@ test("the seed's Trip tab agrees with the app", () => {
   assert.equal(trip.home, T.HOME_CURRENCY);
   assert.equal(trip.currency, T.TRIP_CURRENCY);
 });
+
+test("the stamp window is the same on the phone and the backend: both fed the same instants around every trip day", async () => {
+  const { windowOf, stateOf } = await import("../js/stampbook.js");
+  const days = ["2026-12-26", "2026-12-27", "2026-12-28", "2026-12-29", "2026-12-30", "2026-12-31", "2027-01-01"];
+  const defs = days.map((date, i) => ({ id: "d" + i, date })).concat([{ id: "iss", date: "" }]);
+  for (const def of defs) {
+    const phone = windowOf(def, defs);
+    const back = P.stampWindow(def, defs);
+    assert.deepEqual([phone.opens, phone.closes], [back.opens, back.closes], def.id);
+    if (!def.date) continue;
+    // 00:00 Chicago on the date opens it; 03:00 the next day closes it.
+    assert.equal(phone.opens, Date.parse(def.date + "T00:00:00-06:00"), def.id);
+    assert.equal(phone.closes, Date.parse(def.date + "T00:00:00-06:00") + 27 * 3600000, def.id);
+    for (const ms of [phone.opens - 1, phone.opens, phone.closes - 1, phone.closes]) {
+      const open = stateOf(def, defs, [], ms) === "open";
+      assert.equal(open, P.pressRefusal(def, defs, ms, ms) === "", def.id + " at " + new Date(ms).toISOString());
+    }
+  }
+  // The New Year's Eve stamp: open at 23:59 on Dec 31 and at 02:59 on Jan 1, Chicago time.
+  const nye = defs[5];
+  assert.equal(P.pressRefusal(nye, defs, Date.parse("2026-12-31T23:59:00-06:00"), Date.parse("2026-12-31T23:59:00-06:00")), "");
+  assert.equal(P.pressRefusal(nye, defs, Date.parse("2027-01-01T02:59:00-06:00"), Date.parse("2027-01-01T02:59:00-06:00")), "");
+  assert.equal(P.pressRefusal(nye, defs, Date.parse("2027-01-01T03:00:00-06:00"), Date.parse("2027-01-01T03:00:00-06:00")), "closed");
+});

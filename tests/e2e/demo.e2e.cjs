@@ -3,12 +3,12 @@
 // 23:30). Only Days follows it: Money, the register's day, History times and
 // everything sent to the backend use the real time (R28). Nothing is stored,
 // so a reload ends it. The plan is tests/fixtures/plan.json over the seed; the
-// real time is Nov 15, 12:00 in Japan, before the trip.
+// real time is Nov 15, 12:00 in Chicago, before the trip.
 
 const assert = require("node:assert/strict");
 const { WITH_PLAN, open, advance, until, text, expectText, visible } = require("./helpers.cjs");
 
-const NOV15 = Date.parse("2026-11-15T12:00:00+09:00");
+const NOV15 = Date.parse("2026-11-15T12:00:00-06:00");
 const row = (id) => '.r[data-id="' + id + '"]';
 const MEIJI = "planstop1201";
 const SKY = "planstop1203";
@@ -295,7 +295,7 @@ module.exports = [
   {
     name: "R34 b: back on another real trip-zone day, the demo has ended",
     async run({ page }) {
-      const backend = await ready(page, { nowMs: Date.parse("2026-11-15T23:55:00+09:00") });
+      const backend = await ready(page, { nowMs: Date.parse("2026-11-15T23:55:00-06:00") });
       await tryDay(page, "Sat 12");
       await setHidden(page, true);
       await advance(page, backend, 8 * 60000); // 00:03 on Nov 16
@@ -346,7 +346,7 @@ module.exports = [
   {
     name: "R34 b: a visible phone on Days ends the demo when the real day rolls over, and its timers stop",
     async run({ page }) {
-      const backend = await ready(page, { nowMs: Date.parse("2026-11-15T23:55:00+09:00") });
+      const backend = await ready(page, { nowMs: Date.parse("2026-11-15T23:55:00-06:00") });
       // Every interval set from here on, with how often its callback has run.
       await page.evaluate(() => {
         const orig = window.setInterval.bind(window);
@@ -381,7 +381,7 @@ module.exports = [
   {
     name: "R34 b: with Money showing on a visible page, the demo ends at the date change too",
     async run({ page }) {
-      const backend = await ready(page, { nowMs: Date.parse("2026-11-15T23:55:00+09:00") });
+      const backend = await ready(page, { nowMs: Date.parse("2026-11-15T23:55:00-06:00") });
       await tryDay(page, "Sat 12");
       await page.click('[data-tab="money"]');
       await advance(page, backend, 600000);

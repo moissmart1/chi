@@ -3,6 +3,7 @@
 // the store, mounts the screens (Days, Before we go and Money) and boots.
 
 import { API_URL, STORAGE_PREFIX, NEW_VERSION_MESSAGE } from "./config.js";
+import { TRIP_TZ } from "./trip.js";
 import { createApi } from "./api.js";
 import { createStore } from "./store.js";
 import { createClock } from "./clock.js";
@@ -140,7 +141,7 @@ function mountTabs(store, storage) {
     const trip = store.state.trip;
     try {
       storage.setItem(STORAGE_PREFIX + "tab", t);
-      storage.setItem(STORAGE_PREFIX + "tabDay", dateIn((trip && trip.tz) || "Asia/Tokyo", Date.now()));
+      storage.setItem(STORAGE_PREFIX + "tabDay", dateIn(TRIP_TZ, Date.now()));
     } catch {
       // private mode: it opens on Days next time
     }
@@ -151,7 +152,7 @@ function mountTabs(store, storage) {
   function opening(trip) {
     if (!keptTab) return "days";
     if (trip && trip.start) {
-      const today = tripDay({ ...trip, tz: trip.tz || "Asia/Tokyo" }, Date.now());
+      const today = tripDay(trip, Date.now());
       if (today !== "pre" && today !== "post" && keptDay !== today) return "days";
     }
     return keptTab;
@@ -200,7 +201,7 @@ function start() {
   store = createStore({ api, storage });
 
   // The one clock the Days screen reads, in the trip's time zone.
-  const clock = createClock({ getTz: () => (store.state.trip && store.state.trip.tz) || "Asia/Tokyo" });
+  const clock = createClock({ getTz: () => TRIP_TZ });
   const tabs = mountTabs(store, raw);
 
   const phone = document.getElementById("phone");
@@ -239,7 +240,7 @@ function start() {
   // A phone is never left pretending unseen (R34): the demo ends by itself
   // when the app comes back after more than 10 minutes away, or on another
   // real trip-zone day than the one it started on. Real time, not the demo's.
-  const realToday = () => dateIn((store.state.trip && store.state.trip.tz) || "Asia/Tokyo", Date.now());
+  const realToday = () => dateIn(TRIP_TZ, Date.now());
   let demoOn = null; // the real trip-zone day the demo was started on
   let hiddenAt = null;
   // The one rule: a running demo ends when it was left more than 10 minutes
