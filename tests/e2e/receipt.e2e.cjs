@@ -165,8 +165,8 @@ module.exports = [
     async run({ page }) {
       const half = new Date(NOON12 - 30 * 60 * 1000).toISOString();
       const seed = withExtras({ patch: { seedexp007: { addedAt: half }, seedexp009: { addedAt: half } } });
-      // The store keeps mat.seen as milliseconds (String(Date.now())).
-      await open(page, { seed, nowMs: NOON12, storage: { "mat.seen": String(NOON12 - 60 * 60 * 1000) } });
+      // The store keeps chi.seen as milliseconds (String(Date.now())).
+      await open(page, { seed, nowMs: NOON12, storage: { "chi.seen": String(NOON12 - 60 * 60 * 1000) } });
       await waitRows(page, 8);
       await until(() => page.evaluate(() => document.querySelector('.rc-row[data-id="seedexp007"]').classList.contains("is-new")), "Shibuya Sky is new");
       assert.equal(await page.locator('.rc-row[data-id="seedexp009"].is-new').count(), 0, "Mo's own Coffee is not new");
@@ -179,7 +179,7 @@ module.exports = [
         Object.defineProperty(document, "hidden", { value: true, configurable: true });
         document.dispatchEvent(new Event("visibilitychange"));
       });
-      await until(() => page.evaluate(() => Number(localStorage.getItem("mat.seen")) >= Date.now()), "hiding the page stores mat.seen");
+      await until(() => page.evaluate(() => Number(localStorage.getItem("chi.seen")) >= Date.now()), "hiding the page stores chi.seen");
       await page.reload();
       await waitRows(page, 8);
       assert.equal(await page.locator("#rc .rc-row.is-new").count(), 0, "nothing new after looking");
@@ -222,14 +222,14 @@ module.exports = [
         await expectText(page, "#keyMsg", "That doesn’t look like a trip link.");
       }
       assert.equal(backend.requests.length, 0, "a bad paste calls nothing");
-      assert.equal(await page.evaluate(() => localStorage.getItem("mat.key")), null);
+      assert.equal(await page.evaluate(() => localStorage.getItem("chi.key")), null);
 
       await page.fill("#keyPaste", "  " + ORIGIN + "/#k=test-key  ");
       await page.click("#keyGo");
       await waitRows(page, 8);
       assert.equal(await visible(page, "#gate"), false);
       assert.equal(await page.evaluate(() => globalThis.__marker), 1, "no reload");
-      assert.equal(await page.evaluate(() => localStorage.getItem("mat.key")), "test-key");
+      assert.equal(await page.evaluate(() => localStorage.getItem("chi.key")), "test-key");
       assert.equal(await page.evaluate(() => location.hash), "");
       assert.equal(await page.evaluate(() => location.href.includes("test-key")), false);
       assert.equal(await page.evaluate(() => document.body.innerText.includes("test-key")), false, "the key is not drawn");
@@ -284,11 +284,11 @@ module.exports = [
       await open(page, { seed: SEED, nowMs: NOON12, key: null, me: null, how: null, hash: "#k=test-key" });
       await until(() => visible(page, "#first"), "#first shows");
       assert.equal(await page.locator("#first [data-me]").count(), 3, "three seals");
-      assert.equal(await page.evaluate(() => localStorage.getItem("mat.key")), "test-key");
+      assert.equal(await page.evaluate(() => localStorage.getItem("chi.key")), "test-key");
       assert.equal(await visible(page, "#how"), false);
 
       await page.click('#first [data-me="Ajen"]');
-      await until(() => page.evaluate(() => localStorage.getItem("mat.me") === "Ajen"), "mat.me stored");
+      await until(() => page.evaluate(() => localStorage.getItem("chi.me") === "Ajen"), "chi.me stored");
       assert.equal(await page.evaluate(() => location.hash), "");
       assert.ok(!(await page.evaluate(() => location.href)).includes("k="), "key gone from the address");
       await until(() => visible(page, "#how"), "#how shows");
@@ -302,7 +302,7 @@ module.exports = [
       assert.ok(dim[1] < dim[0], "dimmer than the three lines: " + dim);
 
       await page.click("#howOk");
-      await until(() => page.evaluate(() => localStorage.getItem("mat.how") === "1"), "mat.how stored");
+      await until(() => page.evaluate(() => localStorage.getItem("chi.how") === "1"), "chi.how stored");
       await until(async () => !(await visible(page, "#how")), "#how closes");
       await waitRows(page, 8);
       assert.ok(await visible(page, "#rc"));
@@ -334,13 +334,13 @@ module.exports = [
       await page.addInitScript(() => {
         const set = Storage.prototype.setItem;
         Storage.prototype.setItem = function (k, v) {
-          if (k === "mat.key") throw new Error("QuotaExceededError");
+          if (k === "chi.key") throw new Error("QuotaExceededError");
           return set.call(this, k, v);
         };
       });
       const backend = await open(page, { seed: SEED, nowMs: NOON12, key: null, hash: "#k=test-key" });
       await waitRows(page, 8);
-      assert.equal(await page.evaluate(() => localStorage.getItem("mat.key")), null, "nothing was stored");
+      assert.equal(await page.evaluate(() => localStorage.getItem("chi.key")), null, "nothing was stored");
       assert.equal(await page.evaluate(() => location.hash), "", "key gone from the address");
       assert.equal(await visible(page, "#gate"), false);
       const loads = backend.requests.filter((r) => r.action === "load");

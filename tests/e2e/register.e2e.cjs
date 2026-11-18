@@ -272,11 +272,11 @@ module.exports = [
     },
   },
   {
-    name: "a new expense always opens in dollars; an old mat.cur is cleared; editing keeps the line's own currency",
+    name: "a new expense always opens in dollars; an old chi.cur is cleared; editing keeps the line's own currency",
     async run({ page }) {
-      const backend = await open(page, { seed: SEED, nowMs: NOON12, storage: { "mat.cur": "JPY" } });
+      const backend = await open(page, { seed: SEED, nowMs: NOON12, storage: { "chi.cur": "JPY" } });
       await waitRows(page, 8);
-      assert.equal(await page.evaluate(() => localStorage.getItem("mat.cur")), null, "the old memory is gone");
+      assert.equal(await page.evaluate(() => localStorage.getItem("chi.cur")), null, "the old memory is gone");
       await ringOpen(page);
       await expectText(page, "#xAmt", "$0");
       await expectText(page, "#kCur", "$ → ¥");
@@ -298,7 +298,7 @@ module.exports = [
       await expectText(page, "#kCur", "$ → ¥");
       await page.click("#regDone");
       await waitClosed(page);
-      assert.equal(await page.evaluate(() => localStorage.getItem("mat.cur")), null, "the key never writes it");
+      assert.equal(await page.evaluate(() => localStorage.getItem("chi.cur")), null, "the key never writes it");
       const noodles = await until(() => savedTitled(backend, "Noodles")[0], "Noodles saved");
       await page.evaluate((id) => globalThis.__matTest.register.edit(id), noodles.id);
       await waitOpen(page);

@@ -69,32 +69,32 @@ module.exports = [
       await showing(page, "#vMoney");
       assert.equal(await isActive(page, '[data-tab="money"]'), true);
       await until(() => visible(page, "#say"), "the sentence shows");
-      assert.equal(await stored(page, "mat.tab"), "money");
-      assert.equal(await stored(page, "mat.tabDay"), "2026-12-12");
+      assert.equal(await stored(page, "chi.tab"), "money");
+      assert.equal(await stored(page, "chi.tabDay"), "2026-12-12");
       await page.click('[data-tab="days"]');
       await showing(page, "#vDays");
       await until(() => visible(page, "#rail"), "the rail shows");
-      assert.equal(await stored(page, "mat.tab"), "days");
+      assert.equal(await stored(page, "chi.tab"), "days");
     },
   },
   {
     name: "returns to the last screen",
     async run({ page }) {
-      await open(page, { seed: WITH_PLAN, tab: null, storage: { "mat.tab": "money", "mat.tabDay": "2026-12-12" } });
+      await open(page, { seed: WITH_PLAN, tab: null, storage: { "chi.tab": "money", "chi.tabDay": "2026-12-12" } });
       await showing(page, "#vMoney");
     },
   },
   {
     name: "a new day during the trip opens on the ticket",
     async run({ page }) {
-      await open(page, { seed: WITH_PLAN, tab: null, storage: { "mat.tab": "money", "mat.tabDay": "2026-12-11" } });
+      await open(page, { seed: WITH_PLAN, tab: null, storage: { "chi.tab": "money", "chi.tabDay": "2026-12-11" } });
       await showing(page, "#vDays");
     },
   },
   {
     name: "before the trip the last screen wins",
     async run({ page }) {
-      await open(page, { seed: WITH_PLAN, nowMs: NOV15, tab: null, storage: { "mat.tab": "money", "mat.tabDay": "2026-11-14" } });
+      await open(page, { seed: WITH_PLAN, nowMs: NOV15, tab: null, storage: { "chi.tab": "money", "chi.tabDay": "2026-11-14" } });
       await showing(page, "#vMoney");
     },
   },
@@ -116,11 +116,11 @@ module.exports = [
       await page.click("#ring");
       await until(() => page.evaluate(() => document.getElementById("reg").classList.contains("is-open")), "the register opens");
       await showing(page, "#vMoney");
-      assert.equal(await stored(page, "mat.tab"), "days");
+      assert.equal(await stored(page, "chi.tab"), "days");
       await page.click("#regDone");
       await until(() => page.evaluate(() => !document.getElementById("reg").classList.contains("is-open")), "the register closes");
       await showing(page, "#vDays");
-      assert.equal(await stored(page, "mat.tab"), "days");
+      assert.equal(await stored(page, "chi.tab"), "days");
     },
   },
   {

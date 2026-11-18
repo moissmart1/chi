@@ -19,9 +19,15 @@
 //   script.googleusercontent.com), and anything else not listed here.
 // - Only OK answers are ever kept.
 
-const SW_VERSION = "b90956ad99";
-const SHELL_CACHE = "mat-shell-" + SW_VERSION;
-const FONT_CACHE = "mat-fonts";
+const SW_VERSION = "2b5f3dcfb7";
+// Cache Storage is shared by every app on this origin (another trip's app
+// can sit beside this one), so every name this worker makes or deletes
+// starts with this app's own prefix.
+const PREFIX = "chi-";
+const SHELL_CACHE = PREFIX + "shell-" + SW_VERSION;
+const FONT_CACHE = PREFIX + "fonts";
+// What the worker says to the page when a new version has taken over.
+const NEW_VERSION = PREFIX + "new-version";
 
 const SHELL = [
   "./",
@@ -99,7 +105,7 @@ self.addEventListener("activate", (event) => {
     caches
       .keys()
       .then((names) => {
-        const old = names.filter((n) => n.startsWith("mat-shell-") && n !== SHELL_CACHE);
+        const old = names.filter((n) => n.startsWith(PREFIX + "shell-") && n !== SHELL_CACHE);
         return Promise.all(old.map((n) => caches.delete(n))).then(() => old.length > 0);
       })
       .then((updated) =>
@@ -135,7 +141,7 @@ function tellPage(page) {
         answered = true;
         resolve();
       };
-      page.postMessage({ type: "mat-new-version" }, [channel.port2]);
+      page.postMessage({ type: NEW_VERSION }, [channel.port2]);
     } catch (e) {
       // no answer will come: reloaded below
     }
@@ -177,7 +183,7 @@ async function font(event) {
 // Opening the app with nothing kept and no signal: a plain page, not an error.
 function offlinePage() {
   const html = '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">' +
-    "<title>MAT</title><body style=\"margin:0;min-height:100vh;display:grid;place-items:center;background:#1A1614;color:#F4F0EA;" +
+    "<title>CHI</title><body style=\"margin:0;min-height:100vh;display:grid;place-items:center;background:#1A1614;color:#F4F0EA;" +
     'font:700 17px/1.4 system-ui,sans-serif;text-align:center;padding:24px;box-sizing:border-box"><p>No signal. Open again when you have some.</p></body>';
   return new Response(html, { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } });
 }

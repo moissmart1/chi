@@ -26,7 +26,7 @@ const { chromium } = require("playwright-core");
 const { PORT, ORIGIN } = require("./helpers.cjs");
 
 const ROOT = path.join(__dirname, "..", "..");
-const SHOTS = "/private/tmp/claude-501/mat-shots/failures";
+const SHOTS = "/private/tmp/claude-501/mat-shots/chi/failures";
 const CASE_TIMEOUT_MS = 30000;
 
 // What is on the test port: null (nothing), or the body of its front page.
@@ -45,7 +45,7 @@ function frontPage() {
     });
   });
 }
-const isThisApp = (body) => typeof body === "string" && body.includes("<title>MAT</title>");
+const isThisApp = (body) => typeof body === "string" && body.includes("<title>CHI</title>");
 
 async function startServer() {
   const already = await frontPage();

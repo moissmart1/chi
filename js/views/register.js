@@ -8,8 +8,9 @@
 // root is the phone; the register sits at its bottom over the Money view.
 // Every new entry starts in dollars (CAD), also the next one after ringing up; the ¥/$ key
 // switches the one in hand, and a half-typed entry keeps its currency when put away and reopened.
-// storage is only used to clear the old mat.cur memory once.
+// storage is only used to clear the old stored cur memory once.
 
+import { STORAGE_PREFIX } from "../config.js";
 import { defaultRingDay, newId } from "../time.js";
 import { yen, dollars, pt, dayShort } from "../format.js";
 import { mountUneven, splitOf, toUnits, fromUnits } from "./uneven.js";
@@ -129,7 +130,7 @@ export function mountRegister(root, store, { now = () => Date.now(), storage = d
   // Older versions remembered the last currency here; a new expense now always
   // starts in dollars, so the leftover is cleared once.
   try {
-    if (storage) storage.removeItem("mat.cur");
+    if (storage) storage.removeItem(STORAGE_PREFIX + "cur");
   } catch {
     // storage missing or blocked: nothing to clear
   }

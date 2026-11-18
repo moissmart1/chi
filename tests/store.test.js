@@ -42,7 +42,7 @@ function memStorage(init = {}) {
 //   net.knownOffline   the phone itself says it has no network: nothing is sent
 function phone({ seed, fake, storage, me = "Mo", nowMs = NOW, clock } = {}) {
   fake = fake || createFakeBackend(seed);
-  storage = storage || memStorage({ "mat.key": KEY, "mat.me": me });
+  storage = storage || memStorage({ "chi.key": KEY, "chi.me": me });
   const net = { offline: false, knownOffline: false, failing: new Set(), lose: new Set(), garble: new Set(), override: null, holds: [], sent: [] };
   net.hold = (action) => {
     let release;
@@ -65,7 +65,7 @@ function phone({ seed, fake, storage, me = "Mo", nowMs = NOW, clock } = {}) {
     }
     return { ok: true, status: 200, text: async () => JSON.stringify(env) };
   };
-  const api = createApi({ url: URL, getKey: () => storage.getItem("mat.key"), getActor: () => storage.getItem("mat.me"), fetchImpl, isOnline: () => !net.knownOffline });
+  const api = createApi({ url: URL, getKey: () => storage.getItem("chi.key"), getActor: () => storage.getItem("chi.me"), fetchImpl, isOnline: () => !net.knownOffline });
   const waits = [];
   const store = createStore({ api, storage, now: clock || (() => nowMs), wait: async (ms) => { waits.push(ms); } });
   return { fake, storage, net, api, store, waits };
@@ -80,7 +80,7 @@ async function backend(fake, action = "load", args = {}, actor = "Ajen") {
 
 const until = async (f) => { for (let i = 0; i < 200 && !f(); i++) await new Promise((r) => setTimeout(r, 5)); };
 const sent = (fake, action) => fake.requests.filter((r) => r.action === action).length;
-const queueOf = (storage) => JSON.parse(storage.getItem("mat.queue") || "[]");
+const queueOf = (storage) => JSON.parse(storage.getItem("chi.queue") || "[]");
 const byId = (list, id) => list.find((x) => x.id === id);
 
 function draft(over = {}) {
@@ -178,7 +178,7 @@ test("Boot paints from cache first", async () => {
   const p = phone({ seed: SEED });
   const empty = await backend(createFakeBackend());
   const cached = { id: "cached0001", ...draft({ title: "Cached" }), rate: 111, addedBy: "Mo", addedAt: "2026-12-11T01:00:00.000Z", deleted: false };
-  p.storage.setItem("mat.cache", JSON.stringify({ data: { ...empty, expenses: [cached] }, rev: 0, loadedAt: 1000 }));
+  p.storage.setItem("chi.cache", JSON.stringify({ data: { ...empty, expenses: [cached] }, rev: 0, loadedAt: 1000 }));
   const release = p.net.hold("load");
   const seen = [];
   p.store.subscribe((s) => seen.push({ ids: s.expenses.map((e) => e.id), loadedAt: s.loadedAt }));
@@ -197,13 +197,13 @@ test("Boot paints from cache first", async () => {
   assert.equal(p.store.state.loadedAt, NOW);
   assert.equal(p.store.state.online, true);
   assert.equal(p.store.state.me, "Mo");
-  const cache = JSON.parse(p.storage.getItem("mat.cache"));
+  const cache = JSON.parse(p.storage.getItem("chi.cache"));
   assert.equal(cache.loadedAt, NOW);
   assert.equal(cache.data.expenses.length, 9);
 });
 
 test("No key", async () => {
-  const p = phone({ storage: memStorage({ "mat.me": "Mo" }) });
+  const p = phone({ storage: memStorage({ "chi.me": "Mo" }) });
   await p.store.boot();
   assert.equal(p.store.state.status, "nokey");
   assert.equal(p.net.sent.length, 0);
@@ -211,40 +211,40 @@ test("No key", async () => {
 });
 
 test("Wrong key", async () => {
-  const p = phone({ storage: memStorage({ "mat.key": "not-the-key", "mat.me": "Mo" }) });
+  const p = phone({ storage: memStorage({ "chi.key": "not-the-key", "chi.me": "Mo" }) });
   await p.store.boot();
   assert.equal(p.store.state.status, "nokey");
 });
 
-test("me is null when mat.me is missing or not one of the people, and setMe stores it", async () => {
-  const a = phone({ storage: memStorage({ "mat.key": KEY }) });
+test("me is null when chi.me is missing or not one of the people, and setMe stores it", async () => {
+  const a = phone({ storage: memStorage({ "chi.key": KEY }) });
   await a.store.boot();
   assert.equal(a.store.state.me, null);
   a.store.setMe("Ajen");
   assert.equal(a.store.state.me, "Ajen");
-  assert.equal(a.storage.getItem("mat.me"), "Ajen");
+  assert.equal(a.storage.getItem("chi.me"), "Ajen");
 
-  const b = phone({ storage: memStorage({ "mat.key": KEY, "mat.me": "Zed" }) });
+  const b = phone({ storage: memStorage({ "chi.key": KEY, "chi.me": "Zed" }) });
   await b.store.boot();
   assert.equal(b.store.state.me, null);
 });
 
-test("corrupt JSON in mat.cache and mat.queue is treated as absent", async () => {
-  const storage = memStorage({ "mat.key": KEY, "mat.me": "Mo", "mat.cache": "{not json", "mat.queue": "[oops" });
+test("corrupt JSON in chi.cache and chi.queue is treated as absent", async () => {
+  const storage = memStorage({ "chi.key": KEY, "chi.me": "Mo", "chi.cache": "{not json", "chi.queue": "[oops" });
   const p = phone({ seed: SEED, storage });
   await p.store.boot();
   assert.equal(p.store.state.status, "ready");
   assert.equal(p.store.state.expenses.length, 9);
   assert.equal(sent(p.fake, "addExpense"), 0);
   // valid JSON of the wrong shape is ignored too
-  const q = phone({ seed: SEED, storage: memStorage({ "mat.key": KEY, "mat.cache": "42", "mat.queue": "{\"a\":1}" }) });
+  const q = phone({ seed: SEED, storage: memStorage({ "chi.key": KEY, "chi.cache": "42", "chi.queue": "{\"a\":1}" }) });
   await q.store.boot();
   assert.equal(q.store.state.expenses.length, 9);
 });
 
 test("storage that throws never breaks the store", async () => {
   const fake = createFakeBackend(SEED);
-  const writesThrow = { getItem: (k) => ({ "mat.key": KEY, "mat.me": "Mo" }[k] ?? null), setItem: () => { throw new Error("QuotaExceededError"); } };
+  const writesThrow = { getItem: (k) => ({ "chi.key": KEY, "chi.me": "Mo" }[k] ?? null), setItem: () => { throw new Error("QuotaExceededError"); } };
   const p = phone({ fake, storage: writesThrow });
   await p.store.boot();
   assert.equal(p.store.state.status, "ready");
@@ -264,7 +264,7 @@ test("a failed load keeps the cached loadedAt and goes offline; the next good ca
   const first = phone({ seed: SEED });
   await first.store.boot();
   const p = phone({ fake: first.fake, storage: first.storage });
-  p.storage.setItem("mat.cache", JSON.stringify({ ...JSON.parse(p.storage.getItem("mat.cache")), loadedAt: 1234 }));
+  p.storage.setItem("chi.cache", JSON.stringify({ ...JSON.parse(p.storage.getItem("chi.cache")), loadedAt: 1234 }));
   p.net.offline = true;
   await p.store.boot();
   assert.equal(p.store.state.status, "ready");
@@ -467,9 +467,9 @@ test("a queued line looks the same after a reload: its time and rate are kept", 
   assert.equal(shown.addedAt, new Date(NOW).toISOString());
   assert.equal(shown.rate, 111);
   // the next day the cached rate has moved on
-  const cache = JSON.parse(one.storage.getItem("mat.cache"));
+  const cache = JSON.parse(one.storage.getItem("chi.cache"));
   cache.data.rateToday = 120;
-  one.storage.setItem("mat.cache", JSON.stringify(cache));
+  one.storage.setItem("chi.cache", JSON.stringify(cache));
   const two = phone({ fake: one.fake, storage: one.storage, nowMs: NOW + 86400000 });
   two.net.offline = true;
   await two.store.boot();
@@ -822,7 +822,7 @@ test("Stale undo from history", async () => {
 
 test("a stale undo bar shows the notice and then what the backend has", async () => {
   const a = phone({ seed: SEED });
-  const b = phone({ seed: SEED, fake: a.fake, storage: memStorage({ "mat.key": KEY, "mat.me": "Ajen" }) });
+  const b = phone({ seed: SEED, fake: a.fake, storage: memStorage({ "chi.key": KEY, "chi.me": "Ajen" }) });
   await a.store.boot();
   await b.store.boot();
   await a.store.loadHistory();
@@ -845,7 +845,7 @@ test("a stale undo bar shows the notice and then what the backend has", async ()
 
 test("a stale undo from history shows the notice, then the backend's data and a fresh tape", async () => {
   const a = phone({ seed: SEED });
-  const b = phone({ seed: SEED, fake: a.fake, storage: memStorage({ "mat.key": KEY, "mat.me": "Ajen" }) });
+  const b = phone({ seed: SEED, fake: a.fake, storage: memStorage({ "chi.key": KEY, "chi.me": "Ajen" }) });
   await a.store.boot();
   await b.store.boot();
   a.store.updateExpense("seedexp004", { amount: 4500 });
@@ -885,7 +885,7 @@ test("undoEntry undoes a history entry and updates the tape", async () => {
 
 test("after an undo from History the tape is loaded again from the first page", async () => {
   const a = phone({ seed: SEED });
-  const b = phone({ seed: SEED, fake: a.fake, storage: memStorage({ "mat.key": KEY, "mat.me": "Ajen" }) });
+  const b = phone({ seed: SEED, fake: a.fake, storage: memStorage({ "chi.key": KEY, "chi.me": "Ajen" }) });
   await a.store.boot();
   await b.store.boot();
   await a.store.loadHistory();
@@ -1142,7 +1142,7 @@ test("refresh keeps lines that are still pending", async () => {
 
 test("Person settings", async () => {
   const one = phone();
-  const two = phone({ fake: one.fake, storage: memStorage({ "mat.key": KEY, "mat.me": "Ajen" }) });
+  const two = phone({ fake: one.fake, storage: memStorage({ "chi.key": KEY, "chi.me": "Ajen" }) });
   await one.store.boot();
   await two.store.boot();
   const saving = one.store.setPerson("Mo", { simplify: false });
@@ -1214,7 +1214,7 @@ test("Seen", async () => {
   assert.equal(p.store.state.seenAt, null);
   p.store.markSeen();
   assert.equal(p.store.state.seenAt, NOW);
-  assert.equal(p.storage.getItem("mat.seen"), String(NOW));
+  assert.equal(p.storage.getItem("chi.seen"), String(NOW));
   const again = phone({ fake: p.fake, storage: p.storage });
   await again.store.boot();
   assert.equal(again.store.state.seenAt, NOW);
@@ -1648,14 +1648,14 @@ test("a queued line is credited to whoever rang it up, even after the phone swit
   assert.equal(log.who, "Mo");
 });
 
-test("a queued line restored from mat.queue after a reload is still credited to whoever rang it up", async () => {
+test("a queued line restored from chi.queue after a reload is still credited to whoever rang it up", async () => {
   const first = phone({ seed: SEED });
   await first.store.boot();
   first.net.offline = true;
   first.store.addExpense(draft({ title: "Mo's taxi" }));
   const id = idOf(first.store);
   await first.store.idle();
-  first.storage.setItem("mat.me", "Ajen");
+  first.storage.setItem("chi.me", "Ajen");
   const p = phone({ fake: first.fake, storage: first.storage });
   await p.store.boot();
   await p.store.idle();
@@ -1844,7 +1844,7 @@ for (const mode of ["failing", "lose"]) {
   });
 }
 
-test("a stamp of unknown fate counts in the outbox, survives a reload in mat.queue, and is sent once (N2)", async () => {
+test("a stamp of unknown fate counts in the outbox, survives a reload in chi.queue, and is sent once (N2)", async () => {
   const p = phone({ seed: LODGE, me: "Ajen" });
   await p.store.boot();
   p.net.lose.add("addPayment");
@@ -1924,7 +1924,7 @@ test("a stop edit the phone knows never left is rolled back and said not saved; 
   await store.idle();
   assert.equal(store.state.stops[0].time, "14:00");
   assert.equal(store.state.notice, "No signal. That wasn’t saved.");
-  assert.deepEqual(JSON.parse(storage.getItem("mat.queue") || "[]"), []);
+  assert.deepEqual(JSON.parse(storage.getItem("chi.queue") || "[]"), []);
 });
 
 test("a stop add whose reply is lost is not sent twice, and the next contact shows the truth", async () => {
@@ -1965,7 +1965,7 @@ test("a stop add whose reply is lost, then Undo: the backend ends with it remove
   await p.store.idle();
   assert.equal(p.store.state.notice, UNCONFIRMED);
   assert.equal(stopOf(p.store, id).deleted, false, "the backend's truth is shown at once (it did land)");
-  assert.deepEqual(queueOf(p.storage), [], "a stop add is never kept in mat.queue");
+  assert.deepEqual(queueOf(p.storage), [], "a stop add is never kept in chi.queue");
   p.net.lose.clear();
   p.store.clearNotice();
   await p.store.undo(t);
@@ -2123,10 +2123,10 @@ test("stop writes while the phone knows it has no signal: nothing sent, nothing 
 });
 
 test("a stop in a saved queue from before a reload is never sent; the expense beside it still is", async () => {
-  const storage = memStorage({ "mat.key": KEY, "mat.me": "Mo" });
+  const storage = memStorage({ "chi.key": KEY, "chi.me": "Mo" });
   const stop = { id: "stopBBBB0001", date: "2026-12-12", title: "Tower Records", time: "", detail: "", gettingThere: "", travelMin: 0, fixed: false, place: "", signJp: "", booked: false, link: "", photo: "", note: "" };
   const expense = { id: "expQQQQ0001", ...draft() };
-  storage.setItem("mat.queue", JSON.stringify([
+  storage.setItem("chi.queue", JSON.stringify([
     { stop, sent: true },
     { undo: true, kind: "stop", args: { stop }, logId: 1, actor: "Mo" },
     { expense, addedAt: "2026-12-11T03:00:00.000Z", rate: 111, addedBy: "Mo", failed: false, sent: false },
@@ -2143,14 +2143,14 @@ test("a stop in a saved queue from before a reload is never sent; the expense be
 });
 
 test("a cache from before the plan existed still paints, and the load fills in the stops", async () => {
-  const storage = memStorage({ "mat.key": KEY, "mat.me": "Mo" });
+  const storage = memStorage({ "chi.key": KEY, "chi.me": "Mo" });
   const p0 = phone({ seed: { stops: [SKY] } });
   const data = (await backend(p0.fake)).valueOf();
   const old = { ...data };
   delete old.stops;
   delete old.stays;
   delete old.days;
-  storage.setItem("mat.cache", JSON.stringify({ data: old, rev: 0, loadedAt: 1 }));
+  storage.setItem("chi.cache", JSON.stringify({ data: old, rev: 0, loadedAt: 1 }));
   const p = phone({ fake: p0.fake, storage });
   const hold = p.net.hold("load");
   const booting = p.store.boot();
@@ -2167,8 +2167,8 @@ test("a cache in the real Plan 1 shape paints Days and the same money before the
   const p0 = phone({ seed: seedAll });
   const old = await p0.fake.plan1Load();
   assert.equal("deleted" in old.data.stops[0], false, "Plan 1 stops have deletedAt, not deleted");
-  const storage = memStorage({ "mat.key": KEY, "mat.me": "Mo" });
-  storage.setItem("mat.cache", JSON.stringify({ data: old.data, rev: old.rev, loadedAt: 1 }));
+  const storage = memStorage({ "chi.key": KEY, "chi.me": "Mo" });
+  storage.setItem("chi.cache", JSON.stringify({ data: old.data, rev: old.rev, loadedAt: 1 }));
   const p = phone({ fake: p0.fake, storage });
   const hold = p.net.hold("load");
   const booting = p.store.boot();
@@ -2386,7 +2386,7 @@ test("syncPayments pulls, reloads so the lines are there, says what came in, and
   assert.ok(p.store.state.expenses.some((e) => e.title === "Rail pass" && e.amount === 221.52 && !e.pending));
   assert.equal(p.net.sent.filter((b) => b.action === "syncPayments").length, 1);
   assert.equal(p.net.sent.filter((b) => b.action === "syncPayments")[0].actor, "Mo");
-  assert.equal(JSON.stringify(p.storage.map.get("mat.cache")).includes(PLANNER_ID), false);
+  assert.equal(JSON.stringify(p.storage.map.get("chi.cache")).includes(PLANNER_ID), false);
 
   await p.store.syncPayments();
   assert.equal(p.store.state.notice, "Nothing new in the planner. 1 payment needs a look in the planner. See You for which.");
@@ -2477,7 +2477,7 @@ test("syncTodos puts the list into state and asks again while the backend says m
   assert.equal(p.store.state.todos.length, 17);
   assert.ok(p.store.state.todosPulledAt);
   assert.equal(r.pulledAt, p.store.state.todosPulledAt);
-  assert.equal(JSON.parse(p.storage.map.get("mat.cache")).data.todos.length, 17, "kept in the cache");
+  assert.equal(JSON.parse(p.storage.map.get("chi.cache")).data.todos.length, 17, "kept in the cache");
 
   // A backend that always says more: four calls, then it stops and says so.
   p.net.override = (b) => (b.action === "syncTodos" ? { ok: true, rev: 0, data: { todos: [], pulledAt: "", more: true, problems: [] } } : null);
@@ -3017,10 +3017,10 @@ test("a sheet where migrate has not been run: no definitions, no stamps, nothing
 test("a cache saved before the book existed opens with an empty book", async () => {
   const p = stampPhone();
   await p.store.boot();
-  const cache = JSON.parse(p.storage.getItem("mat.cache"));
+  const cache = JSON.parse(p.storage.getItem("chi.cache"));
   delete cache.data.stampDefs;
   delete cache.data.stamps;
-  p.storage.setItem("mat.cache", JSON.stringify(cache));
+  p.storage.setItem("chi.cache", JSON.stringify(cache));
   const q = stampPhone({ fake: p.fake, storage: p.storage });
   q.net.offline = true;
   await q.store.boot();

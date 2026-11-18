@@ -28,17 +28,17 @@ test("the register's limit is exactly the backend's, in both currencies (F13)", 
 
 test("a key the trip refuses is told apart from no key at all, and a later boot starts clean (F5)", async () => {
   const fake = createFakeBackend();
-  const map = new Map([["mat.key", "wrong-key-1"]]);
+  const map = new Map([["chi.key", "wrong-key-1"]]);
   const storage = { getItem: (k) => (map.has(k) ? map.get(k) : null), setItem: (k, v) => map.set(k, String(v)) };
   const fetchImpl = async (url, init) => ({ ok: true, status: 200, text: async () => JSON.stringify(await fake(JSON.parse(init.body))) });
-  const api = createApi({ url: "https://example.test/exec", getKey: () => storage.getItem("mat.key"), getActor: () => "Mo", fetchImpl });
+  const api = createApi({ url: "https://example.test/exec", getKey: () => storage.getItem("chi.key"), getActor: () => "Mo", fetchImpl });
   const store = createStore({ api, storage, wait: async () => {} });
   await store.boot();
   assert.deepEqual([store.state.status, store.state.keyRefused], ["nokey", true]);
-  map.delete("mat.key");
+  map.delete("chi.key");
   await store.boot();
   assert.deepEqual([store.state.status, store.state.keyRefused], ["nokey", false]);
-  map.set("mat.key", "test-key");
+  map.set("chi.key", "test-key");
   await store.boot();
   assert.deepEqual([store.state.status, store.state.keyRefused], ["ready", false]);
 });

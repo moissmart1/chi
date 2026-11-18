@@ -65,7 +65,7 @@ async function twoPhones(ctx) {
   const a = ctx.page;
   const backend = await ready(a);
   const b = await ctx.newPhone();
-  await ready(b, { backend, me: "Ajen", storage: { "mat.seen": String(NOON12 - 60000) } });
+  await ready(b, { backend, me: "Ajen", storage: { "chi.seen": String(NOON12 - 60000) } });
   return { a, b, backend };
 }
 
@@ -209,7 +209,7 @@ module.exports = [
 
       // The Google Fonts stylesheet is asked for with CORS, so the worker kept it.
       const kept = await page.evaluate(async () => {
-        const cache = await caches.open("mat-fonts");
+        const cache = await caches.open("chi-fonts");
         return (await cache.keys()).map((r) => new URL(r.url).hostname);
       });
       assert.ok(kept.includes("fonts.googleapis.com"), "the font stylesheet is kept: " + JSON.stringify(kept));
@@ -235,7 +235,7 @@ module.exports = [
       await waitRows(page, 8);
       // The phone lost its kept shell (storage cleared) and has no signal.
       await page.evaluate(async () => {
-        for (const name of await caches.keys()) if (name.startsWith("mat-shell-")) await caches.delete(name);
+        for (const name of await caches.keys()) if (name.startsWith("chi-shell-")) await caches.delete(name);
       });
       await context.route("**/*", (route) => route.abort());
       await page.reload();

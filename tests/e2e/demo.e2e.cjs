@@ -213,13 +213,13 @@ module.exports = [
       assert.equal(await page.evaluate(() => document.getElementById("vDays").classList.contains("is-active")), true);
       await expectText(page, "#dayCount", /^Day 3 of 11 today/);
       await until(async () => (await inView(page)) === "2026-12-12", "Dec 12 is in view");
-      assert.equal(await page.evaluate(() => localStorage.getItem("mat.tab")), "money", "the remembered screen is untouched");
-      assert.equal(await page.evaluate(() => localStorage.getItem("mat.tabDay")), "2026-11-15", "and so is the day it was remembered on (the real one)");
+      assert.equal(await page.evaluate(() => localStorage.getItem("chi.tab")), "money", "the remembered screen is untouched");
+      assert.equal(await page.evaluate(() => localStorage.getItem("chi.tabDay")), "2026-11-15", "and so is the day it was remembered on (the real one)");
       await page.click('[data-tab="days"]');
       await page.click("#demoStop");
       await until(async () => !(await visible(page, "#demo")), "Stop works");
-      assert.equal(await page.evaluate(() => localStorage.getItem("mat.tab")), "days", "going to Days by hand remembers Days");
-      assert.equal(await page.evaluate(() => localStorage.getItem("mat.tabDay")), "2026-11-15", "after Stop the remembered day is still the real one");
+      assert.equal(await page.evaluate(() => localStorage.getItem("chi.tab")), "days", "going to Days by hand remembers Days");
+      assert.equal(await page.evaluate(() => localStorage.getItem("chi.tabDay")), "2026-11-15", "after Stop the remembered day is still the real one");
     },
   },
   {

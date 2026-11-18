@@ -3,7 +3,7 @@
 // the three "how this works" lines. mountFirst(root, store, opts) adds them to
 // root and keeps them in step with the store.
 // opts: connected (false: say the app is not connected yet; the store is never
-// booted), storage (where mat.how is kept; default localStorage), onKey(key)
+// booted), storage (where "Got it" on How this works is kept; default localStorage), onKey(key)
 // (a trip key pasted on the no-key screen: keep it and start again).
 //
 // The no-key screen also takes a pasted trip link (or the bare key): an app
@@ -11,6 +11,7 @@
 // kept, and Safari itself clears a site's storage after a week without a
 // visit. The pasted key is never drawn anywhere else and never logged.
 
+import { STORAGE_PREFIX } from "../config.js";
 import { fillSeal } from "../picture.js";
 
 export const HOW_LINES = ["Ring up what you paid.", "The slip says who pays whom.", "Stamp it the moment you send."];
@@ -184,7 +185,7 @@ export function mountFirst(root, store, { connected = true, storage = defaultSto
     store.setMe(b.dataset.me);
   });
   ok.addEventListener("click", () => {
-    set("mat.how", "1");
+    set(STORAGE_PREFIX + "how", "1");
     render(store.state);
   });
 
@@ -212,7 +213,7 @@ export function mountFirst(root, store, { connected = true, storage = defaultSto
     const needMe = !blocked && s.status === "ready" && !s.me && s.people.length > 0;
     if (needMe) drawPeople(s.people);
     setOpen(first, needMe);
-    setOpen(how, !blocked && !needMe && !!s.me && get("mat.how") !== "1");
+    setOpen(how, !blocked && !needMe && !!s.me && get(STORAGE_PREFIX + "how") !== "1");
   }
 
   render(store.state);

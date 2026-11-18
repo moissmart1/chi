@@ -61,14 +61,14 @@ function makeBackend(seed, { clock, now = Date.now() } = {}) {
 // Opens the app on `page` against a fake backend and returns that backend.
 // - seed / backend: build a backend from `seed`, or use the one given (pass
 //   the same backend to two pages to share it).
-// - key, me, how: put into localStorage as mat.key / mat.me / mat.how; null
+// - key, me, how: put into localStorage as chi.key / chi.me / chi.how; null
 //   leaves it unset. how defaults to "1" (the how-this-works lines already
 //   seen), so only first-open tests see them.
 // - storage: more localStorage keys. Every key is only written when not set
 //   already, so a reload keeps whatever the app stored.
 // - hash: appended to the address (for example "#k=test-key").
-// - tab: the screen the app last showed, put into localStorage as mat.tab,
-//   with mat.tabDay the Japan date of nowMs (as if it was shown today), so
+// - tab: the screen the app last showed, put into localStorage as chi.tab,
+//   with chi.tabDay the Japan date of nowMs (as if it was shown today), so
 //   the app opens on it. Default "money"; "days" for the Days screen; null
 //   writes neither (the app then decides, from whatever `storage` holds).
 // Time: the page's clock is installed and paused at nowMs, and a backend
@@ -93,7 +93,7 @@ async function open(page, { seed = SEED, key = "test-key", me = "Mo", how = "1",
     };
   });
 
-  const own = { "mat.key": key, "mat.me": me, "mat.how": how, "mat.tab": tab, "mat.tabDay": tab === null ? null : japanDate(nowMs) };
+  const own = { "chi.key": key, "chi.me": me, "chi.how": how, "chi.tab": tab, "chi.tabDay": tab === null ? null : japanDate(nowMs) };
   const entries = Object.entries({ ...own, ...storage })
     .filter(([, v]) => v !== null && v !== undefined)
     .map(([k, v]) => [k, String(v)]);

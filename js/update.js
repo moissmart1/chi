@@ -16,9 +16,11 @@
 //   A page never reloads twice within RELOAD_GAP_MS (the time is kept in
 //   storage, which lasts across the reload).
 
+import { STORAGE_PREFIX } from "./config.js";
+
 export const RELOAD_GAP_MS = 60 * 1000;
 export const RETRY_MS = 3000;
-const KEY = "mat.reloadedAt";
+const KEY = STORAGE_PREFIX + "reloadedAt";
 
 export function createUpdater({ isSafe, reload, storage, now = () => Date.now(), later = (fn, ms) => setTimeout(fn, ms) }) {
   let wanted = false;

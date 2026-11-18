@@ -280,14 +280,14 @@ module.exports = [
     name: "opening History clears the new count and remembers when it was seen",
     async run({ page }) {
       const seen = Date.parse("2026-12-01T00:00:00Z");
-      const backend = await ready(page, { storage: { "mat.seen": String(seen) } });
+      const backend = await ready(page, { storage: { "chi.seen": String(seen) } });
       await otherPhone(backend, "addExpense", { expense: { ...SHARED(1), id: "freshline001", title: "Tempura", paidBy: "Ajen", splitMode: "equal", splitVals: [], note: "", kind: "" } });
       await page.evaluate(() => globalThis.__matTest.store.refresh());
       await expectText(page, "#histN", "1");
       assert.equal(await visible(page, "#histN"), true);
       await openTape(page);
       await until(async () => !(await visible(page, "#histN")), "the count clears");
-      assert.equal(await page.evaluate(() => localStorage.getItem("mat.seen")), String(NOON12));
+      assert.equal(await page.evaluate(() => localStorage.getItem("chi.seen")), String(NOON12));
     },
   },
   {

@@ -13,7 +13,7 @@
 //   made (a per-item chain), so an edit waits for its add and an undo waits
 //   for the write it undoes. A write whose item has nothing in flight starts
 //   at once.
-// - Adds of expenses are kept in mat.queue from the moment they are made
+// - Adds of expenses are kept in the stored queue from the moment they are made
 //   until the backend has them, and resent on the next contact. A stamp whose
 //   reply never came is kept too (in memory only: a reload fetches the truth)
 //   and resent with the same id on the next contact. (A stop add is not
@@ -25,13 +25,14 @@
 //   nothing, because an earlier unconfirmed one had landed) waits for a load,
 //   then undoes the backend's own record of it from the item's history.
 // - An add (or stamp) that is undone after its request left the phone may
-//   or may not be on the backend. It is kept in mat.queue as an undo to
+//   or may not be on the backend. It is kept in the stored queue as an undo to
 //   finish, until the backend confirms it: resend the add (the backend
 //   returns the first one, with its log id) and then undo that. A line that
 //   provably never left the phone is simply forgotten.
 //
 // Everything outside comes in through createStore's arguments.
 
+import { STORAGE_PREFIX } from "./config.js";
 import { newId } from "./time.js";
 
 const BUSY_RETRIES = 3;
@@ -61,7 +62,7 @@ const LIST = { expense: "expenses", payment: "payments", person: "people", stop:
 const KEY_FIELD = { expense: "id", payment: "id", person: "name", stop: "id", stay: "id", day: "date", todo: "id" };
 const FLAG = { expense: "deleted", payment: "removed", stop: "deleted", stay: "deleted", stamp: "gone" };
 const keyOf = (kind, x) => (kind === "stamp" ? x.def + "|" + x.who : x[KEY_FIELD[kind]]);
-// Adds kept in mat.queue and resent with the same id until the backend has
+// Adds kept in the stored queue and resent with the same id until the backend has
 // them. A stop add is not one of them: stop writes need a connection, so
 // with no reply it is rolled back like any other write (and never resent).
 const ADD_API = { expense: "addExpense", payment: "addPayment", stamp: "pressStamp" };
@@ -262,7 +263,7 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
 
   function saveCache() {
     if (!base) return;
-    setItem("mat.cache", JSON.stringify({ data: base, rev: state.rev, loadedAt: state.loadedAt }));
+    setItem(STORAGE_PREFIX + "cache", JSON.stringify({ data: base, rev: state.rev, loadedAt: state.loadedAt }));
   }
 
   const isAdd = (op) => op.api === ADD_API[op.kind];
@@ -287,7 +288,7 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
           },
     );
     const undos = resolving.map((op) => ({ undo: true, kind: op.kind, args: op.args, logId: op.logId, actor: op.actor || null }));
-    setItem("mat.queue", JSON.stringify(live.concat(undos)));
+    setItem(STORAGE_PREFIX + "queue", JSON.stringify(live.concat(undos)));
   }
 
   // ---- talking to the backend ----
@@ -446,7 +447,7 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
   }
 
   function restoreQueue() {
-    const queue = getJson("mat.queue");
+    const queue = getJson(STORAGE_PREFIX + "queue");
     if (!Array.isArray(queue)) return;
     for (const q of queue) {
       if (!q || typeof q !== "object") continue;
@@ -505,16 +506,16 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
 
   async function boot() {
     state.keyRefused = false;
-    const key = getItem("mat.key");
-    myName = getItem("mat.me");
-    const seen = Number(getItem("mat.seen"));
-    state.seenAt = getItem("mat.seen") !== null && isFinite(seen) ? seen : null;
+    const key = getItem(STORAGE_PREFIX + "key");
+    myName = getItem(STORAGE_PREFIX + "me");
+    const seen = Number(getItem(STORAGE_PREFIX + "seen"));
+    state.seenAt = getItem(STORAGE_PREFIX + "seen") !== null && isFinite(seen) ? seen : null;
     if (!key) {
       state.status = "nokey";
       changed();
       return;
     }
-    const cache = getJson("mat.cache");
+    const cache = getJson(STORAGE_PREFIX + "cache");
     if (cache && typeof cache === "object" && isData(cache.data)) {
       base = cache.data;
       state.rev = typeof cache.rev === "number" ? cache.rev : null;
@@ -752,7 +753,7 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
   // ---- the stamp book ----
 
   // A press: shown at once (a stamp of mine, with the seed that wears its
-  // ink), sent as pressStamp { def, at, seed }. Kept in mat.queue like a line
+  // ink), sent as pressStamp { def, at, seed }. Kept in the stored queue like a line
   // until the backend has it, resent with the same def (the backend answers a
   // second press of the same stamp with the first), and never shown on the
   // undo bar: it is lifted from History.
@@ -818,7 +819,7 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
 
   // ---- undoing an add or a stamp ----
 
-  // Remember (in mat.queue too) that this add must end up undone on the
+  // Remember (in the stored queue too) that this add must end up undone on the
   // backend, and show it gone meanwhile.
   function startResolving(op) {
     op.resolving = true;
@@ -1335,13 +1336,13 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
 
   function setMe(name) {
     myName = name;
-    setItem("mat.me", name);
+    setItem(STORAGE_PREFIX + "me", name);
     changed();
   }
 
   function markSeen() {
     state.seenAt = now();
-    setItem("mat.seen", String(state.seenAt));
+    setItem(STORAGE_PREFIX + "seen", String(state.seenAt));
     emit();
   }
 

@@ -317,7 +317,7 @@ cases.push(
       await page.click('#nav [data-tab="days"]');
       await until(async () => (await layout(page)).daysShown, "Days is back");
       assert.deepEqual((await layout(page)).keys, ["before", "ring", "youBtn"]);
-      assert.equal(await page.evaluate(() => localStorage.getItem("mat.tab")), "money", "the remembered tab is left as it was");
+      assert.equal(await page.evaluate(() => localStorage.getItem("chi.tab")), "money", "the remembered tab is left as it was");
       // A narrow window shows that tab.
       await page.setViewportSize(PHONE);
       await until(() => page.evaluate(() => document.querySelector(".view.is-active").id === "vMoney" && !document.getElementById("vDays").classList.contains("is-active")), "the phone shows Money");
@@ -376,7 +376,7 @@ cases.push(
       const announce = () => page.evaluate(() => new Promise((resolve) => {
         const ch = new MessageChannel();
         ch.port1.onmessage = () => resolve(true);
-        navigator.serviceWorker.dispatchEvent(new MessageEvent("message", { data: { type: "mat-new-version" }, ports: [ch.port2] }));
+        navigator.serviceWorker.dispatchEvent(new MessageEvent("message", { data: { type: "chi-new-version" }, ports: [ch.port2] }));
         setTimeout(() => resolve(false), 500);
       }));
       await page.evaluate(() => { window.__notReloaded = true; });

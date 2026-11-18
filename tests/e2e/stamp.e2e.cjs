@@ -323,7 +323,7 @@ module.exports = [
     async run({ page }) {
       const half = new Date(NOON12 - 30 * 60 * 1000).toISOString();
       const payments = [pay({ n: 1, cad: 10, by: "Ajen", at: half }), pay({ n: 2, cad: 5, from: "Trenton", by: "Mo", at: half })];
-      await ready(page, { seed: { ...SEED, payments }, storage: { "mat.seen": String(NOON12 - 60 * 60 * 1000) } });
+      await ready(page, { seed: { ...SEED, payments }, storage: { "chi.seen": String(NOON12 - 60 * 60 * 1000) } });
       await expectText(page, "#histN", "1");
       assert.ok(await visible(page, "#histN"));
     },

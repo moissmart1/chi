@@ -15,7 +15,7 @@ const ready = async (page, opts = {}) => {
 const announce = (page) => page.evaluate(() => new Promise((resolve) => {
   const ch = new MessageChannel();
   ch.port1.onmessage = () => resolve(true);
-  navigator.serviceWorker.dispatchEvent(new MessageEvent("message", { data: { type: "mat-new-version" }, ports: [ch.port2] }));
+  navigator.serviceWorker.dispatchEvent(new MessageEvent("message", { data: { type: "chi-new-version" }, ports: [ch.port2] }));
   setTimeout(() => resolve(false), 500);
 }));
 const mark = (page) => page.evaluate(() => { window.__notReloaded = true; });

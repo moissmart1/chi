@@ -52,7 +52,7 @@ async function openYou(page) {
 
 async function pick(page, name) {
   await page.click('#setWho [data-me="' + name + '"]');
-  await until(async () => (await storage(page, "mat.me")) === name, "mat.me is " + name);
+  await until(async () => (await storage(page, "chi.me")) === name, "chi.me is " + name);
 }
 
 module.exports = [
@@ -120,7 +120,7 @@ module.exports = [
     },
   },
   {
-    name: "switching person stores mat.me and #say follows; the field then shows that person's own address and a half-typed one is dropped",
+    name: "switching person stores chi.me and #say follows; the field then shows that person's own address and a half-typed one is dropped",
     async run({ page }) {
       const backend = await ready(page);
       await expectText(page, "#say", "You’re owed $1,343.08.");
@@ -199,17 +199,17 @@ module.exports = [
     },
   },
   {
-    name: "the stamp sound switch flips On and Off and mat.sound between on and off",
+    name: "the stamp sound switch flips On and Off and chi.sound between on and off",
     async run({ page }) {
       await ready(page);
       await openYou(page);
       await expectText(page, "#setSoundV", "On");
       await page.click("#setSound");
       await expectText(page, "#setSoundV", "Off");
-      assert.equal(await storage(page, "mat.sound"), "off");
+      assert.equal(await storage(page, "chi.sound"), "off");
       await page.click("#setSound");
       await expectText(page, "#setSoundV", "On");
-      assert.equal(await storage(page, "mat.sound"), "on");
+      assert.equal(await storage(page, "chi.sound"), "on");
       await page.click("#setSound");
       await page.click("#youDone");
       await waitYouClosed(page);
@@ -320,8 +320,8 @@ module.exports = [
       assert.ok(m.start_url.endsWith("#k=test-key"), m.start_url);
       assert.equal(m.start_url, ORIGIN + "/#k=test-key");
       assert.equal(m.scope, ORIGIN + "/");
-      assert.equal(m.id, ORIGIN + "/");
-      assert.equal(m.name, "MAT Japan 2026");
+      assert.equal(m.id, ORIGIN + "/?app=chi");
+      assert.equal(m.name, "CHI Chicago 2026");
       assert.ok(m.icons.length > 0 && m.icons.every((i) => i.src.startsWith(ORIGIN + "/icons/")), "absolute icon URLs");
       assert.equal(await page.evaluate(() => document.body.innerText.includes("test-key")), false, "the key is not drawn");
 

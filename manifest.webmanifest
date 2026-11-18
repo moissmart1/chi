@@ -1,7 +1,7 @@
 {
-  "id": "./",
-  "name": "MAT Japan 2026",
-  "short_name": "MAT",
+  "id": "./?app=chi",
+  "name": "CHI Chicago 2026",
+  "short_name": "CHI",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

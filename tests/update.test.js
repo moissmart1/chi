@@ -19,7 +19,7 @@ test("a new version with nothing open: the page reloads at once and notes when",
   const r = rig();
   r.updater.newVersion();
   assert.equal(r.reloads, 1);
-  assert.equal(r.map.get("mat.reloadedAt"), "1000000");
+  assert.equal(r.map.get("chi.reloadedAt"), "1000000");
 });
 
 test("no new version: check() does nothing", () => {
@@ -46,7 +46,7 @@ test("something is open: it waits, looks again every few seconds, and reloads on
 });
 
 test("reloaded less than a minute ago: it holds off, then reloads", () => {
-  const r = rig({ stored: { "mat.reloadedAt": String(1_000_000 - 5000) } });
+  const r = rig({ stored: { "chi.reloadedAt": String(1_000_000 - 5000) } });
   r.updater.newVersion();
   assert.equal(r.reloads, 0);
   r.nowMs += RELOAD_GAP_MS;
@@ -55,7 +55,7 @@ test("reloaded less than a minute ago: it holds off, then reloads", () => {
 });
 
 test("storage that throws or holds rubbish never stops the reload", () => {
-  const r = rig({ stored: { "mat.reloadedAt": "soon" } });
+  const r = rig({ stored: { "chi.reloadedAt": "soon" } });
   r.updater.newVersion();
   assert.equal(r.reloads, 1);
   let n = 0;

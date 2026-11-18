@@ -346,14 +346,14 @@ module.exports = [
       await idle(page);
       assert.equal(be.fake.tables.Stamps.length, 0);
       assert.equal(await page.evaluate(() => globalThis.__matTest.store.outbox().waiting), 1);
-      assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("mat.queue")).length), 1);
+      assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("chi.queue")).length), 1);
       await advance(page, be, 5 * 60000);
       be.failWith = null;
       await page.evaluate(() => globalThis.__matTest.store.flush());
       await idle(page);
       assert.equal(be.fake.tables.Stamps.length, 1);
       assert.equal(be.fake.tables.Stamps[0].at, new Date(NOON12).toISOString(), "stamped with the time it was pressed, not when it arrived");
-      assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("mat.queue")).length), 0);
+      assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("chi.queue")).length), 0);
     },
   },
   {
@@ -464,7 +464,7 @@ module.exports = [
       assert.equal(m.squares, 11);
       assert.equal(m.squaresIn, true, JSON.stringify(m));
       assert.equal(m.ticketIn, true, JSON.stringify(m));
-      await page.screenshot({ path: "/private/tmp/claude-501/mat-shots/stamp-book/7-narrow-320-days.png" });
+      await page.screenshot({ path: "/private/tmp/claude-501/mat-shots/chi/stamp-book/7-narrow-320-days.png" });
     },
   },
   ...[

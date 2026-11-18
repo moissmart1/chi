@@ -173,7 +173,7 @@ module.exports = [
         if (body.action === "load") await gate;
         return real(body);
       };
-      await open(page, { backend, tab: "days", storage: { "mat.cache": JSON.stringify({ data: old.data, rev: old.rev, loadedAt: NOON12 }) } });
+      await open(page, { backend, tab: "days", storage: { "chi.cache": JSON.stringify({ data: old.data, rev: old.rev, loadedAt: NOON12 }) } });
       await until(() => page.evaluate(() => document.querySelectorAll("#rail .pg .tk").length === 11), "the tickets draw from the cache");
       await expectText(page, "#dayCount", /^Day 3 of 11/);
       assert.ok((await text(page, tk("2026-12-12"))).includes("Shibuya Sky"), "the cached stops are on the ticket");

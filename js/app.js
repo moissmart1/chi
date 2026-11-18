@@ -2,7 +2,7 @@
 // Starts the app: takes the trip key from the invite link, builds the api and
 // the store, mounts the screens (Days, Before we go and Money) and boots.
 
-import { API_URL } from "./config.js";
+import { API_URL, STORAGE_PREFIX, NEW_VERSION_MESSAGE } from "./config.js";
 import { createApi } from "./api.js";
 import { createStore } from "./store.js";
 import { createClock } from "./clock.js";
@@ -38,7 +38,7 @@ const DEMO_GUARD_MS = 30000;
 function phoneStorage() {
   try {
     const s = globalThis.localStorage;
-    s.getItem("mat.key");
+    s.getItem(STORAGE_PREFIX + "key");
     return s;
   } catch {
     const mem = new Map();
@@ -64,7 +64,7 @@ function takeKey(storage) {
   }
   if (key) {
     try {
-      storage.setItem("mat.key", key);
+      storage.setItem(STORAGE_PREFIX + "key", key);
     } catch {
       // nowhere to keep it: it works for this visit only
     }
@@ -74,7 +74,7 @@ function takeKey(storage) {
   return key || null;
 }
 
-// The phone's storage, except that mat.key falls back to the key from this
+// The phone's storage, except that the stored key falls back to the key from this
 // visit (its link, or a pasted one) when the phone could not keep it.
 function withKey(storage, keyHere) {
   return {
@@ -85,15 +85,15 @@ function withKey(storage, keyHere) {
       } catch {
         v = null;
       }
-      return v === null && k === "mat.key" ? keyHere() : v;
+      return v === null && k === STORAGE_PREFIX + "key" ? keyHere() : v;
     },
     setItem: (k, v) => storage.setItem(k, v),
   };
 }
 
 // The screens. showTab(tab) shows one, marks its button and makes the
-// others inert; with `remember` it keeps the choice (mat.tab) and the trip day
-// it was made on (mat.tabDay, by the real time, never the demo clock).
+// others inert; with `remember` it keeps the choice (the stored tab) and the trip day
+// it was made on (the stored tabDay, by the real time, never the demo clock).
 function mountTabs(store, storage) {
   const views = { days: document.getElementById("vDays"), before: document.getElementById("vBefore"), money: document.getElementById("vMoney") };
   const nav = document.getElementById("nav");
@@ -104,8 +104,8 @@ function mountTabs(store, storage) {
       return null;
     }
   };
-  const keptTab = TABS.includes(read("mat.tab")) ? read("mat.tab") : null;
-  const keptDay = read("mat.tabDay");
+  const keptTab = TABS.includes(read(STORAGE_PREFIX + "tab")) ? read(STORAGE_PREFIX + "tab") : null;
+  const keptDay = read(STORAGE_PREFIX + "tabDay");
   let tab = null;
   let settled = false; // the opening screen has been decided with the trip known
   const shownHooks = []; // called with the tab's name each time a tab is shown
@@ -139,8 +139,8 @@ function mountTabs(store, storage) {
     if (!remember || wide || t === "before") return;
     const trip = store.state.trip;
     try {
-      storage.setItem("mat.tab", t);
-      storage.setItem("mat.tabDay", dateIn((trip && trip.tz) || "Asia/Tokyo", Date.now()));
+      storage.setItem(STORAGE_PREFIX + "tab", t);
+      storage.setItem(STORAGE_PREFIX + "tabDay", dateIn((trip && trip.tz) || "Asia/Tokyo", Date.now()));
     } catch {
       // private mode: it opens on Days next time
     }
@@ -194,8 +194,8 @@ function start() {
   let store;
   const api = createApi({
     url: API_URL,
-    getKey: () => storage.getItem("mat.key"),
-    getActor: () => (store && store.state.me) || storage.getItem("mat.me"),
+    getKey: () => storage.getItem(STORAGE_PREFIX + "key"),
+    getActor: () => (store && store.state.me) || storage.getItem(STORAGE_PREFIX + "me"),
   });
   store = createStore({ api, storage });
 
@@ -206,7 +206,7 @@ function start() {
   const phone = document.getElementById("phone");
   // Ring up on Days shows Money while the register is open, so each line is
   // seen printing onto the receipt, and goes back to Days when it closes.
-  // Borrowed: mat.tab is left as it was.
+  // Borrowed: the stored tab is left as it was.
   let borrowed = false;
   const register = mountRegister(phone, store, {
     storage: raw,
@@ -269,7 +269,7 @@ function start() {
   });
   const you = mountYou(phone, store, {
     demo: clock,
-    getKey: () => storage.getItem("mat.key"),
+    getKey: () => storage.getItem(STORAGE_PREFIX + "key"),
     screen: () => (tabs.tab() === "days" ? "Days" : tabs.tab() === "before" ? "Before we go" : "Money"),
     // Try another day: Days follows the demo clock from the picked day's
     // 07:00. Nothing is stored, so a reload ends it.
@@ -410,7 +410,7 @@ function start() {
     onKey: (key) => {
       keyHere = key;
       try {
-        raw.setItem("mat.key", key);
+        raw.setItem(STORAGE_PREFIX + "key", key);
       } catch {
         // nowhere to keep it: it works for this visit only
       }
@@ -522,7 +522,7 @@ function registerWorker() {
     // The worker says a new version has taken over: answer (so it leaves the
     // reloading to this page) and reload when safe.
     navigator.serviceWorker.addEventListener("message", (ev) => {
-      if (!ev.data || ev.data.type !== "mat-new-version") return;
+      if (!ev.data || ev.data.type !== NEW_VERSION_MESSAGE) return;
       try {
         if (ev.ports && ev.ports[0]) ev.ports[0].postMessage("ok");
       } catch {
