@@ -73,7 +73,7 @@ module.exports = [
       await setScroll(page, 0);
       await advance(page, backend, 15000);
       assert.equal(await scrollTop(page), 0, "not on the tick");
-      const env = await backend.handle({ key: "test-key", actor: "Ajen", via: "app", action: "updateStop", args: { id: TEN[2].id, patch: { detail: "Changed on another phone" } } });
+      const env = await backend.handle({ key: "test-key", actor: "Izzah", via: "app", action: "updateStop", args: { id: TEN[2].id, patch: { detail: "Changed on another phone" } } });
       assert.equal(env.ok, true, JSON.stringify(env));
       await advance(page, backend, 20000);
       await expectText(page, '.r[data-id="' + TEN[2].id + '"] .r-s', /Changed on another phone/);

@@ -1,8 +1,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const P = require("../backend/Pure.js");
-const taxi = { id: "e1", title: "Taxi back", amount: 23.4, currency: "USD", paidBy: "Ajen", split: ["Ajen", "Trenton"], day: "2026-12-11", note: "", deleted: false };
-const stamp = { id: "p1", from: "Ajen", to: "Mo", cad: 250, removed: false };
+const taxi = { id: "e1", title: "Taxi back", amount: 23.4, currency: "USD", paidBy: "Izzah", split: ["Izzah", "Sam"], day: "2026-12-11", note: "", deleted: false };
+const stamp = { id: "p1", from: "Izzah", to: "Mo", cad: 250, removed: false };
 
 test("every kind of change reads as one plain sentence", () => {
   assert.equal(P.summarize("add", "expense", null, taxi), "rang up Taxi back US$23.40");
@@ -10,12 +10,12 @@ test("every kind of change reads as one plain sentence", () => {
   assert.equal(P.summarize("edit", "expense", { ...taxi, amount: 1350 }, { ...taxi, amount: 1450 }), "changed Taxi back US$1,350.00 → US$1,450.00");
   assert.equal(P.summarize("edit", "expense", taxi, { ...taxi, title: "Taxi home" }), "renamed Taxi back to Taxi home");
   assert.equal(P.summarize("edit", "expense", taxi, { ...taxi, paidBy: "Mo", note: "late" }), "changed Taxi back: payer, note");
-  assert.equal(P.summarize("edit", "expense", taxi, { ...taxi, split: ["Ajen"], day: "2026-12-12" }), "changed Taxi back: split, day");
+  assert.equal(P.summarize("edit", "expense", taxi, { ...taxi, split: ["Izzah"], day: "2026-12-12" }), "changed Taxi back: split, day");
   assert.equal(P.summarize("delete", "expense", taxi, { ...taxi, deleted: true }), "deleted Taxi back US$23.40");
   assert.equal(P.summarize("restore", "expense", { ...taxi, deleted: true }, taxi), "brought back Taxi back US$23.40");
-  assert.equal(P.summarize("stamp", "payment", null, stamp), "stamped Ajen → Mo $250.00");
-  assert.equal(P.summarize("unstamp", "payment", stamp, { ...stamp, removed: true }), "removed the stamp Ajen → Mo $250.00");
-  assert.equal(P.summarize("restamp", "payment", { ...stamp, removed: true }, stamp), "put back the stamp Ajen → Mo $250.00");
+  assert.equal(P.summarize("stamp", "payment", null, stamp), "stamped Izzah → Mo $250.00");
+  assert.equal(P.summarize("unstamp", "payment", stamp, { ...stamp, removed: true }), "removed the stamp Izzah → Mo $250.00");
+  assert.equal(P.summarize("restamp", "payment", { ...stamp, removed: true }, stamp), "put back the stamp Izzah → Mo $250.00");
 });
 
 test("edit sentences: kind-only, money precedence, currency change, thousands", () => {
@@ -35,22 +35,22 @@ test("undoing puts the item back to how it was before that change", () => {
 });
 
 test("undoTarget returns a fresh object and never touches the entry", () => {
-  const before = { ...taxi, split: ["Ajen", "Trenton"] };
-  const after = { ...taxi, split: ["Ajen"] };
+  const before = { ...taxi, split: ["Izzah", "Sam"] };
+  const after = { ...taxi, split: ["Izzah"] };
   const entry = { kind: "expense", before, after };
   const t1 = P.undoTarget(entry);
   assert.notEqual(t1, before);
   t1.title = "changed";
   t1.split.push("Mo");
   assert.equal(before.title, "Taxi back");
-  assert.deepEqual(before.split, ["Ajen", "Trenton"]);
+  assert.deepEqual(before.split, ["Izzah", "Sam"]);
   const e2 = { kind: "expense", before: null, after };
   const t2 = P.undoTarget(e2);
   assert.notEqual(t2, after);
   assert.equal(after.deleted, false);
   assert.equal(t2.deleted, true);
   t2.split.push("Mo");
-  assert.deepEqual(after.split, ["Ajen"]);
+  assert.deepEqual(after.split, ["Izzah"]);
 });
 
 test("only the newest change to an item can be undone, and only once", () => {
@@ -73,13 +73,13 @@ test("only the newest change to an item can be undone, and only once", () => {
 test("a raw Log row becomes the API entry, with no snapshots", () => {
   const raw = (o) => ({ id: "", at: "", who: "", via: "", action: "", kind: "", ref: "", summary: "", before: "", after: "", undoes: "", undone_by: "", ...o });
   const rows = [
-    raw({ id: "1", at: "2026-12-11T01:00:00.000Z", who: "Ajen", via: "claude", action: "add", kind: "expense", ref: "e1", summary: "rang up Taxi back US$23.40", after: JSON.stringify(taxi) }),
+    raw({ id: "1", at: "2026-12-11T01:00:00.000Z", who: "Izzah", via: "claude", action: "add", kind: "expense", ref: "e1", summary: "rang up Taxi back US$23.40", after: JSON.stringify(taxi) }),
     raw({ id: 2, at: "2026-12-11T02:00:00.000Z", who: "Mo", via: "", action: "edit", kind: "expense", ref: "e1", summary: "x", before: JSON.stringify(taxi), after: JSON.stringify({ ...taxi, note: "n" }), undoes: "", undone_by: "" }),
     raw({ id: 3, who: "Mo", via: "web", action: "add", kind: "payment", ref: "p1", undoes: "2", undone_by: 4 }),
     raw({ id: "4", kind: "payment", ref: "p1" }),
   ];
   const e1 = P.entryFromRow(rows[0], rows);
-  assert.deepEqual(e1, { id: 1, at: "2026-12-11T01:00:00.000Z", who: "Ajen", via: "claude", action: "add", kind: "expense", ref: "e1", summary: "rang up Taxi back US$23.40", undoes: null, undoneBy: null, canUndo: false });
+  assert.deepEqual(e1, { id: 1, at: "2026-12-11T01:00:00.000Z", who: "Izzah", via: "claude", action: "add", kind: "expense", ref: "e1", summary: "rang up Taxi back US$23.40", undoes: null, undoneBy: null, canUndo: false });
   assert.equal("before" in e1, false);
   assert.equal("after" in e1, false);
   const e2 = P.entryFromRow(rows[1], rows);
@@ -115,8 +115,8 @@ test("log ids compare as numbers even when the sheet hands them back as text", (
 });
 
 test("a person's e-Transfer change reads as a sentence without the address, and is never undoable (F9)", () => {
-  assert.equal(P.summarize("edit", "person", { name: "Ajen", etransfer: "" }, { name: "Ajen", etransfer: "a@example.com" }), "changed Ajen’s e-Transfer address");
-  const entry = { id: 3, kind: "person", ref: "Ajen", undoneBy: null };
+  assert.equal(P.summarize("edit", "person", { name: "Izzah", etransfer: "" }, { name: "Izzah", etransfer: "a@example.com" }), "changed Izzah’s e-Transfer address");
+  const entry = { id: 3, kind: "person", ref: "Izzah", undoneBy: null };
   assert.equal(P.canUndo(entry, [entry]), false);
 });
 
@@ -131,7 +131,7 @@ test("a picture change reads as a sentence with no pronoun and no picture in it,
     assert.deepEqual(P.undoTarget(entry), { name: "Mo", photo: before }, "undo puts back what was there");
     assert.equal(P.canUndo(entry, [entry]), true);
     assert.equal(P.canUndo(entry, [entry, { id: 5, kind: "picture", ref: "Mo" }]), false, "a newer picture change comes first");
-    assert.equal(P.canUndo(entry, [entry, { id: 5, kind: "person", ref: "Mo" }, { id: 6, kind: "picture", ref: "Ajen" }]), true, "an e-Transfer change or another person's picture does not block it");
+    assert.equal(P.canUndo(entry, [entry, { id: 5, kind: "person", ref: "Mo" }, { id: 6, kind: "picture", ref: "Izzah" }]), true, "an e-Transfer change or another person's picture does not block it");
   }
 });
 

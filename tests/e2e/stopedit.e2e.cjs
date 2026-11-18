@@ -415,7 +415,7 @@ module.exports = [
       const backend = await ready(page);
       await openEdit(page, SKY);
       await page.fill("#stDetail", "Gate B");
-      let env = await backend.handle({ key: "test-key", actor: "Ajen", via: "app", action: "deleteStop", args: { id: SKY } });
+      let env = await backend.handle({ key: "test-key", actor: "Izzah", via: "app", action: "deleteStop", args: { id: SKY } });
       assert.equal(env.ok, true, JSON.stringify(env));
       await advance(page, backend, 20000);
       await expectText(page, "#stMsg", "Someone removed this stop, so it can’t be saved.");
@@ -424,7 +424,7 @@ module.exports = [
       assert.equal(await disabled(page, "#stSave"), true);
       assert.equal(await disabled(page, "#stDel"), true);
       // Put back on that phone: the sheet can save again.
-      env = await backend.handle({ key: "test-key", actor: "Ajen", via: "app", action: "restoreStop", args: { id: SKY } });
+      env = await backend.handle({ key: "test-key", actor: "Izzah", via: "app", action: "restoreStop", args: { id: SKY } });
       assert.equal(env.ok, true, JSON.stringify(env));
       await advance(page, backend, 20000);
       await until(async () => !(await disabled(page, "#stSave")), "Save comes back on");
@@ -454,10 +454,10 @@ module.exports = [
       await openAdd(page);
       await page.fill("#stWhat", "Half a na");
       await page.focus("#stWhat");
-      const env = await backend.handle({ key: "test-key", actor: "Ajen", via: "app", action: "addStop", args: { stop: { id: "ajenstop0001", date: D12, time: "16:00", title: "Tower Records" } } });
+      const env = await backend.handle({ key: "test-key", actor: "Izzah", via: "app", action: "addStop", args: { stop: { id: "ajenstop0001", date: D12, time: "16:00", title: "Tower Records" } } });
       assert.equal(env.ok, true, JSON.stringify(env));
       await advance(page, backend, 20000);
-      await until(() => page.evaluate(() => !!document.querySelector('.r[data-id="ajenstop0001"]')), "Ajen’s stop is on the ticket");
+      await until(() => page.evaluate(() => !!document.querySelector('.r[data-id="ajenstop0001"]')), "Izzah’s stop is on the ticket");
       assert.equal(await value(page, "#stWhat"), "Half a na");
       assert.equal(await isOpen(page, "stop"), true);
       assert.equal(await page.evaluate(() => document.activeElement && document.activeElement.id), "stWhat", "the field keeps focus");
@@ -470,7 +470,7 @@ module.exports = [
       const backend = await ready(page);
       await openEdit(page, SKY);
       await page.fill("#stDetail", "Booked for 14:00, gate B");
-      const env = await backend.handle({ key: "test-key", actor: "Ajen", via: "app", action: "updateStop", args: { id: SKY, patch: { note: "Bring the QR code." } } });
+      const env = await backend.handle({ key: "test-key", actor: "Izzah", via: "app", action: "updateStop", args: { id: SKY, patch: { note: "Bring the QR code." } } });
       assert.equal(env.ok, true, JSON.stringify(env));
       await advance(page, backend, 20000);
       await idle(page);
@@ -481,7 +481,7 @@ module.exports = [
       await idle(page);
       const saved = backend.fake.tables.Stops.find((r) => r.id === SKY);
       assert.equal(saved.detail, "Booked for 14:00, gate B");
-      assert.equal(saved.note, "Bring the QR code.", "Ajen’s note is kept: only the changed field was sent");
+      assert.equal(saved.note, "Bring the QR code.", "Izzah’s note is kept: only the changed field was sent");
     },
   },
   {
@@ -490,7 +490,7 @@ module.exports = [
       const { page } = ctx;
       const backend = await ready(page);
       const b = await ctx.newPhone();
-      await ready(b, { backend, me: "Ajen" });
+      await ready(b, { backend, me: "Izzah" });
       await addTower(page);
       await idle(page);
       await advance(b, backend, 20000);

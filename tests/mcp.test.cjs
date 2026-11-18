@@ -35,7 +35,7 @@ const badArgs = (fake, name, args) => {
   return r.error.message;
 };
 const app = (fake, action, args, actor = "Mo") => fake({ key: "test-key", actor, action, args });
-const NAMES = ["Mo", "Ajen", "Trenton"];
+const NAMES = ["Mo", "Izzah"];
 
 // ---------- the brief's tests ----------
 
@@ -59,11 +59,11 @@ test("every tool has a name, a description and a schema", () => {
 
 test("Claude adds a stop: validated, logged as Claude, undoable", async () => {
   const fake = createFakeBackend({});
-  const r = fake.mcp(rpc("tools/call", { name: "add_stop", arguments: { date: "2026-12-12", title: "Shibuya Sky", time: "14:00", travel_min: 30, sign_jp: "渋谷" } }), { ...T, as: "Ajen" });
+  const r = fake.mcp(rpc("tools/call", { name: "add_stop", arguments: { date: "2026-12-12", title: "Shibuya Sky", time: "14:00", travel_min: 30, sign_jp: "渋谷" } }), { ...T, as: "Izzah" });
   const stop = body(r).stop;
   assert.deepEqual([stop.title, stop.travelMin, stop.signJp], ["Shibuya Sky", 30, "渋谷"]);
   const log = fake.tables.Log.at(-1);
-  assert.deepEqual([log.who, log.via], ["Ajen", "claude"]);
+  assert.deepEqual([log.who, log.via], ["Izzah", "claude"]);
   const u = fake.mcp(rpc("tools/call", { name: "undo", arguments: { log_id: body(r).log_id } }), T);
   assert.equal(body(u).stop.deleted, true);
 });
@@ -79,7 +79,7 @@ test("a refusal comes back in the backend's words, as a tool error", () => {
 test("get_trip and explain_debt agree with the app's own maths", () => {
   const fake = createFakeBackend(seed);
   const trip = body(fake.mcp(rpc("tools/call", { name: "get_trip", arguments: {} }), T));
-  const people = ["Mo", "Ajen", "Trenton"];
+  const people = ["Mo", "Izzah"];
   const expected = money.owedList(people, seed.expenses, seed.payments, true);
   assert.deepEqual(trip.owed, expected.map((x) => ({ from: x.from, to: x.to, amount: dollars(x.cents) })));
   assert.equal(JSON.stringify(trip).includes("etransfer"), false);
@@ -92,7 +92,7 @@ test("get_trip and explain_debt agree with the app's own maths", () => {
 test("add_expense defaults: everyone shares it, and the day is today in Chicago", () => {
   const fake = createFakeBackend({}, { clock: () => "2026-12-12T19:20:00.000Z" }); // 13:20 in Chicago
   const e = body(fake.mcp(rpc("tools/call", { name: "add_expense", arguments: { title: "Ramen", amount: 30, currency: "USD", paid_by: "Mo" } }), T)).expense;
-  assert.deepEqual([e.day, e.split.length, e.addedBy], ["2026-12-12", 3, "Mo"]);
+  assert.deepEqual([e.day, e.split.length, e.addedBy], ["2026-12-12", 2, "Mo"]);
 });
 
 test("no reply ever holds the trip key or the token", () => {
@@ -244,7 +244,7 @@ test("a time is trimmed before it is handed on; an empty one is no time", () => 
 
 test("writes are made as the person `as` names (any case, spaces trimmed), else the first person, always via claude (R35)", () => {
   const fake = createFakeBackend({});
-  for (const [as, who] of [["Trenton", "Trenton"], ["ajen", "Ajen"], [" Ajen ", "Ajen"], [undefined, "Mo"]]) {
+  for (const [as, who] of [["Izzah", "Izzah"], ["izzah", "Izzah"], [" Izzah ", "Izzah"], [undefined, "Mo"]]) {
     ok(fake, "add_stop", { date: "2026-12-11", title: "With " + as }, as === undefined ? T : { ...T, as });
     const log = fake.tables.Log.at(-1);
     assert.deepEqual([log.who, log.via], [who, "claude"], String(as));
@@ -282,8 +282,8 @@ test("the write tools map their arguments to the API and answer { <kind>, log_id
   assert.equal(refusal(fake, "set_day", { date: "2026-12-14", line_colour: "blue" }), "Use a colour like #2FB6E8.");
   assert.equal(refusal(fake, "set_day", { date: "2027-01-01", city: "x" }), "That day isn’t on this trip.");
 
-  const e = ok(fake, "add_expense", { title: "Taxi", amount: 12.5, currency: "CAD", paid_by: "Ajen", split: ["Mo", "Ajen"], note: "airport", kind: "transport", day: "2026-12-13" });
-  assert.deepEqual([e.expense.amount, e.expense.currency, e.expense.paidBy, e.expense.split, e.expense.note, e.expense.kind, e.expense.day, e.expense.rate], [12.5, "CAD", "Ajen", ["Mo", "Ajen"], "airport", "transport", "2026-12-13", 0.72]);
+  const e = ok(fake, "add_expense", { title: "Taxi", amount: 12.5, currency: "CAD", paid_by: "Izzah", split: ["Mo", "Izzah"], note: "airport", kind: "transport", day: "2026-12-13" });
+  assert.deepEqual([e.expense.amount, e.expense.currency, e.expense.paidBy, e.expense.split, e.expense.note, e.expense.kind, e.expense.day, e.expense.rate], [12.5, "CAD", "Izzah", ["Mo", "Izzah"], "airport", "transport", "2026-12-13", 0.72]);
   assert.equal(refusal(fake, "add_expense", { title: "x", amount: 1, currency: "JPY", paid_by: "Mo" }), "Use US or Canadian dollars.");
   assert.equal(refusal(fake, "add_expense", { title: "x", amount: 1, currency: "USD", paid_by: "Nobody" }), "Pick who paid.");
 });
@@ -330,7 +330,7 @@ test("undo through the connector obeys the app's rules", async () => {
 // ---------- reads ----------
 
 test("get_trip gives the trip, names only, the days, and only live stops, stays, expenses and payments", async () => {
-  const fake = createFakeBackend({ ...seed, ...plan, payments: [{ id: "pay0000001", from: "Ajen", to: "Mo", cad: 25, seed: 3, rot: 0 }, { id: "pay0000002", from: "Trenton", to: "Mo", cad: 5, seed: 3, rot: 0, removed: true }] });
+  const fake = createFakeBackend({ ...seed, ...plan, payments: [{ id: "pay0000001", from: "Izzah", to: "Mo", cad: 25, seed: 3, rot: 0 }, { id: "pay0000002", from: "Izzah", to: "Mo", cad: 5, seed: 3, rot: 0, removed: true }] });
   await app(fake, "deleteStop", { id: "planstop1102" });
   await app(fake, "deleteExpense", { id: "seedexp004" });
   const t = ok(fake, "get_trip", {});
@@ -344,7 +344,7 @@ test("get_trip gives the trip, names only, the days, and only live stops, stays,
   assert.equal(t.expenses.some((e) => e.id === "seedexp004"), false);
   assert.deepEqual(t.payments.map((p) => p.id), ["pay0000001"]);
   const live = seed.expenses.filter((e) => e.id !== "seedexp004");
-  const pays = [{ from: "Ajen", to: "Mo", cad: 25 }];
+  const pays = [{ from: "Izzah", to: "Mo", cad: 25 }];
   assert.deepEqual(t.owed, money.owedList(NAMES, live, pays, true).map((x) => ({ from: x.from, to: x.to, amount: dollars(x.cents) })));
   assert.deepEqual(t.owed_direct, money.owedList(NAMES, live, pays, false).map((x) => ({ from: x.from, to: x.to, amount: dollars(x.cents) })));
   for (const o of t.owed.concat(t.owed_direct)) assert.match(o.amount, /^\$\d{1,3}(,\d{3})*\.\d{2}$/);
@@ -401,13 +401,13 @@ test("get_history: newest first, 30 by default, at most 200, with id, when, who,
 test("no tool gives out an e-Transfer address or an email; the History entry about one stays, without it", async () => {
   const fake = createFakeBackend({ ...seed, ...plan });
   await app(fake, "setPerson", { name: "Mo", patch: { etransfer: "mo.pays@example.com" } });
-  await app(fake, "setPerson", { name: "Ajen", patch: { etransfer: "416-555-0123" } }, "Ajen");
+  await app(fake, "setPerson", { name: "Izzah", patch: { etransfer: "416-555-0123" } }, "Izzah");
   fake.tables.People[0].email = "mo.real@example.com";
-  const s = ok(fake, "add_stop", { date: "2026-12-12", title: "Pay back", note: "Ajen takes 416-555-0123, or write to someone@example.org" });
+  const s = ok(fake, "add_stop", { date: "2026-12-12", title: "Pay back", note: "Izzah takes 416-555-0123, or write to someone@example.org" });
   assert.equal(s.stop.note.includes("416-555-0123") || s.stop.note.includes("someone@example.org"), false, s.stop.note);
   const seen = [];
   for (const name of ["get_trip", "get_history"]) seen.push(JSON.stringify(call(fake, name, {})));
-  seen.push(JSON.stringify(call(fake, "explain_debt", { from: "Ajen", to: "Mo" })));
+  seen.push(JSON.stringify(call(fake, "explain_debt", { from: "Izzah", to: "Mo" })));
   seen.push(JSON.stringify(call(fake, "undo", { log_id: 999 })));
   seen.push(JSON.stringify(fake.mcp(rpc("tools/list"), T)));
   const all = seen.join("");
@@ -431,7 +431,7 @@ test("the trip key and the token never reach a reply, an error, the Log, History
   r(fake.mcp(rpc("nope"), T));
   r(fake.mcp({ id: 1 }, T));
   for (const name of ["get_trip", "get_history"]) r(call(fake, name, {}));
-  r(call(fake, "explain_debt", { from: "Mo", to: "Ajen" }));
+  r(call(fake, "explain_debt", { from: "Mo", to: "Izzah" }));
   const added = r(call(fake, "add_stop", { date: "2026-12-12", title: "Tea house" }));
   r(call(fake, "add_stop", { date: "2026-12-12", title: "x", link: "javascript:1" }));
   r(call(fake, "change_stop", { id: body(added).stop.id, note: "n" }));
@@ -553,7 +553,7 @@ test("R35: an `as` that names no one refuses every write with -32602 and stores 
   assert.equal(JSON.stringify(fake.tables), before, "nothing stored");
   assert.ok(ok(fake, "get_trip", {}, q).trip);
   assert.ok(ok(fake, "get_history", {}, q).entries);
-  assert.ok(ok(fake, "explain_debt", { from: "Mo", to: "Ajen" }, q).from);
+  assert.ok(ok(fake, "explain_debt", { from: "Mo", to: "Izzah" }, q).from);
   // An empty as is no as: the first person.
   ok(fake, "add_stop", { date: "2026-12-12", title: "Tea" }, { ...T, as: " " });
   assert.equal(fake.tables.Log.at(-1).who, "Mo");
@@ -615,23 +615,24 @@ test("a string argument holding (hidden) is refused, so leaving a field out keep
 });
 
 test("an e-Transfer address that is an ordinary word hides only a field that is exactly it; a phone or email address is never returned", async () => {
-  const fake = createFakeBackend({ ...seed, ...plan });
-  await app(fake, "setPerson", { name: "Mo", patch: { etransfer: "Tokyo" } });
-  await app(fake, "setPerson", { name: "Ajen", patch: { etransfer: "+1 (416) 555-0123" } }, "Ajen");
-  await app(fake, "setPerson", { name: "Trenton", patch: { etransfer: "trent@example.net" } }, "Trenton");
-  const s = ok(fake, "add_stop", { date: "2026-12-12", title: "Tokyo Tower", detail: "Tokyo", note: "Ajen: +1 (416) 555-0123, Trenton: trent@example.net" }).stop;
-  assert.equal(s.title, "Tokyo Tower");
+  // Three people here, so a phone number and an email address are both in play.
+  const fake = createFakeBackend({ ...seed, ...plan, addPeople: [{ name: "Sam", initials: "SA" }] });
+  await app(fake, "setPerson", { name: "Mo", patch: { etransfer: "Chicago" } });
+  await app(fake, "setPerson", { name: "Izzah", patch: { etransfer: "+1 (416) 555-0123" } }, "Izzah");
+  await app(fake, "setPerson", { name: "Sam", patch: { etransfer: "sam@example.net" } }, "Sam");
+  const s = ok(fake, "add_stop", { date: "2026-12-12", title: "Chicago Theatre", detail: "Chicago", note: "Izzah: +1 (416) 555-0123, Sam: sam@example.net" }).stop;
+  assert.equal(s.title, "Chicago Theatre");
   assert.equal(s.detail, "(hidden)", "a field that is exactly the address");
-  assert.equal(s.note, "Ajen: (hidden), Trenton: (hidden)");
+  assert.equal(s.note, "Izzah: (hidden), Sam: (hidden)");
   const all = [
     JSON.stringify(call(fake, "get_trip", {})),
     JSON.stringify(call(fake, "get_history", { limit: 200 })),
-    JSON.stringify(call(fake, "explain_debt", { from: "Ajen", to: "Mo" })),
+    JSON.stringify(call(fake, "explain_debt", { from: "Izzah", to: "Mo" })),
     JSON.stringify(call(fake, "change_stop", { id: s.id, link: "javascript:+1 (416) 555-0123" })),
-    JSON.stringify(call(fake, "add_expense", { title: "x", amount: 1, currency: "USD", paid_by: "trent@example.net" })),
+    JSON.stringify(call(fake, "add_expense", { title: "x", amount: 1, currency: "USD", paid_by: "sam@example.net" })),
   ].join("");
-  assert.equal(all.includes("555-0123") || all.includes("trent@example.net"), false);
-  assert.ok(all.includes("Tokyo Tower"));
+  assert.equal(all.includes("555-0123") || all.includes("sam@example.net"), false);
+  assert.ok(all.includes("Chicago Theatre"));
 });
 
 // ---------- fix round 2: another phone's write between the connector's start and its write ----------
@@ -642,7 +643,7 @@ test("save_stay never undoes another phone's edit made while Claude's request is
   fake.beforeConnectorWrite = (body) => {
     if (body.action !== "saveStay") return;
     fake.beforeConnectorWrite = null;
-    fake({ key: "test-key", actor: "Ajen", action: "saveStay", args: { stay: { id: s.id, name: "Ryokan", firstNight: "2026-12-14", lastNight: "2026-12-15", note: "phone B edit", addressJp: "京都" } } });
+    fake({ key: "test-key", actor: "Izzah", action: "saveStay", args: { stay: { id: s.id, name: "Ryokan", firstNight: "2026-12-14", lastNight: "2026-12-15", note: "phone B edit", addressJp: "京都" } } });
   };
   const moved = ok(fake, "save_stay", { id: s.id, last_night: "2026-12-16" }).stay;
   assert.deepEqual([moved.note, moved.lastNight, moved.addressJp], ["phone B edit", "2026-12-16", "京都"]);
@@ -660,7 +661,7 @@ test("change_stop never undoes another phone's edit made while Claude's request 
   fake.beforeConnectorWrite = (body) => {
     if (body.action !== "updateStop") return;
     fake.beforeConnectorWrite = null;
-    fake({ key: "test-key", actor: "Ajen", action: "updateStop", args: { id: "planstop1203", patch: { note: "phone B edit" } } });
+    fake({ key: "test-key", actor: "Izzah", action: "updateStop", args: { id: "planstop1203", patch: { note: "phone B edit" } } });
   };
   const c = ok(fake, "change_stop", { id: "planstop1203", time: "15:00" }).stop;
   assert.deepEqual([c.note, c.time, c.detail], ["phone B edit", "15:00", "Booked for 14:00"]);
@@ -720,7 +721,7 @@ test("M2: add_expense refuses a day that is neither pre nor a trip day; pre and 
 const PLANNER_ID = "fakePlannerSheet_0123456789abcdefXYZ";
 const PHEAD = ["payment_id", "date_paid", "payer", "description", "category", "vendor", "booking_ref", "amount", "currency", "amount_cad", "cad_is_exact", "split_between", "split_type", "status", "include_in_split", "source", "added_by", "notes"];
 const prow = (o) => PHEAD.map((h) => (o[h] === undefined ? "" : o[h]));
-const PX7 = { payment_id: "X7", date_paid: "2026-12-11", payer: "Mo", description: "Rail pass", category: "transport", vendor: "North Rail", booking_ref: "AB12", amount: 247.5, currency: "USD", amount_cad: 221.52, cad_is_exact: "yes", split_between: "Mo, Ajen, Trenton", split_type: "equal", include_in_split: "yes" };
+const PX7 = { payment_id: "X7", date_paid: "2026-12-11", payer: "Mo", description: "Rail pass", category: "transport", vendor: "North Rail", booking_ref: "AB12", amount: 247.5, currency: "USD", amount_cad: 221.52, cad_is_exact: "yes", split_between: "Mo, Izzah", split_type: "equal", include_in_split: "yes" };
 const PLANNER = [PHEAD, prow(PX7), prow({ ...PX7, payment_id: "P5", split_type: "personal" }), prow({ ...PX7, payment_id: "Z1", include_in_split: "no" })];
 
 test("sync_payments brings the planner's payments in, each credited to who paid, logged as from the planner", () => {
@@ -728,7 +729,7 @@ test("sync_payments brings the planner's payments in, each credited to who paid,
   const tool = fake.mcp(rpc("tools/list"), T).result.tools.find((t) => t.name === "sync_payments");
   assert.equal(tool.description, "Use this to bring in what’s been paid from the planner sheet’s Payments tab: new payments are added and changed ones updated. The change shows in the app’s History and can be undone.");
   assert.deepEqual(tool.inputSchema, { type: "object", properties: {}, additionalProperties: false });
-  const r = ok(fake, "sync_payments", {}, { ...T, as: " ajen " });
+  const r = ok(fake, "sync_payments", {}, { ...T, as: " izzah " });
   assert.deepEqual(r, { added: 1, changed: 0, same: 0, removed: 0, not_counted: [], problems: [{ id: "P5", message: "Only payments split equally can be brought in.", row: 3, what: "Rail pass" }], more: false, capped: false });
   assert.deepEqual(fake.tables.Log.map((l) => [l.who, l.via]), [["Mo", "planner"]]); // credited to who paid, not the person in the link
   assert.deepEqual(ok(fake, "sync_payments", {}), { added: 0, changed: 0, same: 1, removed: 0, not_counted: [], problems: [{ id: "P5", message: "Only payments split equally can be brought in.", row: 3, what: "Rail pass" }], more: false, capped: false });
@@ -786,18 +787,18 @@ test("sync_payments needs the token and a known `as`; a refusal is the backend's
 test("get_trip says who has a picture, never the picture; undoing one answers without it; no tool sets one", async () => {
   const JPEG = require("./fixtures/picture.json").jpeg;
   const fake = createFakeBackend({ ...seed, ...plan });
-  await app(fake, "setPerson", { name: "Ajen", patch: { photo: JPEG } }, "Ajen");
+  await app(fake, "setPerson", { name: "Izzah", patch: { photo: JPEG } }, "Izzah");
   const t = ok(fake, "get_trip", {});
   assert.deepEqual(t.people, NAMES);
-  assert.deepEqual(t.has_picture, { Mo: false, Ajen: true, Trenton: false });
+  assert.deepEqual(t.has_picture, { Mo: false, Izzah: true });
   const h = ok(fake, "get_history", {}).entries;
-  assert.equal(h[0].sentence, "Ajen set a picture");
-  const u = ok(fake, "undo", { log_id: h[0].id }, { ...T, as: "Ajen" });
-  assert.deepEqual(u.person, { name: "Ajen", has_picture: false });
+  assert.equal(h[0].sentence, "Izzah set a picture");
+  const u = ok(fake, "undo", { log_id: h[0].id }, { ...T, as: "Izzah" });
+  assert.deepEqual(u.person, { name: "Izzah", has_picture: false });
   await app(fake, "setPerson", { name: "Mo", patch: { photo: JPEG } });
   const mine = ok(fake, "get_history", {}).entries[0];
-  const theirs = call(fake, "undo", { log_id: mine.id }, { ...T, as: "Ajen" });
-  assert.equal(theirs.result.isError, true, "Claude acting as Ajen cannot change Mo's");
+  const theirs = call(fake, "undo", { log_id: mine.id }, { ...T, as: "Izzah" });
+  assert.equal(theirs.result.isError, true, "Claude acting as Izzah cannot change Mo's");
   assert.match(theirs.result.content[0].text, /own picture/);
   const seen = [];
   for (const name of ["get_trip", "get_history"]) seen.push(JSON.stringify(call(fake, name, {})));

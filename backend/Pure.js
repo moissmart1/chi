@@ -628,8 +628,7 @@ function setupSeedRows() {
     ],
     People: [
       { name: "Mo", initials: "MO", order: 1, etransfer: "", simplify: true, email: "", photo: "" },
-      { name: "Ajen", initials: "AJ", order: 2, etransfer: "", simplify: true, email: "", photo: "" },
-      { name: "Trenton", initials: "TR", order: 3, etransfer: "", simplify: true, email: "", photo: "" },
+      { name: "Izzah", initials: "IZ", order: 2, etransfer: "", simplify: true, email: "", photo: "" },
     ],
     Days: days,
   };

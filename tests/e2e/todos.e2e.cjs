@@ -91,7 +91,7 @@ module.exports = [
   {
     name: "before the trip the list is on the Before tab: open items by book-by date, the due lines, the seals, done folded, the fetch line; Days shows none of it",
     async run({ page }) {
-      const backend = await ready(page, { claims: { 2: "Ajen" } });
+      const backend = await ready(page, { claims: { 2: "Izzah" } });
       assert.ok(await visible(page, "#todos"));
       assert.equal(await onScreen(page), "vBefore");
       assert.equal(await page.evaluate(() => document.getElementById("todos").closest("#vBefore") !== null), true, "the list is in the Before view");
@@ -111,11 +111,11 @@ module.exports = [
       await expectText(page, row(3) + " .bw-due", "by Sat Dec 5 · in 19 days");
       assert.equal(await page.$(row(3) + " .bw-due b"), null, "not heavier 19 days out");
       assert.equal(await page.$(row(4) + " .bw-due"), null, "no date, no due line");
-      // Ajen is on #2: his seal; nobody on the others: an empty ring.
+      // Izzah is on #2: his seal; nobody on the others: an empty ring.
       assert.equal(await page.evaluate((s) => document.querySelector(s).classList.contains("is-empty"), row(2) + " .bw-seal"), false);
       assert.ok((await text(page, row(2) + " .bw-seal")).length > 0);
       assert.equal(await page.evaluate((s) => document.querySelector(s).classList.contains("is-empty"), row(1) + " .bw-seal"), true);
-      await expectText(page, row(2) + " .bw-b", /Ajen is on it/);
+      await expectText(page, row(2) + " .bw-b", /Izzah is on it/);
       await expectText(page, "#bwDoneB", "済 Done (1)");
       assert.equal(await visible(page, "#bwDone"), false, "done is folded");
       await expectText(page, "#bwAt", /^From the planner · fetched \d\d:\d\d$/);
@@ -134,7 +134,7 @@ module.exports = [
   {
     name: "the Before tab: named with the count, the count matches the open rows and follows a tick, and focus and the screen are Days-like",
     async run({ page }) {
-      const backend = await ready(page, { claims: { 2: "Ajen" } });
+      const backend = await ready(page, { claims: { 2: "Izzah" } });
       const bar = () =>
         page.evaluate(() => {
           const b = document.getElementById("beforeBtn");
@@ -208,7 +208,7 @@ module.exports = [
       assert.equal(await fourth.evaluate(() => document.activeElement && document.activeElement.id), "dayCount", "focus goes to the day counter, not lost");
       // A later sync that brings an item back brings the tab back and does not take focus.
       await fourth.evaluate(() => document.getElementById("dayCount").focus());
-      assert.equal((await backend.call("undo", { logId: Number(backend.fake.tables.Log[backend.fake.tables.Log.length - 1].id) }, "Ajen")).ok, true);
+      assert.equal((await backend.call("undo", { logId: Number(backend.fake.tables.Log[backend.fake.tables.Log.length - 1].id) }, "Izzah")).ok, true);
       await fourth.evaluate(() => window.__matTest.store.checkRev());
       await until(() => tabIsIn(fourth), "back, open again");
       assert.equal(await onScreen(fourth), "vDays", "still on Days");
@@ -218,7 +218,7 @@ module.exports = [
   {
     name: "a row opens in place: the whole item, the note, the controls named with the item; the booking opens in a new tab",
     async run({ page, context }) {
-      await ready(page, { claims: { 2: "Ajen" } });
+      await ready(page, { claims: { 2: "Izzah" } });
       await openRow(page, "1");
       await expectText(page, row(1) + " .bw-note", "Window seats for three, both legs.");
       const link = await page.$eval(row(1) + " a.bw-link", (a) => ({ href: a.href, target: a.target, rel: a.rel, text: a.textContent, name: a.getAttribute("aria-label") }));
@@ -254,7 +254,7 @@ module.exports = [
   {
     name: "I’ll do it, hand it back, take it over: shown at once, saved, said on the undo bar",
     async run({ page }) {
-      const backend = await ready(page, { claims: { 2: "Ajen" } });
+      const backend = await ready(page, { claims: { 2: "Izzah" } });
       await openRow(page, "3");
       await page.click(row(3) + " .bw-claim");
       await expectText(page, "#ubarT", "You’re on Snow park day trip.");
@@ -282,14 +282,14 @@ module.exports = [
       const tape = () => page.evaluate(() => [...document.querySelectorAll("#hist .tp-row")].map((r) => [r.querySelector(".tp-s").textContent, !!r.querySelector(".tp-undo")]));
       await until(async () => (await tape()).some(([s]) => s.startsWith("Mo took over")), "History lists the claims");
       const got = await tape();
-      for (const want of [["Mo took over: Tea ceremony class, from Ajen", true], ["Mo handed back: Snow park day trip", true], ["Mo is on: Snow park day trip", false]]) {
+      for (const want of [["Mo took over: Tea ceremony class, from Izzah", true], ["Mo handed back: Snow park day trip", true], ["Mo is on: Snow park day trip", false]]) {
         assert.ok(got.some((g) => g[0] === want[0] && g[1] === want[1]), JSON.stringify(want) + " in " + JSON.stringify(got));
       }
       await page.evaluate(() => {
         const r = [...document.querySelectorAll("#hist .tp-row")].find((x) => x.querySelector(".tp-s").textContent.startsWith("Mo took over"));
         r.querySelector(".tp-undo").click();
       });
-      await until(() => stored(backend, "2").claimed_by === "Ajen", "the undo gives it back to Ajen");
+      await until(() => stored(backend, "2").claimed_by === "Izzah", "the undo gives it back to Izzah");
     },
   },
   {
@@ -365,7 +365,7 @@ module.exports = [
     async run({ page }) {
       const backend = await ready(page);
       await stubSound(page);
-      assert.equal((await backend.call("tickTodo", { id: "4" }, "Ajen")).ok, true);
+      assert.equal((await backend.call("tickTodo", { id: "4" }, "Izzah")).ok, true);
       await openRow(page, "4");
       await page.click(row(4) + " .bw-tick");
       await expectText(page, "#ubarT", "That one is already done.");
@@ -483,7 +483,7 @@ module.exports = [
     name: "sideways (844 × 390): the Before tab in the rail, a row opens and its controls fit",
     viewport: { width: 844, height: 390 },
     async run({ page }) {
-      await ready(page, { claims: { 2: "Ajen" } });
+      await ready(page, { claims: { 2: "Izzah" } });
       assert.ok(await visible(page, "#todos"));
       // The rail lists Days, Before, Ring up, Money, You, stacked, each 44 px or more.
       const rail = await railKeys(page);
@@ -505,7 +505,7 @@ module.exports = [
     name: "sideways (667 × 375): the five rail keys are in order, stacked and in view without scrolling",
     viewport: { width: 667, height: 375 },
     async run({ page }) {
-      await ready(page, { claims: { 2: "Ajen" } });
+      await ready(page, { claims: { 2: "Izzah" } });
       const rail = await railKeys(page);
       assert.deepEqual(rail.map((r) => r.id), FIVE);
       assert.ok(rail.every((r, i) => r.vis && r.h >= 44 && (i === 0 || r.top >= rail[i - 1].bottom - 0.5)), JSON.stringify(rail));
@@ -765,7 +765,7 @@ for (const width of [320, 375, 390, 430]) {
     name: "the bar at " + width + " px: Days, Before, Ring up, Money, You in that order, Ring up in the centre, equal tab keys, nothing clipped, one lamp lit on the current key",
     viewport: { width, height: 760 },
     async run({ page }) {
-      await ready(page, { claims: { 2: "Ajen" }, go: false });
+      await ready(page, { claims: { 2: "Izzah" }, go: false });
       await until(() => tabIsIn(page), "the Before tab is in the bar");
       for (const tab of ["days", "before"]) {
         await page.click('#nav button[data-tab="' + tab + '"]');
@@ -795,7 +795,7 @@ for (const width of [320, 375, 390, 430]) {
       await until(async () => !(await tabIsIn(page)), "the key goes with the last item, no reload");
       assert.equal(checkBar(await barShape(page), "four keys after the last tick", false), "days");
       // The key comes back (the tick is undone elsewhere): the bar re-lays to five.
-      assert.equal((await backend.call("undo", { logId: Number(backend.fake.tables.Log[backend.fake.tables.Log.length - 1].id) }, "Ajen")).ok, true);
+      assert.equal((await backend.call("undo", { logId: Number(backend.fake.tables.Log[backend.fake.tables.Log.length - 1].id) }, "Izzah")).ok, true);
       await page.evaluate(() => window.__matTest.store.checkRev());
       await until(() => tabIsIn(page), "back to five keys");
       checkBar(await barShape(page), "five keys again", true);
@@ -810,7 +810,7 @@ module.exports.push({
     await until(() => tabIsIn(page), "five keys");
     await page.focus("#ring");
     assert.equal(await page.evaluate(() => document.activeElement.id), "ring");
-    assert.equal((await backend.call("tickTodo", { id: "2" }, "Ajen")).ok, true, "ticked on another phone");
+    assert.equal((await backend.call("tickTodo", { id: "2" }, "Izzah")).ok, true, "ticked on another phone");
     await advance(page, backend, 31 * 1000);
     await page.evaluate(() => window.__matTest.store.checkRev());
     await advance(page, backend, 1700);
@@ -979,7 +979,7 @@ module.exports.push({
     const backend = await ready(page, { nowMs: NOON12, items: [ITEMS[1], ITEMS[4]] });
     await page.focus('#nav button[data-tab="before"]');
     assert.equal(await page.evaluate(() => document.activeElement.dataset.tab), "before");
-    assert.equal((await backend.call("tickTodo", { id: "2" }, "Ajen")).ok, true, "ticked on another phone");
+    assert.equal((await backend.call("tickTodo", { id: "2" }, "Izzah")).ok, true, "ticked on another phone");
     await advance(page, backend, 31 * 1000);
     await page.evaluate(() => window.__matTest.store.checkRev());
     await advance(page, backend, 1700);

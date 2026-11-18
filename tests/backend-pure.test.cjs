@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const P = require("../backend/Pure.js");
-const NAMES = ["Mo", "Ajen", "Trenton"];
+const NAMES = ["Mo", "Izzah", "Sam"];
 const good = { id: "a1b2c3d4e5", day: "2026-12-11", title: "Ramen", amount: 42, currency: "USD", paidBy: "Mo", split: NAMES };
 
 test("cells that look like formulas are neutralised", () => {
@@ -70,7 +70,7 @@ test("a day must be a real calendar date", () => {
 });
 
 test("an expense value carries exactly the client-settable fields, trimmed", () => {
-  const r = P.validateExpense({ ...good, title: "  Ramen ", note: " n ", rate: 99, addedBy: "Ajen", addedAt: "t", deleted: true }, NAMES);
+  const r = P.validateExpense({ ...good, title: "  Ramen ", note: " n ", rate: 99, addedBy: "Izzah", addedAt: "t", deleted: true }, NAMES);
   assert.equal(r.ok, true);
   assert.deepEqual(Object.keys(r.value).sort(), ["amount", "currency", "day", "id", "kind", "note", "paidBy", "split", "splitMode", "splitVals", "title"]);
   assert.equal(r.value.title, "Ramen");
@@ -88,16 +88,16 @@ test("odd input is refused with a message, never thrown", () => {
 });
 
 test("payments need two different known people and a sane amount", () => {
-  const pay = { id: "p1p2p3p4p5", from: "Ajen", to: "Mo", cad: 250.304, seed: 7, rot: -4.2 };
+  const pay = { id: "p1p2p3p4p5", from: "Izzah", to: "Mo", cad: 250.304, seed: 7, rot: -4.2 };
   assert.equal(P.validatePayment(pay, NAMES).value.cad, 250.3);
-  assert.equal(P.validatePayment({ ...pay, to: "Ajen" }, NAMES).ok, false);
+  assert.equal(P.validatePayment({ ...pay, to: "Izzah" }, NAMES).ok, false);
   assert.equal(P.validatePayment({ ...pay, cad: 0 }, NAMES).ok, false);
   assert.equal(P.validatePayment({ ...pay, cad: 100001 }, NAMES).ok, false);
 });
 
 test("a payment carries seed and rot, and refuses missing or odd ones", () => {
-  const pay = { id: "p1p2p3p4p5", from: "Ajen", to: "Mo", cad: 250.304, seed: 7, rot: -4.2 };
-  assert.deepEqual(P.validatePayment(pay, NAMES).value, { id: "p1p2p3p4p5", from: "Ajen", to: "Mo", cad: 250.3, seed: 7, rot: -4.2 });
+  const pay = { id: "p1p2p3p4p5", from: "Izzah", to: "Mo", cad: 250.304, seed: 7, rot: -4.2 };
+  assert.deepEqual(P.validatePayment(pay, NAMES).value, { id: "p1p2p3p4p5", from: "Izzah", to: "Mo", cad: 250.3, seed: 7, rot: -4.2 });
   const { seed, ...noSeed } = pay;
   const { rot, ...noRot } = pay;
   for (const bad of [noSeed, noRot, { ...pay, seed: 0 }, { ...pay, seed: 1.5 }, { ...pay, seed: "7" }, { ...pay, rot: NaN }, { ...pay, rot: Infinity }, { ...pay, rot: "1" }, null, "x", { ...pay, id: "short" }, { ...pay, id: "-abc12345" }, { ...pay, id: "_abc12345" }, { ...pay, from: "Nobody" }]) {
@@ -118,17 +118,17 @@ test("a person can change only their e-Transfer address and Simplify", () => {
 
 test("rows round-trip between sheet and API shapes", () => {
   const h = P.TABS.Expenses;
-  const row = P.objToRow(h, { id: "x", title: "=evil", split: "Mo,Ajen", deleted_at: "" });
+  const row = P.objToRow(h, { id: "x", title: "=evil", split: "Mo,Izzah", deleted_at: "" });
   assert.equal(row[h.indexOf("title")], "'=evil");
-  const e = P.expenseFromRow({ id: "x", day: "pre", title: "T", amount: 80, currency: "CAD", rate: 0.72, paid_by: "Mo", split: "Mo,Ajen", split_mode: "parts", split_vals: "1,3", note: "n", kind: "food", added_by: "Mo", added_at: "t", deleted_at: "" });
-  assert.deepEqual(e.split, ["Mo", "Ajen"]);
+  const e = P.expenseFromRow({ id: "x", day: "pre", title: "T", amount: 80, currency: "CAD", rate: 0.72, paid_by: "Mo", split: "Mo,Izzah", split_mode: "parts", split_vals: "1,3", note: "n", kind: "food", added_by: "Mo", added_at: "t", deleted_at: "" });
+  assert.deepEqual(e.split, ["Mo", "Izzah"]);
   assert.deepEqual(e.splitVals, [1, 3]);
   assert.equal(e.paidBy, "Mo");
   assert.equal(e.deleted, false);
   assert.equal(P.expenseFromRow({ id: "y", split: "Mo", split_mode: "", split_vals: "" }).splitMode, "equal");
   const who = P.personFromRow({ name: "Mo", initials: "MO", order: 1, etransfer: "mo@example.com", simplify: false, email: "private@example.com" });
   assert.deepEqual(who, { name: "Mo", initials: "MO", etransfer: "mo@example.com", simplify: false, photo: "" });
-  assert.equal(P.personFromRow({ name: "Ajen", initials: "AJ", simplify: "" }).simplify, true);
+  assert.equal(P.personFromRow({ name: "Izzah", initials: "IZ", simplify: "" }).simplify, true);
 });
 
 // ---- Task 16: a picture in each person's seal ----
@@ -176,7 +176,7 @@ test("the People row keeps the picture, after email, as text", () => {
   const row = P.objToRow(h, { name: "Mo", initials: "MO", order: 1, etransfer: "", simplify: true, email: "", photo: JPEG });
   const back = P.personFromRow(P.rowToObj(h, row));
   assert.equal(back.photo, JPEG);
-  assert.equal(P.personFromRow({ name: "Ajen", initials: "AJ" }).photo, "", "an older row with no photo cell has none");
+  assert.equal(P.personFromRow({ name: "Izzah", initials: "IZ" }).photo, "", "an older row with no photo cell has none");
 });
 
 test("rows coped with as Sheets really hands them back", () => {
@@ -190,16 +190,16 @@ test("rows coped with as Sheets really hands them back", () => {
   assert.equal(P.personFromRow({ name: "A", simplify: "FALSE" }).simplify, false);
   assert.equal(P.personFromRow({ name: "A", simplify: "TRUE" }).simplify, true);
   assert.equal(P.personFromRow({ name: "A", simplify: true }).simplify, true);
-  const p = P.paymentFromRow({ id: "p", from: "Ajen", to: "Mo", cad: "250.3", stamped_by: "Ajen", stamped_at: new Date(Date.UTC(2026, 11, 13)), seed: "7", rot: "-4.2", removed_at: "" });
-  assert.deepEqual(p, { id: "p", from: "Ajen", to: "Mo", cad: 250.3, stampedBy: "Ajen", stampedAt: "2026-12-13T00:00:00.000Z", seed: 7, rot: -4.2, removed: false });
+  const p = P.paymentFromRow({ id: "p", from: "Izzah", to: "Mo", cad: "250.3", stamped_by: "Izzah", stamped_at: new Date(Date.UTC(2026, 11, 13)), seed: "7", rot: "-4.2", removed_at: "" });
+  assert.deepEqual(p, { id: "p", from: "Izzah", to: "Mo", cad: 250.3, stampedBy: "Izzah", stampedAt: "2026-12-13T00:00:00.000Z", seed: 7, rot: -4.2, removed: false });
   assert.equal(P.paymentFromRow({ id: "q", removed_at: "2026-12-14T00:00:00.000Z" }).removed, true);
 });
 
 test("expense and payment rows round-trip from the API shape", () => {
-  const x = { id: "a1b2c3d4e5", day: "2026-12-11", title: "Taxi", amount: 23.4, currency: "USD", rate: 0.72, paidBy: "Ajen", split: ["Ajen", "Trenton"], splitMode: "parts", splitVals: [1, 2], note: "late", kind: "transport", addedBy: "Ajen", addedAt: "2026-12-11T01:00:00.000Z", deleted: true };
+  const x = { id: "a1b2c3d4e5", day: "2026-12-11", title: "Taxi", amount: 23.4, currency: "USD", rate: 0.72, paidBy: "Izzah", split: ["Izzah", "Sam"], splitMode: "parts", splitVals: [1, 2], note: "late", kind: "transport", addedBy: "Izzah", addedAt: "2026-12-11T01:00:00.000Z", deleted: true };
   const row = P.expenseToRow(x);
-  assert.equal(row.paid_by, "Ajen");
-  assert.equal(row.split, "Ajen,Trenton");
+  assert.equal(row.paid_by, "Izzah");
+  assert.equal(row.split, "Izzah,Sam");
   assert.equal(row.split_vals, "1,2");
   for (const k of ["added_at", "deleted_at", "deleted", "paidBy"]) assert.equal(k in row, false, k);
   const back = P.expenseFromRow(row);
@@ -210,18 +210,18 @@ test("expense and payment rows round-trip from the API shape", () => {
   assert.equal("rate" in noExtras, false);
   assert.equal("added_by" in noExtras, false);
 
-  const pay = { id: "p1p2p3p4p5", from: "Ajen", to: "Mo", cad: 250.3, stampedBy: "Ajen", stampedAt: "2026-12-13T00:00:00.000Z", seed: 7, rot: -4.2, removed: true };
+  const pay = { id: "p1p2p3p4p5", from: "Izzah", to: "Mo", cad: 250.3, stampedBy: "Izzah", stampedAt: "2026-12-13T00:00:00.000Z", seed: 7, rot: -4.2, removed: true };
   const prow = P.paymentToRow(pay);
-  assert.equal(prow.stamped_by, "Ajen");
+  assert.equal(prow.stamped_by, "Izzah");
   for (const k of ["stamped_at", "removed_at", "removed"]) assert.equal(k in prow, false, k);
   const pback = P.paymentFromRow(prow);
   for (const k of Object.keys(pay)) if (k !== "stampedAt" && k !== "removed") assert.deepEqual(pback[k], pay[k], k);
 });
 
-test("the setup seed rows are the trip, three people and one day per date", () => {
+test("the setup seed rows are the trip, two people (Mo and Izzah) and one day per date", () => {
   const s = P.setupSeedRows();
   assert.deepEqual(s.Trip.map((r) => r.key), ["name", "start", "end", "home", "currency", "tz"]);
-  assert.deepEqual(s.People.map((r) => [r.name, r.initials, r.order, r.simplify]), [["Mo", "MO", 1, true], ["Ajen", "AJ", 2, true], ["Trenton", "TR", 3, true]]);
+  assert.deepEqual(s.People.map((r) => [r.name, r.initials, r.order, r.simplify]), [["Mo", "MO", 1, true], ["Izzah", "IZ", 2, true]]);
   assert.equal(s.Days.length, 11);
   assert.equal(s.Days[0].date, "2026-12-10");
   assert.equal(s.Days[10].date, "2026-12-20");
@@ -244,7 +244,7 @@ test("every column is plain text except the numbers and the on/off flags", () =>
 });
 
 test("rows read back from text columns still give numbers where the API wants them", () => {
-  const e = P.expenseFromRow({ id: "x", day: "2026-12-11", title: "0012", amount: 42, currency: "USD", rate: 0.72, paid_by: "Mo", split: "Mo,Ajen", split_mode: "parts", split_vals: "1,3", note: "3-4", kind: "", added_by: "Mo", added_at: "t", deleted_at: "" });
+  const e = P.expenseFromRow({ id: "x", day: "2026-12-11", title: "0012", amount: 42, currency: "USD", rate: 0.72, paid_by: "Mo", split: "Mo,Izzah", split_mode: "parts", split_vals: "1,3", note: "3-4", kind: "", added_by: "Mo", added_at: "t", deleted_at: "" });
   assert.deepEqual(e.splitVals, [1, 3]);
   assert.equal(P.expenseFromRow({ id: "x", split: "Mo", split_mode: "parts", split_vals: "3" }).splitVals[0], 3);
   assert.equal(e.title, "0012");
@@ -470,8 +470,8 @@ test("day rows, labels and links", () => {
 const PLAN_HEAD = ["payment_id", "date_paid", "payer", "description", "category", "vendor", "booking_ref", "amount", "currency", "amount_cad", "cad_is_exact", "split_between", "split_type", "status", "include_in_split", "source", "added_by", "notes"];
 // One planner row from named fields; the rest blank.
 const planRow = (o, head = PLAN_HEAD) => head.map((h) => (o[h] === undefined ? "" : o[h]));
-const X7 = { payment_id: "X7", date_paid: "2026-12-11", payer: "Mo", description: "Rail pass", category: "transport", vendor: "North Rail", booking_ref: "AB12", amount: 160.5, currency: "USD", amount_cad: 221.52, cad_is_exact: "yes", split_between: "Mo, Ajen, Trenton", split_type: "equal", include_in_split: "yes" };
-const X9 = { payment_id: "X9", date_paid: "2026-11-02", payer: "Ajen", description: "Flight north", category: "flight", vendor: "Sky Air", booking_ref: "ZZ9", amount: 204.25, currency: "USD", amount_cad: 274.05, cad_is_exact: "no — est.", split_between: "Mo,Ajen,Trenton", split_type: "equal", include_in_split: "yes" };
+const X7 = { payment_id: "X7", date_paid: "2026-12-11", payer: "Mo", description: "Rail pass", category: "transport", vendor: "North Rail", booking_ref: "AB12", amount: 160.5, currency: "USD", amount_cad: 221.52, cad_is_exact: "yes", split_between: "Mo, Izzah, Sam", split_type: "equal", include_in_split: "yes" };
+const X9 = { payment_id: "X9", date_paid: "2026-11-02", payer: "Izzah", description: "Flight north", category: "flight", vendor: "Sky Air", booking_ref: "ZZ9", amount: 204.25, currency: "USD", amount_cad: 274.05, cad_is_exact: "no — est.", split_between: "Mo,Izzah,Sam", split_type: "equal", include_in_split: "yes" };
 const PLAN_DATES = ["2026-12-10", "2026-12-11", "2026-12-12", "2026-12-13"];
 const payOf = (o) => {
   const r = P.paymentsFromRows([PLAN_HEAD, planRow(o)]);
@@ -485,7 +485,7 @@ test("paymentsFromRows reads each payment by column name, trimmed, numbers as nu
   assert.deepEqual(r.problems, []);
   assert.deepEqual(r.payments, [{
     id: "X7", row: 2, datePaid: "2026-12-11", payer: "Mo", description: "Rail pass", category: "transport", vendor: "North Rail", bookingRef: "AB12",
-    amount: 160.5, currency: "USD", amountCad: 221.52, cadExact: "yes", splitBetween: ["Mo", "Ajen", "Trenton"], splitType: "equal", include: true,
+    amount: 160.5, currency: "USD", amountCad: 221.52, cadExact: "yes", splitBetween: ["Mo", "Izzah", "Sam"], splitType: "equal", include: true,
   }]);
 });
 
@@ -515,7 +515,7 @@ test("paymentsFromRows finds columns in any order", () => {
   assert.deepEqual(r.problems, []);
   assert.equal(r.payments[0].id, "X7");
   assert.equal(r.payments[0].amountCad, 221.52);
-  assert.deepEqual(r.payments[0].splitBetween, ["Mo", "Ajen", "Trenton"]);
+  assert.deepEqual(r.payments[0].splitBetween, ["Mo", "Izzah", "Sam"]);
 });
 
 test("paymentsFromRows: a missing column gives one problem and no payments", () => {
@@ -591,10 +591,10 @@ test("paymentsFromRows skips blank rows, leaves out unusable and repeated ids, a
 
 test("expenseFromPayment: the two note examples, word for word", () => {
   const a = P.expenseFromPayment(payOf(X7), NAMES, PLAN_DATES);
-  assert.deepEqual(a, { ok: true, value: { title: "Rail pass", amount: 221.52, currency: "CAD", paidBy: "Mo", split: ["Mo", "Ajen", "Trenton"], day: "2026-12-11", kind: "transport", note: "X7 · North Rail · ref AB12 · US$160.50 charged" } });
+  assert.deepEqual(a, { ok: true, value: { title: "Rail pass", amount: 221.52, currency: "CAD", paidBy: "Mo", split: ["Mo", "Izzah", "Sam"], day: "2026-12-11", kind: "transport", note: "X7 · North Rail · ref AB12 · US$160.50 charged" } });
   const b = P.expenseFromPayment(payOf(X9), NAMES, PLAN_DATES);
   assert.equal(b.value.note, "X9 · Sky Air · ref ZZ9 · US$204.25 charged · CAD amount is an estimate");
-  assert.deepEqual([b.value.amount, b.value.currency, b.value.day, b.value.kind, b.value.paidBy], [274.05, "CAD", "pre", "transport", "Ajen"]);
+  assert.deepEqual([b.value.amount, b.value.currency, b.value.day, b.value.kind, b.value.paidBy], [274.05, "CAD", "pre", "transport", "Izzah"]);
 });
 
 test("expenseFromPayment: only equal splits, only the trip's people, in their own spelling", () => {
@@ -606,8 +606,8 @@ test("expenseFromPayment: only equal splits, only the trip's people, in their ow
   assert.deepEqual(convert({ split_between: "Mo, Nadia" }), { ok: false, message: "Someone in the split isn’t one of the people on this trip." });
   assert.deepEqual(convert({ split_between: " , " }), { ok: false, message: "That payment has nobody to split it between." });
   assert.deepEqual(convert({ payer: "" }), { ok: false, message: "The payer isn’t one of the people on this trip." });
-  const v = convert({ payer: " ajen ", split_between: "MO,trenton " }).value;
-  assert.deepEqual([v.paidBy, v.split], ["Ajen", ["Mo", "Trenton"]]);
+  const v = convert({ payer: " izzah ", split_between: "MO,sam " }).value;
+  assert.deepEqual([v.paidBy, v.split], ["Izzah", ["Mo", "Sam"]]);
 });
 
 test("expenseFromPayment: the amount is amount_cad when there is one, else US or Canadian dollars as charged", () => {

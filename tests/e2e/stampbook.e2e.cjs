@@ -141,7 +141,7 @@ module.exports = [
       // the Today row: me at 13:20 Chicago time, the others not yet
       assert.equal(await text(page, "#bookTH"), "今日 Today");
       assert.equal(await who(page, 1), "You|13:20");
-      assert.equal(await who(page, 2), "Ajen|not yet");
+      assert.equal(await who(page, 2), "Izzah|not yet");
       assert.equal(await page.locator("#bookWho .bk-p.is-in").count(), 1);
       // one row, one History line, in the backend
       assert.equal(be.fake.tables.Stamps.length, 1);
@@ -361,12 +361,12 @@ module.exports = [
     async run({ page }) {
       const be = await ready(page);
       await openBook(page);
-      const r = await be.fake({ key: KEY, actor: "Ajen", action: "pressStamp", args: { def: TODAY, at: new Date(NOON12 - 2 * 60000).toISOString() } });
+      const r = await be.fake({ key: KEY, actor: "Izzah", action: "pressStamp", args: { def: TODAY, at: new Date(NOON12 - 2 * 60000).toISOString() } });
       assert.equal(r.ok, true);
       await page.evaluate(() => globalThis.__matTest.store.checkRev());
-      await until(async () => (await who(page, 2)) === "Ajen|13:18", "Ajen's time shows");
+      await until(async () => (await who(page, 2)) === "Izzah|13:18", "Izzah's time shows");
       assert.equal(await page.locator("#bookWho .bk-p.is-in").count(), 1);
-      assert.equal(await stampsDrawn(page), 0, "Ajen's drawing is not on my page");
+      assert.equal(await stampsDrawn(page), 0, "Izzah's drawing is not on my page");
       assert.equal(await text(page, "#bookN"), "0 of 12");
     },
   },
@@ -413,11 +413,11 @@ module.exports = [
     },
   },
   {
-    name: "History: nobody acts on someone else's stamp: Ajen's line has no Undo for Mo, Mo's own has",
+    name: "History: nobody acts on someone else's stamp: Izzah's line has no Undo for Mo, Mo's own has",
     async run({ page }) {
       const be = await backendWith();
       const at = new Date(NOON12 - 60000).toISOString();
-      assert.equal((await be.fake({ key: KEY, actor: "Ajen", action: "pressStamp", args: { def: TODAY, at } })).ok, true);
+      assert.equal((await be.fake({ key: KEY, actor: "Izzah", action: "pressStamp", args: { def: TODAY, at } })).ok, true);
       await ready(page, { backend: be });
       await openBook(page);
       await page.click(cell(TODAY));
@@ -429,7 +429,7 @@ module.exports = [
       await page.click("#setHist");
       await until(() => page.locator("#tape .tp-row").count().then((n) => n >= 2), "the tape shows both");
       const rows = await page.$$eval("#tape .tp-row", (rs) => rs.map((r) => [r.querySelector(".tp-s").textContent, r.querySelector("button.tp-undo") !== null]));
-      assert.deepEqual(rows.filter((r) => /stamped/.test(r[0])).sort(), [["Ajen stamped Dec 12", false], ["Mo stamped Dec 12", true]]);
+      assert.deepEqual(rows.filter((r) => /stamped/.test(r[0])).sort(), [["Izzah stamped Dec 12", false], ["Mo stamped Dec 12", true]]);
     },
   },
   {

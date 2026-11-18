@@ -59,7 +59,9 @@
 .bk-today{margin:12px 0 4px;padding:12px 14px;border-radius:10px;background:var(--key);box-shadow:var(--key-edge)}
 .bk-th{font-weight:900;font-size:14px}
 .bk-th i{font-family:var(--seal);font-weight:400;margin-right:8px}
-.bk-who{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}
+/* A third of the row each, two centred (as the who-are-you keys). */
+.bk-who{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:10px}
+.bk-who>.bk-p{flex:0 0 calc((100% - 16px) / 3)}
 .bk-p{display:flex;align-items:center;gap:8px;min-width:0;font-size:12.5px;line-height:1.2}
 .bk-p span{min-width:0}
 .bk-p b{display:block;font-weight:900;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

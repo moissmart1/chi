@@ -112,7 +112,9 @@ i{font-style:normal}
 /* A dimmed table under the sheet: nothing behind can be tapped until you choose. */
 .veil{position:absolute;inset:0;z-index:40;background:rgba(13,11,10,.72)}
 .veil .sheet{z-index:auto}
-.who-pick{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:4px 0 2px}
+/* Keys a third of the row wide, whatever the count: two sit centred, three fill it. */
+.who-pick{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin:4px 0 2px}
+.who-pick>button{flex:0 0 calc((100% - 12px) / 3);min-width:0}
 .who-pick button{height:96px;border:0;border-radius:8px;background:var(--key);display:grid;justify-items:center;align-content:center;gap:8px;
   font-weight:900;font-size:15.5px;box-shadow:var(--key-edge);transition:transform .15s ease-out,background .12s,box-shadow .15s}
 .who-pick button:active{transform:translateY(1.5px);background:var(--key-hi);box-shadow:var(--key-down)}

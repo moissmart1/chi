@@ -15,6 +15,20 @@ const { createFakeBackend } = require("../fake-backend.cjs");
 const PORT = Number(process.env.MAT_PORT) || 4173;
 const ORIGIN = "http://localhost:" + PORT;
 const SEED = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "fixtures", "seed.json"), "utf8"));
+// The same lines among three people (Mo, Izzah and Sam), for the cases that
+// need a third person: Simplify routing, more than one debt on the slip.
+// Sam paid what Izzah paid on the first day and the dinner, and shares
+// everything the two share (and the taxi with Izzah).
+const THREE = (() => {
+  const t = JSON.parse(JSON.stringify(SEED));
+  t.addPeople = [{ name: "Sam", initials: "SA" }];
+  for (const e of t.expenses) {
+    if (e.split.length === 2) e.split = ["Mo", "Izzah", "Sam"];
+    else if (e.split.length === 1) e.split = ["Izzah", "Sam"];
+    if (e.id === "seedexp003" || e.id === "seedexp006") e.paidBy = e.addedBy = "Sam";
+  }
+  return t;
+})();
 // A small plan (days, stops, stays) to lay over the seed: WITH_PLAN.
 const PLAN = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "fixtures", "plan.json"), "utf8"));
 const WITH_PLAN = { ...SEED, ...PLAN };
@@ -166,4 +180,4 @@ function visible(page, selector) {
   }, selector);
 }
 
-module.exports = { PORT, ORIGIN, SEED, PLAN, WITH_PLAN, NOON12, SEEDED_AT, makeBackend, open, advance, until, text, expectText, visible };
+module.exports = { PORT, ORIGIN, SEED, THREE, PLAN, WITH_PLAN, NOON12, SEEDED_AT, makeBackend, open, advance, until, text, expectText, visible };

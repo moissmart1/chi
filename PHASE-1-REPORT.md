@@ -9,7 +9,7 @@ Survey: `triplit/docs/superpowers/specs/2026-11-17-second-trip-survey.md`.
 - [x] 1. One place for the trip's constants (js/trip.js, backend/Pure.js top, tripMismatch in load and setup)
 - [x] 2. Time zone
 - [x] 3. Currency
-- [ ] 4. Two people
+- [x] 4. Two people
 - [ ] 5. The trip's own seed
 - [ ] 6. No planner
 - [ ] 7. Japanese words in the interface
@@ -51,6 +51,15 @@ Survey: `triplit/docs/superpowers/specs/2026-11-17-second-trip-survey.md`.
 - Backend: `validateExpense` takes USD/CAD ("Use US or Canadian dollars."), cents for both; connector enum `[USD, CAD]`; planner pull reads `US$`/`CA$` text and USD/CAD (this code goes in item 6).
 - Fixtures: seed lines are US$ at rate 0.72, total US$2,850.00 (the plan's example figure); test amounts and expectations moved to US$/cents. MY CALL: in backend-only tests (fake-backend.test) the old yen figures were kept as dollar figures (e.g. US$4,200.00 ramen) rather than re-deriving every number: they test mechanics, not prices.
 - Not changed (phase 2): the quick chip "Onsen".
+
+### 4. Two people
+- Seed People: Mo (MO), Izzah (IZ). Fixtures: every Ajen became Izzah; Trenton's lines are Izzah's, his place in splits gone (the taxi is "Izzah only").
+- Who-are-you, You's person picker and the stamp book's Today row: flex rows whose keys are a third of the row wide, so two sit centred at the same size and three fill the row as before (`css/base.css`, `css/sheet.css`, `css/stampbook.css`). An e2e check measures the two keys (a third wide each, centred).
+- Slip: with fewer than three people the "Simplify: fewest payments" switch and its question are not drawn (the setting, the backend and the maths stay). With two there is one debt at most (new e2e cases, Simplify on or off).
+- Wording: the line sheet's "Shared by … all three" says "both" with two (and "everyone" for four or more); the Invite link row says "For Izzah." (the one other person by name), "For the other two." with three, "For the others." beyond (`inviteFor`, unit-tested). Comment "three phones" in js/stamp.js.
+- Split row `÷2` and the uneven panel's two rows were already dynamic; register e2e now pins ÷2/÷1, parts 1:3, exact amounts over two rows.
+- Three people still work: `tests/e2e/helpers.cjs` `THREE` (the same lines with a third person, Sam) drives the whole stamp suite and the Simplify suite (`slip.e2e`); pure maths tests (money, history rules, routing sentences) use Mo/Izzah/Sam; the fake backend takes `addPeople` for this.
+- Not changed: `js/money.js` loop removal / `routedVia` (harmless with two, needed with three).
 
 ## Tests deleted (and why)
 

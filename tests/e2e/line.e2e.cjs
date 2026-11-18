@@ -67,7 +67,7 @@ const SEEDED_DAY = (() => {
 })();
 const idOfSeed = (title) => SEED.expenses.find((e) => e.title === title).id;
 // What the backend's own wording says about a line, as another phone would cause it.
-const otherPhone = (backend, action, args, via = "app") => backend.handle({ key: "test-key", actor: "Ajen", via, action, args });
+const otherPhone = (backend, action, args, via = "app") => backend.handle({ key: "test-key", actor: "Izzah", via, action, args });
 
 module.exports = [
   {
@@ -80,15 +80,17 @@ module.exports = [
       const { dollars } = await import("../../js/format.js");
       const e = SEED.expenses.find((x) => x.title === "Shibuya dinner");
       const mine = dollars(expenseShares({ ...e, deleted: false })["Mo"]);
-      assert.equal(mine, "$43.59");
+      assert.equal(mine, "$65.38");
       await expectText(page, "#lnShare", "Your share " + mine);
       const body = await text(page, "#lineBody");
       assert.ok(body.includes("Shibuya dinner"), body);
       assert.ok(body.includes("US$94.15"), body);
       assert.ok(body.includes("about $130.76"), body);
-      assert.ok(body.includes("Trenton paid"), body);
+      assert.ok(body.includes("Izzah paid"), body);
+      assert.ok(body.includes("both"), "shared by both: " + body);
+      assert.equal(body.includes("all three"), false, body);
       assert.equal(SEEDED_DAY, "Fri Nov 20");
-      await expectText(page, "#lnBy", "Rung up by Trenton, " + SEEDED_DAY);
+      await expectText(page, "#lnBy", "Rung up by Izzah, " + SEEDED_DAY);
       // Focus moves to the sheet (not the note field), which is a modal dialog.
       assert.equal(await page.evaluate(() => document.activeElement.id), "lnDone");
       assert.equal(await page.evaluate(() => [document.getElementById("line").getAttribute("role"), document.getElementById("line").getAttribute("aria-modal")].join()), "dialog,true");
@@ -103,7 +105,7 @@ module.exports = [
       await ready(page);
       await openLine(page, "Taxi back");
       await expectText(page, "#lnShare", "You’re not in this one.");
-      await expectText(page, "#lnBy", "Rung up by Ajen, " + SEEDED_DAY);
+      await expectText(page, "#lnBy", "Rung up by Izzah, " + SEEDED_DAY);
       const fonts = await page.evaluate(() =>
         ["#lineBody .ln-t", "#lineBody .ln-a", "#lnLog span", "#lnShare"].map((s) => {
           const el = document.querySelector(s);
@@ -121,7 +123,7 @@ module.exports = [
       await openLine(page, "Shibuya dinner");
       const first = await waitSentences(page, (s) => s.length >= 1 && s[0] !== "…", "history arrives");
       assert.equal(first.length, 1, "only the line's own history: " + first);
-      assert.match(first[0], /^Trenton rang up Shibuya dinner/);
+      assert.match(first[0], /^Izzah rang up Shibuya dinner/);
 
       // Through the UI: Edit, change the amount, Save.
       await page.click("#lnEdit");
@@ -139,12 +141,12 @@ module.exports = [
       await openLine(page, "Shibuya dinner");
       const after = await waitSentences(page, (s) => s.length === 2, "the edit shows in the line's history");
       assert.equal(after[0], "Mo changed Shibuya dinner US$94.15 → US$15,000.00", "newest first");
-      assert.match(after[1], /^Trenton rang up /);
+      assert.match(after[1], /^Izzah rang up /);
 
       // A change made through Claude, seen from another phone, is marked as such.
       await otherPhone(backend, "updateExpense", { id: idOfSeed("Shibuya dinner"), patch: { title: "Shibuya dinner out" } }, "claude");
       await page.evaluate(() => document.getElementById("fresh").click());
-      await waitSentences(page, (s) => s[0] && s[0].endsWith("(through Claude)") && s[0].startsWith("Ajen renamed"), "the Claude sentence appears");
+      await waitSentences(page, (s) => s[0] && s[0].endsWith("(through Claude)") && s[0].startsWith("Izzah renamed"), "the Claude sentence appears");
     },
   },
   {

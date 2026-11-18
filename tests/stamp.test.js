@@ -45,11 +45,11 @@ test("the gate stamp escapes what it prints", () => {
 test("Remind says who, how much and where to send it", () => {
   const people = [{ name: "Mo", etransfer: "mo@example.com" }];
   assert.equal(
-    remindText("Mo", { from: "Ajen", to: "Mo", cents: 25030 }, people),
-    "Ajen, you owe me $250.30 for the Chicago trip. e-Transfer: mo@example.com",
+    remindText("Mo", { from: "Izzah", to: "Mo", cents: 25030 }, people),
+    "Izzah, you owe me $250.30 for the Chicago trip. e-Transfer: mo@example.com",
   );
-  assert.equal(remindText("Mo", { from: "Ajen", to: "Mo", cents: 25030 }, [{ name: "Mo", etransfer: "" }]), "Ajen, you owe me $250.30 for the Chicago trip.");
-  assert.equal(remindText("Mo", { from: "Ajen", to: "Mo", cents: 25030 }, []), "Ajen, you owe me $250.30 for the Chicago trip.");
+  assert.equal(remindText("Mo", { from: "Izzah", to: "Mo", cents: 25030 }, [{ name: "Mo", etransfer: "" }]), "Izzah, you owe me $250.30 for the Chicago trip.");
+  assert.equal(remindText("Mo", { from: "Izzah", to: "Mo", cents: 25030 }, []), "Izzah, you owe me $250.30 for the Chicago trip.");
 });
 
 test("what was sent is read as dollars and cents, on the string", () => {
@@ -71,18 +71,18 @@ test("what was sent is read as dollars and cents, on the string", () => {
 
 test("the routing sentence says who is paid through whom, from the viewer's side", async () => {
   const { routeSentence } = await import("../js/views/working.js");
-  const row = { from: "Mo", to: "Trenton", cents: 1000 };
-  assert.equal(routeSentence(row, "Ajen", "Mo"), "You pay Trenton because you owe Ajen and Ajen owes Trenton. Fewer payments, same totals.");
-  assert.equal(routeSentence(row, "Ajen", "Trenton"), "Mo pays you because Mo owes Ajen and Ajen owes you. Fewer payments, same totals.");
-  assert.equal(routeSentence(row, "Ajen", "Ajen"), "Mo pays Trenton because Mo owes you and you owe Trenton. Fewer payments, same totals.");
-  assert.equal(routeSentence(row, "others", "Mo"), "You pay Trenton to cover what the others owe. Fewer payments, same totals.");
+  const row = { from: "Mo", to: "Sam", cents: 1000 };
+  assert.equal(routeSentence(row, "Izzah", "Mo"), "You pay Sam because you owe Izzah and Izzah owes Sam. Fewer payments, same totals.");
+  assert.equal(routeSentence(row, "Izzah", "Sam"), "Mo pays you because Mo owes Izzah and Izzah owes you. Fewer payments, same totals.");
+  assert.equal(routeSentence(row, "Izzah", "Izzah"), "Mo pays Sam because Mo owes you and you owe Sam. Fewer payments, same totals.");
+  assert.equal(routeSentence(row, "others", "Mo"), "You pay Sam to cover what the others owe. Fewer payments, same totals.");
 });
 
 test("the working: paid, share, sent, and received only when not zero", async () => {
   const { workingLines } = await import("../js/views/working.js");
   const w = { paid: 0, share: 1000, sent: 0, received: 0 };
   assert.deepEqual(workingLines("Mo", w, "Mo").map((l) => l.label), ["You paid", "Your share came to", "Already sent"]);
-  const other = workingLines("Ajen", { ...w, received: 400 }, "Mo");
-  assert.deepEqual(other.map((l) => [l.label, l.cents]), [["Ajen paid", 0], ["Ajen’s share came to", 1000], ["Already sent", 0], ["Already received", 400]]);
+  const other = workingLines("Izzah", { ...w, received: 400 }, "Mo");
+  assert.deepEqual(other.map((l) => [l.label, l.cents]), [["Izzah paid", 0], ["Izzah’s share came to", 1000], ["Already sent", 0], ["Already received", 400]]);
   assert.equal(other[0].paid, true);
 });

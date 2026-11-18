@@ -162,13 +162,13 @@ test("lockedLine and Chicago clock text", () => {
 });
 
 test("summary: the count, and today's stamp only while it is open and not yet pressed", () => {
-  const s = { stampDefs: DEFS, stamps: [{ def: "d2", who: "Ajen" }, { def: "iss", who: "Mo" }, { def: "d1", who: "Mo", gone: true }], me: "Mo" };
+  const s = { stampDefs: DEFS, stamps: [{ def: "d2", who: "Izzah" }, { def: "iss", who: "Mo" }, { def: "d1", who: "Mo", gone: true }], me: "Mo" };
   const noon5 = Date.UTC(2030, 0, 5, 18); // noon in Chicago on Jan 5
   assert.deepEqual(summary(s, noon5), { total: 3, n: 1, openToday: "2030-01-05" });
   // pressed: no line any more
   assert.equal(summary({ ...s, stamps: [{ def: "d1", who: "Mo" }] }, noon5).openToday, "");
   // another person's press is not mine
-  assert.equal(summary({ ...s, stamps: [{ def: "d1", who: "Ajen" }] }, noon5).openToday, "2030-01-05");
+  assert.equal(summary({ ...s, stamps: [{ def: "d1", who: "Izzah" }] }, noon5).openToday, "2030-01-05");
   // 02:00 on Jan 6 in Chicago: Jan 5 is still open (grace) but today is Jan 6
   assert.equal(summary(s, Date.UTC(2030, 0, 6, 8)).openToday, "2030-01-06");
   // a day with no stamp, before the trip, after it

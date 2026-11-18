@@ -16,7 +16,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const KEY = "test-key";
 const URL = "https://example.test/exec";
 const NOW = Date.UTC(2026, 11, 11, 3);
-const ALL = ["Mo", "Ajen", "Trenton"];
+const ALL = ["Mo", "Izzah"];
 const UNDO_FAILED = "Couldn’t undo that. Try again from History.";
 const STALE = "That was changed again since. Undo the newer change first.";
 
@@ -72,7 +72,7 @@ function phone({ seed, fake, storage, me = "Mo", nowMs = NOW, clock } = {}) {
 }
 
 // Straight to the backend, as another phone would.
-async function backend(fake, action = "load", args = {}, actor = "Ajen") {
+async function backend(fake, action = "load", args = {}, actor = "Izzah") {
   const r = await fake({ key: KEY, actor, action, args });
   assert.equal(r.ok, true, JSON.stringify(r));
   return r.data;
@@ -102,7 +102,7 @@ test("api posts { key, actor, via, action, args } as text/plain and resolves { r
   };
   let actor = "Mo";
   const api = createApi({ url: URL, getKey: () => "sekret-key", getActor: () => actor, fetchImpl });
-  actor = "Ajen"; // read at call time
+  actor = "Izzah"; // read at call time
   const r = await api("load", { a: 1 });
   assert.deepEqual(r, { rev: 7, data: { hello: 1 } });
   assert.equal(calls.length, 1);
@@ -110,7 +110,7 @@ test("api posts { key, actor, via, action, args } as text/plain and resolves { r
   assert.equal(calls[0].url.includes("sekret"), false);
   assert.equal(calls[0].init.method, "POST");
   assert.equal(calls[0].init.headers["Content-Type"], "text/plain;charset=utf-8");
-  assert.deepEqual(JSON.parse(calls[0].init.body), { key: "sekret-key", actor: "Ajen", via: "app", action: "load", args: { a: 1 } });
+  assert.deepEqual(JSON.parse(calls[0].init.body), { key: "sekret-key", actor: "Izzah", via: "app", action: "load", args: { a: 1 } });
 });
 
 test("api rejects with the backend's error code, network when fetch fails, server on a bad reply, and never shows the key", async () => {
@@ -220,9 +220,9 @@ test("me is null when chi.me is missing or not one of the people, and setMe stor
   const a = phone({ storage: memStorage({ "chi.key": KEY }) });
   await a.store.boot();
   assert.equal(a.store.state.me, null);
-  a.store.setMe("Ajen");
-  assert.equal(a.store.state.me, "Ajen");
-  assert.equal(a.storage.getItem("chi.me"), "Ajen");
+  a.store.setMe("Izzah");
+  assert.equal(a.store.state.me, "Izzah");
+  assert.equal(a.storage.getItem("chi.me"), "Izzah");
 
   const b = phone({ storage: memStorage({ "chi.key": KEY, "chi.me": "Zed" }) });
   await b.store.boot();
@@ -250,7 +250,7 @@ test("storage that throws never breaks the store", async () => {
   assert.equal(p.store.state.status, "ready");
   p.store.addExpense(draft());
   p.store.markSeen();
-  p.store.setMe("Ajen");
+  p.store.setMe("Izzah");
   await p.store.idle();
   assert.equal((await backend(fake)).expenses.length, 10);
 
@@ -337,7 +337,7 @@ test("lastChange carries the item as changed, the old copy for an edit, and canU
     assert.equal(p.store.state.lastChange.canUndo, true);
     await p.store.idle();
   }
-  const pt = p.store.addPayment({ from: "Ajen", to: "Mo", cad: 25 });
+  const pt = p.store.addPayment({ from: "Izzah", to: "Mo", cad: 25 });
   assert.equal(p.store.state.lastChange.action, "stamp");
   assert.equal(p.store.state.lastChange.kind, "payment");
   await p.store.idle();
@@ -355,7 +355,7 @@ test("addPayment makes an id, a whole seed from 1 to 999999 and a rot from -13 t
   const p = phone();
   await p.store.boot();
   for (let i = 0; i < 40; i++) {
-    p.store.addPayment({ from: "Ajen", to: "Mo", cad: 1 + i });
+    p.store.addPayment({ from: "Izzah", to: "Mo", cad: 1 + i });
     const pay = p.store.state.lastChange.item;
     assert.match(pay.id, /^[A-Za-z0-9]{20}$/);
     assert.ok(Number.isInteger(pay.seed) && pay.seed >= 1 && pay.seed <= 999999, String(pay.seed));
@@ -691,7 +691,7 @@ test("an undone stamp whose reply was lost is finished the same way", async () =
   const p = phone();
   await p.store.boot();
   p.net.lose.add("addPayment");
-  const t = p.store.addPayment({ from: "Ajen", to: "Mo", cad: 25 });
+  const t = p.store.addPayment({ from: "Izzah", to: "Mo", cad: 25 });
   const id = idOf(p.store);
   p.store.undo(t);
   await p.store.idle();
@@ -748,7 +748,7 @@ test("Undo of an edit and of a delete", async () => {
 test("Undo of a stamp", async () => {
   const p = phone();
   await p.store.boot();
-  const t = p.store.addPayment({ from: "Ajen", to: "Mo", cad: 25 });
+  const t = p.store.addPayment({ from: "Izzah", to: "Mo", cad: 25 });
   const id = idOf(p.store);
   await p.store.idle();
   p.store.undo(t);
@@ -822,7 +822,7 @@ test("Stale undo from history", async () => {
 
 test("a stale undo bar shows the notice and then what the backend has", async () => {
   const a = phone({ seed: SEED });
-  const b = phone({ seed: SEED, fake: a.fake, storage: memStorage({ "chi.key": KEY, "chi.me": "Ajen" }) });
+  const b = phone({ seed: SEED, fake: a.fake, storage: memStorage({ "chi.key": KEY, "chi.me": "Izzah" }) });
   await a.store.boot();
   await b.store.boot();
   await a.store.loadHistory();
@@ -839,13 +839,13 @@ test("a stale undo bar shows the notice and then what the backend has", async ()
   assert.equal(byId(a.store.state.expenses, "seedexp004").amount, 4600);
   const top = a.store.state.history.entries[0];
   assert.equal(top.ref, "seedexp004");
-  assert.equal(top.who, "Ajen");
+  assert.equal(top.who, "Izzah");
   assert.equal(top.action, "edit");
 });
 
 test("a stale undo from history shows the notice, then the backend's data and a fresh tape", async () => {
   const a = phone({ seed: SEED });
-  const b = phone({ seed: SEED, fake: a.fake, storage: memStorage({ "chi.key": KEY, "chi.me": "Ajen" }) });
+  const b = phone({ seed: SEED, fake: a.fake, storage: memStorage({ "chi.key": KEY, "chi.me": "Izzah" }) });
   await a.store.boot();
   await b.store.boot();
   a.store.updateExpense("seedexp004", { amount: 4500 });
@@ -860,7 +860,7 @@ test("a stale undo from history shows the notice, then the backend's data and a 
   assert.equal(ok, false);
   assert.equal(a.store.state.notice, STALE);
   assert.deepEqual(a.store.state.expenses, (await backend(a.fake)).expenses);
-  assert.equal(a.store.state.history.entries[0].who, "Ajen");
+  assert.equal(a.store.state.history.entries[0].who, "Izzah");
   assert.equal(a.store.state.history.entries.find((e) => e.id === mine.id).canUndo, false);
 });
 
@@ -885,7 +885,7 @@ test("undoEntry undoes a history entry and updates the tape", async () => {
 
 test("after an undo from History the tape is loaded again from the first page", async () => {
   const a = phone({ seed: SEED });
-  const b = phone({ seed: SEED, fake: a.fake, storage: memStorage({ "chi.key": KEY, "chi.me": "Ajen" }) });
+  const b = phone({ seed: SEED, fake: a.fake, storage: memStorage({ "chi.key": KEY, "chi.me": "Izzah" }) });
   await a.store.boot();
   await b.store.boot();
   await a.store.loadHistory();
@@ -1057,7 +1057,7 @@ test("checkRev only reloads on change", async () => {
   await p.store.checkRev();
   await p.store.checkRev();
   assert.equal(sent(p.fake, "load"), 1);
-  await backend(p.fake, "addExpense", { expense: { id: "other00001", ...draft({ title: "Their lunch", paidBy: "Ajen" }) } });
+  await backend(p.fake, "addExpense", { expense: { id: "other00001", ...draft({ title: "Their lunch", paidBy: "Izzah" }) } });
   await p.store.checkRev();
   assert.equal(sent(p.fake, "load"), 2);
   assert.equal(byId(p.store.state.expenses, "other00001").title, "Their lunch");
@@ -1142,7 +1142,7 @@ test("refresh keeps lines that are still pending", async () => {
 
 test("Person settings", async () => {
   const one = phone();
-  const two = phone({ fake: one.fake, storage: memStorage({ "chi.key": KEY, "chi.me": "Ajen" }) });
+  const two = phone({ fake: one.fake, storage: memStorage({ "chi.key": KEY, "chi.me": "Izzah" }) });
   await one.store.boot();
   await two.store.boot();
   const saving = one.store.setPerson("Mo", { simplify: false });
@@ -1392,13 +1392,13 @@ test("outbox counts lines not yet on the backend: sending or waiting, never refu
 
 const UNCONFIRMED = "Couldn’t confirm that. Checking…";
 const NOT_SAVED = "No signal. That wasn’t saved.";
-const LODGE = { expenses: [{ id: "exp00001", day: "pre", title: "Lodge", amount: 300, currency: "CAD", paidBy: "Mo", split: ["Mo", "Ajen"] }] };
+const LODGE = { expenses: [{ id: "exp00001", day: "pre", title: "Lodge", amount: 300, currency: "CAD", paidBy: "Mo", split: ["Mo", "Izzah"] }] };
 
 test("a stamp whose reply is lost stays on the slip and is resent with the same id: one payment, and a later stamp makes a second", async () => {
-  const p = phone({ seed: LODGE, me: "Ajen" });
+  const p = phone({ seed: LODGE, me: "Izzah" });
   await p.store.boot();
   p.net.lose.add("addPayment");
-  p.store.addPayment({ from: "Ajen", to: "Mo", cad: 150 });
+  p.store.addPayment({ from: "Izzah", to: "Mo", cad: 150 });
   const id = idOf(p.store);
   await p.store.idle();
   assert.equal(p.fake.tables.Settlements.length, 1, "it reached the backend");
@@ -1413,21 +1413,21 @@ test("a stamp whose reply is lost stays on the slip and is resent with the same 
   assert.deepEqual(p.net.sent.filter((b) => b.action === "addPayment").map((b) => b.args.payment.id), [id, id]);
   assert.deepEqual(p.store.state.payments.map((x) => [x.id, "pending" in x]), [[id, false]]);
 
-  p.store.addPayment({ from: "Ajen", to: "Mo", cad: 10 });
+  p.store.addPayment({ from: "Izzah", to: "Mo", cad: 10 });
   await p.store.idle();
   assert.equal(p.fake.tables.Settlements.length, 2, "a second, not a third");
   assert.equal(p.store.state.payments.length, 2);
 });
 
 test("a second stamp while one is of unknown fate: each tap is one payment with its own id", async () => {
-  const p = phone({ seed: LODGE, me: "Ajen" });
+  const p = phone({ seed: LODGE, me: "Izzah" });
   await p.store.boot();
   p.net.lose.add("addPayment");
-  p.store.addPayment({ from: "Ajen", to: "Mo", cad: 100 });
+  p.store.addPayment({ from: "Izzah", to: "Mo", cad: 100 });
   await p.store.idle();
   p.net.lose.clear();
   p.net.offline = true;
-  p.store.addPayment({ from: "Ajen", to: "Mo", cad: 50 });
+  p.store.addPayment({ from: "Izzah", to: "Mo", cad: 50 });
   await p.store.idle();
   assert.equal(p.store.state.payments.length, 2);
   p.net.offline = false;
@@ -1609,7 +1609,7 @@ test("rev is not stepped for a resent add: another phone's line written in betwe
   let adds = 0;
   const wrapped = async (body) => {
     if (body.action === "addExpense" && ++adds === 2) {
-      await fake({ key: KEY, actor: "Ajen", via: "app", action: "addExpense", args: { expense: { id: "bbbbbbbb1", day: "pre", title: "B line", amount: 5, currency: "CAD", paidBy: "Ajen", split: ALL } } });
+      await fake({ key: KEY, actor: "Izzah", via: "app", action: "addExpense", args: { expense: { id: "bbbbbbbb1", day: "pre", title: "B line", amount: 5, currency: "CAD", paidBy: "Izzah", split: ALL } } });
     }
     return fake(body);
   };
@@ -1638,7 +1638,7 @@ test("a queued line is credited to whoever rang it up, even after the phone swit
   p.store.addExpense(draft({ title: "Mo's taxi" }));
   const id = idOf(p.store);
   await p.store.idle();
-  p.store.setMe("Ajen");
+  p.store.setMe("Izzah");
   p.net.offline = false;
   await p.store.checkRev();
   await p.store.idle();
@@ -1655,7 +1655,7 @@ test("a queued line restored from chi.queue after a reload is still credited to 
   first.store.addExpense(draft({ title: "Mo's taxi" }));
   const id = idOf(first.store);
   await first.store.idle();
-  first.storage.setItem("chi.me", "Ajen");
+  first.storage.setItem("chi.me", "Izzah");
   const p = phone({ fake: first.fake, storage: first.storage });
   await p.store.boot();
   await p.store.idle();
@@ -1668,10 +1668,10 @@ test("api sends a per-request actor when given one, and the phone's own otherwis
     bodies.push(JSON.parse(init.body));
     return { ok: true, status: 200, text: async () => JSON.stringify({ ok: true, rev: 1, data: {} }) };
   };
-  const api = createApi({ url: URL, getKey: () => "k", getActor: () => "Ajen", fetchImpl });
+  const api = createApi({ url: URL, getKey: () => "k", getActor: () => "Izzah", fetchImpl });
   await api("addExpense", {}, { actor: "Mo" });
   await api("load", {});
-  assert.deepEqual(bodies.map((b) => b.actor), ["Mo", "Ajen"]);
+  assert.deepEqual(bodies.map((b) => b.actor), ["Mo", "Izzah"]);
 });
 
 test("api refuses to send when the phone says it is offline, marked as never sent", async () => {
@@ -1707,14 +1707,14 @@ test("emit: a subscriber that throws does not stop the others or the store", asy
 
 test("a mistyped name in a split is set aside, and a phone reopened after the Sheet is fixed loads (H1, H2)", async () => {
   const fake = createFakeBackend(LODGE);
-  fake.tables.Expenses[0].split = "Mo,Ajen,Trent";
+  fake.tables.Expenses[0].split = "Mo,Izzah,Trent";
   const a = phone({ fake });
   a.store.subscribe(draw);
   await a.store.boot();
   assert.deepEqual(a.store.state.expenses, []);
   assert.deepEqual(a.store.state.setAside, [{ kind: "expense", id: "exp00001", title: "Lodge", reason: "name" }]);
 
-  fake.tables.Expenses[0].split = "Mo,Ajen,Trenton";
+  fake.tables.Expenses[0].split = "Mo,Izzah";
   const b = phone({ fake, storage: a.storage });
   b.store.subscribe(draw);
   const loads = sent(fake, "load");
@@ -1748,7 +1748,7 @@ test("a mistyped payer is set aside, not counted as owing nobody (H3)", async ()
 test("a US dollar line with a blank rate is set aside (H4); a bad payment is set aside too", async () => {
   const fake = createFakeBackend({
     expenses: [{ id: "exp00002", day: "pre", title: "Taxi", amount: 3000, currency: "USD", paidBy: "Mo", split: ALL }, { id: "exp00003", day: "pre", title: "Fine", amount: 30, currency: "CAD", paidBy: "Mo", split: ALL }],
-    payments: [{ id: "pay000001", from: "Ajen", to: "Mo", cad: 5, seed: 1, rot: 0 }, { id: "pay000002", from: "Ajen", to: "Mo", cad: 5, seed: 1, rot: 0 }],
+    payments: [{ id: "pay000001", from: "Izzah", to: "Mo", cad: 5, seed: 1, rot: 0 }, { id: "pay000002", from: "Izzah", to: "Mo", cad: 5, seed: 1, rot: 0 }],
   });
   fake.tables.Expenses[0].rate = "";
   fake.tables.Settlements[1].to = "Moe";
@@ -1759,7 +1759,7 @@ test("a US dollar line with a blank rate is set aside (H4); a bad payment is set
   assert.deepEqual(p.store.state.payments.map((x) => x.id), ["pay000001"]);
   assert.deepEqual(p.store.state.setAside, [
     { kind: "expense", id: "exp00002", title: "Taxi", reason: "amount" },
-    { kind: "payment", id: "pay000002", title: "Ajen → Moe", reason: "name" },
+    { kind: "payment", id: "pay000002", title: "Izzah → Moe", reason: "name" },
   ]);
   for (const v of Object.values(balances(ALL, p.store.state.expenses, p.store.state.payments))) assert.ok(Number.isFinite(v));
 });
@@ -1787,10 +1787,10 @@ const livePayments = (fake) => fake.tables.Settlements.filter((r) => !r.removed_
 for (const mode of ["failing", "lose"]) {
   const how = mode === "failing" ? "never arrived" : "arrived but its reply was lost";
   test("removing a stamp whose request " + how + " leaves no live payment, now or after contact (N1)", async () => {
-    const p = phone({ seed: LODGE, me: "Ajen" });
+    const p = phone({ seed: LODGE, me: "Izzah" });
     await p.store.boot();
     p.net[mode].add("addPayment");
-    p.store.addPayment({ from: "Ajen", to: "Mo", cad: 150 });
+    p.store.addPayment({ from: "Izzah", to: "Mo", cad: 150 });
     const id = idOf(p.store);
     await p.store.idle();
     p.net[mode].clear();
@@ -1811,10 +1811,10 @@ for (const mode of ["failing", "lose"]) {
   });
 
   test("the bar's Undo on a stamp whose request " + how + " leaves no live payment (N1)", async () => {
-    const p = phone({ seed: LODGE, me: "Ajen" });
+    const p = phone({ seed: LODGE, me: "Izzah" });
     await p.store.boot();
     p.net[mode].add("addPayment");
-    const t = p.store.addPayment({ from: "Ajen", to: "Mo", cad: 150 });
+    const t = p.store.addPayment({ from: "Izzah", to: "Mo", cad: 150 });
     await p.store.idle();
     p.net[mode].clear();
     await p.store.undo(t);
@@ -1845,35 +1845,35 @@ for (const mode of ["failing", "lose"]) {
 }
 
 test("a stamp of unknown fate counts in the outbox, survives a reload in chi.queue, and is sent once (N2)", async () => {
-  const p = phone({ seed: LODGE, me: "Ajen" });
+  const p = phone({ seed: LODGE, me: "Izzah" });
   await p.store.boot();
   p.net.lose.add("addPayment");
-  p.store.addPayment({ from: "Ajen", to: "Mo", cad: 150 });
+  p.store.addPayment({ from: "Izzah", to: "Mo", cad: 150 });
   const id = idOf(p.store);
   await p.store.idle();
   assert.deepEqual(p.store.outbox(), { unsent: 1, waiting: 1 });
   assert.deepEqual(queueOf(p.storage).map((q) => q.payment && q.payment.id), [id]);
   p.net.lose.clear();
 
-  const q = phone({ fake: p.fake, storage: p.storage, me: "Ajen" });
+  const q = phone({ fake: p.fake, storage: p.storage, me: "Izzah" });
   q.store.setMe("Mo"); // credited to whoever stamped it, not the phone's person now
   await q.store.boot();
   await q.store.idle();
   assert.equal(p.fake.tables.Settlements.length, 1, "one payment, not two");
-  assert.equal(p.fake.tables.Settlements[0].stamped_by, "Ajen");
+  assert.equal(p.fake.tables.Settlements[0].stamped_by, "Izzah");
   assert.deepEqual(q.store.state.payments.map((x) => [x.id, "pending" in x]), [[id, false]]);
   assert.deepEqual(queueOf(q.storage), []);
   assert.deepEqual(q.store.outbox(), { unsent: 0, waiting: 0 });
 });
 
 test("a stamp that never left, restored after a reload, is sent once (N2)", async () => {
-  const p = phone({ seed: LODGE, me: "Ajen" });
+  const p = phone({ seed: LODGE, me: "Izzah" });
   await p.store.boot();
   p.net.knownOffline = true;
-  p.store.addPayment({ from: "Ajen", to: "Mo", cad: 150 });
+  p.store.addPayment({ from: "Izzah", to: "Mo", cad: 150 });
   await p.store.idle();
   assert.equal(queueOf(p.storage)[0].sent, false);
-  const q = phone({ fake: p.fake, storage: p.storage, me: "Ajen" });
+  const q = phone({ fake: p.fake, storage: p.storage, me: "Izzah" });
   await q.store.boot();
   await q.store.idle();
   assert.equal(p.fake.tables.Settlements.length, 1);
@@ -2370,7 +2370,7 @@ test("R36: a waited-on stop edit refused by the backend comes back with its reas
 const PLANNER_ID = "fakePlannerSheet_0123456789abcdefXYZ";
 const PHEAD = ["payment_id", "date_paid", "payer", "description", "category", "vendor", "booking_ref", "amount", "currency", "amount_cad", "cad_is_exact", "split_between", "split_type", "status", "include_in_split", "source", "added_by", "notes"];
 const prow = (o) => PHEAD.map((h) => (o[h] === undefined ? "" : o[h]));
-const PX7 = { payment_id: "X7", date_paid: "2026-12-11", payer: "Mo", description: "Rail pass", category: "transport", vendor: "North Rail", booking_ref: "AB12", amount: 24750, currency: "USD", amount_cad: 221.52, cad_is_exact: "yes", split_between: "Mo, Ajen, Trenton", split_type: "equal", include_in_split: "yes" };
+const PX7 = { payment_id: "X7", date_paid: "2026-12-11", payer: "Mo", description: "Rail pass", category: "transport", vendor: "North Rail", booking_ref: "AB12", amount: 24750, currency: "USD", amount_cad: 221.52, cad_is_exact: "yes", split_between: "Mo, Izzah", split_type: "equal", include_in_split: "yes" };
 const PQ3 = { ...PX7, payment_id: "Q3", description: "Noodle bar", amount_cad: "", amount: 3600, vendor: "Ramen Ya", booking_ref: "" };
 
 test("syncPayments pulls, reloads so the lines are there, says what came in, and resolves with the counts", async () => {
@@ -2534,7 +2534,7 @@ test("tickTodo refused rolls back with the backend's sentence; offline it says n
   const p = phone({ seed: bookSeed(2) });
   await p.store.boot();
   await p.store.syncTodos();
-  await backend(p.fake, "tickTodo", { id: "2" }, "Ajen"); // another phone ticked it first
+  await backend(p.fake, "tickTodo", { id: "2" }, "Izzah"); // another phone ticked it first
   p.store.tickTodo("2");
   await p.store.idle();
   assert.equal(p.store.state.notice, "That one is already done.");
@@ -2561,7 +2561,7 @@ test("claimTodo: I’ll do it, take it over, hand it back, each with its own wor
   assert.equal(byId(p.store.state.todos, "1").claimedBy, "");
   assert.equal(p.store.state.lastChange.action, "unclaim");
   await p.store.idle();
-  await backend(p.fake, "claimTodo", { id: "2", on: true }, "Ajen");
+  await backend(p.fake, "claimTodo", { id: "2", on: true }, "Izzah");
   await p.store.refresh();
   p.store.claimTodo("2", true);
   assert.equal(p.store.state.lastChange.action, "takeover");
@@ -3009,7 +3009,7 @@ test("a sheet where migrate has not been run: no definitions, no stamps, nothing
   await p.store.boot();
   assert.equal(p.store.state.status, "ready");
   assert.deepEqual([p.store.state.stampDefs, p.store.state.stamps], [[], []]);
-  assert.equal(p.store.state.people.length, 3);
+  assert.equal(p.store.state.people.length, 2);
   assert.equal(p.store.pressStamp("d1"), null);
   assert.equal(p.net.sent.filter((b) => b.action === "pressStamp").length, 0);
 });
@@ -3031,10 +3031,10 @@ test("a cache saved before the book existed opens with an empty book", async () 
 test("everyone's stamps come with a load; another phone's press arrives on the next check", async () => {
   const p = stampPhone();
   await p.store.boot();
-  const ajen = await p.fake({ key: KEY, actor: "Ajen", action: "pressStamp", args: { def: "d1", at: new Date(IN_D1).toISOString() } });
-  assert.equal(ajen.ok, true);
+  const izzah = await p.fake({ key: KEY, actor: "Izzah", action: "pressStamp", args: { def: "d1", at: new Date(IN_D1).toISOString() } });
+  assert.equal(izzah.ok, true);
   await p.store.checkRev();
-  assert.deepEqual(p.store.state.stamps.map((s) => [s.def, s.who]), [["d1", "Ajen"]]);
+  assert.deepEqual(p.store.state.stamps.map((s) => [s.def, s.who]), [["d1", "Izzah"]]);
 });
 
 test("a Trip tab set up for another trip: boot keeps the backend's sentence in tripProblem; a good load clears it", async () => {

@@ -5,8 +5,9 @@
 // on write, only patched columns written, same return values, and cells read
 // back the way Sheets hands them back (a stored "'=x" reads as "=x").
 //
-// seed = { expenses?, payments?, people?, days?, stops?, stays?, planner?,
-// plannerId? } (see constraints R6). planner: the planner sheet's Payments tab
+// seed = { expenses?, payments?, people?, addPeople?, days?, stops?, stays?,
+// planner?, plannerId? } (see constraints R6). addPeople: more People rows
+// ({ name, initials, ... }) after the seed's Mo and Izzah. planner: the planner sheet's Payments tab
 // as rows (row 1 its column names; null: the planner has no Payments tab);
 // plannerId: PLANNER_ID in Script Properties; paymentProblems: { at, list, more }, kept as PAYMENT_PROBLEMS; missingColumns: ["Tab.column", ...]
 // an older Sheet lacks until migrate (ensureColumns_) adds them; missingTabs:
@@ -409,6 +410,8 @@ function createFakeBackend(seed, { clock, lockFails, keepsApostrophe = false } =
 function seedWorld(P, prim, tables, props, seed, now) {
   const rows = P.setupSeedRows();
   for (const tab of ["Trip", "People", "Days"]) for (const o of rows[tab]) prim.appendObj_(tab, o);
+  // More people than the seed's two, for the cases that need three or more.
+  for (const [i, p] of (seed.addPeople || []).entries()) prim.appendObj_("People", { order: rows.People.length + i + 1, etransfer: "", simplify: true, email: "", photo: "", ...p });
   for (const [name, patch] of Object.entries(seed.people || {})) prim.updateWhere_("People", "name", name, patch);
   for (const [date, patch] of Object.entries(seed.days || {})) prim.updateWhere_("Days", "date", date, patch);
 

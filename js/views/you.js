@@ -74,7 +74,7 @@ const MARKUP = `
   <button type="button" class="set-r" id="setHow" aria-expanded="false" aria-controls="setHowLines"><span>How this works</span><b id="setHowV">Show</b></button>
   <div class="how" id="setHowLines" hidden></div>
   <button type="button" class="set-r" id="setInstall" aria-expanded="false"><span>Add to Home Screen<small>Opens like an app, full screen</small><span class="set-steps" id="setInstallHow" hidden><span>1. Tap Share, then Add to Home Screen.</span><span>2. If it asks for your trip link, paste: it’s already copied.</span></span></span><b>Set up</b></button>
-  <button type="button" class="set-r" id="setInvite"><span>Invite link<small>For the other two. Keep it between you.</small></span><b id="setInviteV" aria-live="polite" data-w="Not copied">Copy</b></button>
+  <button type="button" class="set-r" id="setInvite"><span>Invite link<small id="setInviteFor">For the others. Keep it between you.</small></span><b id="setInviteV" aria-live="polite" data-w="Not copied">Copy</b></button>
   <button type="button" class="set-r" id="setClaude"><span>Claude link<small>Lets your Claude add stops and expenses. Keep it to yourself.</small></span><b id="setClaudeV" aria-live="polite" data-w="Not copied">Copy</b></button>
   <button type="button" class="set-r" id="setPlanner" hidden><span>Planner payments<small>Brings in what’s been paid from the planner sheet</small></span><b id="setPlannerV" aria-live="polite" data-w="Needs a look">Fetch</b></button>
   <div class="set-pp" id="setPlannerP" hidden></div>
@@ -123,6 +123,17 @@ export function problemHead({ id, row, what } = {}) {
   if (typeof row === "number" && Number.isFinite(row)) parts.push("row " + row);
   if (typeof what === "string" && what !== "") parts.push(what);
   return parts.length ? parts.join(" · ") : "A payment row";
+}
+
+// Who the invite link is for, as the Invite link row says it: the one other
+// person by name, else how many others there are.
+export function inviteFor(names, me) {
+  const all = Array.isArray(names) ? names : [];
+  const others = all.filter((n) => n !== me);
+  const count = all.includes(me) ? others.length : all.length - 1;
+  if (count === 1) return (others.length === 1 ? "For " + others[0] : "For the other one") + ". Keep it between you.";
+  if (count === 2) return "For the other two. Keep it between you.";
+  return "For the others. Keep it between you.";
 }
 
 // "Sat Dec 12, 13:20", in the phone's own clock.
@@ -298,6 +309,7 @@ export function mountYou(root, store, { onHistory = () => {}, onDemo = () => {},
 
   function render(s) {
     drawWho(s);
+    $("setInviteFor").textContent = inviteFor(s.people.map((p) => p.name), s.me);
     drawMail(s);
     drawPic(s);
     soundV.textContent = soundOn() ? "On" : "Off";

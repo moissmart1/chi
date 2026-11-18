@@ -127,7 +127,7 @@ module.exports = [
     viewport: VIEWPORT,
     async run({ page }) {
       await ready(page);
-      await page.click('#slip button.spot[data-key="Trenton>Mo"]');
+      await page.click('#slip button.spot[data-key="Izzah>Mo"]');
       await until(() => page.evaluate(() => !!document.querySelector("#slip .spot.is-armed")), "armed");
       await expectReach(page, "#stampAmt", true);
       await expectReach(page, "#slip .spot.is-armed", true);

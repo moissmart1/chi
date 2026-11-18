@@ -76,7 +76,7 @@ test("done items: ticked ones newest first, then the planner's own bookings in p
     item({ id: "1", status: "Booked" }),
     item({ id: "2", tickedBy: "Mo", tickedAt: "2026-11-20T10:00:00.000Z", status: "Booked" }),
     item({ id: "3" }),
-    item({ id: "4", tickedBy: "Ajen", tickedAt: "2026-11-21T09:00:00.000Z" }),
+    item({ id: "4", tickedBy: "Izzah", tickedAt: "2026-11-21T09:00:00.000Z" }),
     item({ id: "5", status: "booked (paid)" }),
   ];
   assert.deepEqual(doneTodos(list).map((t) => t.id), ["4", "2", "1", "5"]);

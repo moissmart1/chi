@@ -564,7 +564,7 @@ cases.push(
       await until(() => visible(page, "#todos"), "the list shows");
       assert.deepEqual(await marked(), ["before"]);
       await page.focus("#beforeBtn");
-      assert.equal((await backend.fake({ key: "test-key", actor: "Ajen", action: "tickTodo", args: { id: "2" } })).ok, true, "ticked on another phone");
+      assert.equal((await backend.fake({ key: "test-key", actor: "Izzah", action: "tickTodo", args: { id: "2" } })).ok, true, "ticked on another phone");
       await advance(page, backend, 31 * 1000);
       await page.evaluate(() => window.__matTest.store.checkRev());
       await advance(page, backend, 1700);

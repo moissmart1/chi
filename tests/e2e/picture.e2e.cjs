@@ -99,8 +99,8 @@ async function checkRegister(page) {
   assert.ok(isColour(on), "on: full colour in the vermilion ring " + JSON.stringify(on));
   assert.equal(on.alt, "");
   assert.equal(await page.getAttribute(payer("Mo"), "aria-label"), "Mo paid");
-  const aj = await sealOf(page, payer("Ajen"));
-  assert.deepEqual([aj.pic, aj.text], [false, "AJ"], "no picture: initials as before");
+  const aj = await sealOf(page, payer("Izzah"));
+  assert.deepEqual([aj.pic, aj.text], [false, "IZ"], "no picture: initials as before");
   // Split seals: all on; Mo off is grey and faint in the dim ring.
   assert.ok(isColour(await sealOf(page, splitter("Mo"))), "split, on");
   await page.click(splitter("Mo"));
@@ -108,8 +108,8 @@ async function checkRegister(page) {
   await waitSeal(page, splitter("Mo"), (s) => !s.on && isGrey(s), "off: greyscale, faint, dim ring");
   await page.click(splitter("Mo"));
   await waitSeal(page, splitter("Mo"), (s) => s.on && isColour(s), "on again: colour");
-  // Payer: Ajen chosen, Mo's paid seal goes grey.
-  await page.click(payer("Ajen"));
+  // Payer: Izzah chosen, Mo's paid seal goes grey.
+  await page.click(payer("Izzah"));
   await waitSeal(page, payer("Mo"), (s) => !s.on && isGrey(s), "payer not chosen: grey");
   await page.click("#regDone");
   await waitClosed(page, "reg");
@@ -121,12 +121,12 @@ async function checkLine(page) {
   assert.equal(mini.ring, SHU);
   assert.equal(mini.filter, "none");
   assert.equal(await page.getAttribute(row, "aria-label"), "Mo", "the seal still says whose it is");
-  assert.equal((await sealOf(page, '#rc .rc-row[data-id="seedexp002"] .mini')).text, "AJ");
+  assert.equal((await sealOf(page, '#rc .rc-row[data-id="seedexp002"] .mini')).text, "IZ");
   await page.click('#rc .rc-row[data-id="seedexp001"]');
   await until(() => page.evaluate(() => document.getElementById("line").classList.contains("is-open")), "the line sheet opens");
   await waitSeal(page, "#line .ln-paid .mini", (s) => s.pic, "the line sheet's payer seal");
   const shared = await page.$$eval("#line .ln-d .mini", (els) => els.map((e) => (e.classList.contains("has-pic") ? "pic" : e.textContent)));
-  assert.deepEqual(shared, ["pic", "AJ", "TR"], "shared by: Mo's picture, the others' initials");
+  assert.deepEqual(shared, ["pic", "IZ", "TR"], "shared by: Mo's picture, the others' initials");
   await page.click("#lnDone");
   await waitClosed(page, "line");
 }
@@ -144,11 +144,11 @@ module.exports = [
         paid: document.querySelector("#line .ln-paid .mini").classList.contains("has-pic"),
         shared: [...document.querySelectorAll("#line .ln-d .mini")].map((e) => (e.classList.contains("has-pic") ? "pic" : e.textContent)),
       }));
-      assert.deepEqual(await seals(), { paid: false, shared: ["MO", "AJ", "TR"] });
-      // Mo (the payer) sets a picture on this phone; Ajen (shares it) on another.
+      assert.deepEqual(await seals(), { paid: false, shared: ["MO", "IZ", "TR"] });
+      // Mo (the payer) sets a picture on this phone; Izzah (shares it) on another.
       await page.evaluate((pic) => globalThis.__matTest.store.setPerson("Mo", { photo: pic }), JPEG);
       await until(async () => (await seals()).paid, "the payer's seal shows the picture");
-      backend.fake.primitives.updateWhere_("People", "name", "Ajen", { photo: JPEG });
+      backend.fake.primitives.updateWhere_("People", "name", "Izzah", { photo: JPEG });
       await page.evaluate(() => globalThis.__matTest.store.refresh());
       await until(async () => JSON.stringify((await seals()).shared) === JSON.stringify(["pic", "pic", "TR"]), "the sharers' seals show theirs");
       assert.equal(await page.evaluate(() => document.getElementById("line").classList.contains("is-open")), true, "the sheet stayed open");
@@ -160,7 +160,7 @@ module.exports = [
       const { page } = ctx;
       const backend = await ready(page);
       const b = await ctx.newPhone();
-      await ready(b, { backend, me: "Ajen" });
+      await ready(b, { backend, me: "Izzah" });
 
       await openYou(page);
       assert.equal(await text(page, "#setPic > span"), "Your pictureShows in your seal, on every phone");
@@ -183,7 +183,7 @@ module.exports = [
       assert.equal(await visible(page, "#setPicDel"), true);
       // Which one are you: Mo chosen (in colour), and the others keep their initials.
       assert.ok(isColour(await waitSeal(page, '#setWho [data-me="Mo"] .seal', (s) => s.pic, "the who seal")));
-      assert.equal((await sealOf(page, '#setWho [data-me="Ajen"] .seal')).text, "AJ");
+      assert.equal((await sealOf(page, '#setWho [data-me="Izzah"] .seal')).text, "IZ");
       // The centre square was kept: its left half blue, its right half orange.
       const halves = await page.evaluate(() => {
         const img = document.querySelector("#setPicSeal img");
@@ -206,8 +206,8 @@ module.exports = [
       assert.equal((await sealOf(b, '#rc .rc-row[data-id="seedexp001"] .mini')).text, "MO", "not before it refreshes");
       await openYou(b);
       await b.click("#setFreshRow");
-      await waitSeal(b, '#setWho [data-me="Mo"] .seal', (s) => s.pic && !s.on, "Ajen's phone shows Mo's picture, off (Ajen is chosen)");
-      assert.equal(await text(b, "#setPicPick"), "Add", "Ajen's own row: no picture of his");
+      await waitSeal(b, '#setWho [data-me="Mo"] .seal', (s) => s.pic && !s.on, "Izzah's phone shows Mo's picture, off (Izzah is chosen)");
+      assert.equal(await text(b, "#setPicPick"), "Add", "Izzah's own row: no picture of his");
       await b.click("#youDone");
       await waitClosed(b, "you");
       await waitSeal(b, '#rc .rc-row[data-id="seedexp001"] .mini', (s) => s.pic, "and on the receipt");
@@ -231,9 +231,9 @@ module.exports = [
       await until(() => photoOf(backend, "Mo") === stored, "undo puts the picture back");
       await waitSeal(page, '#rc .rc-row[data-id="seedexp001"] .mini', (s) => s.pic, "the receipt shows it again");
 
-      // Ajen's History has no Undo on Mo's picture.
+      // Izzah's History has no Undo on Mo's picture.
       await b.click("#histBtn");
-      await until(() => b.evaluate(() => document.querySelectorAll("#tape .tp-row").length >= 3), "Ajen's tape loads");
+      await until(() => b.evaluate(() => document.querySelectorAll("#tape .tp-row").length >= 3), "Izzah's tape loads");
       const theirs = await b.$$eval("#tape .tp-row", (els) => els.map((r) => [r.querySelector(".tp-s").textContent, !!r.querySelector(".tp-undo")]));
       assert.deepEqual(theirs.slice(0, 3), [["Mo undid: removed the picture", false], ["Mo removed the picture", false], ["Mo set a picture", false]]);
     },
@@ -241,10 +241,10 @@ module.exports = [
   {
     name: "who are you: a picture replaces the initials on first open, in colour",
     async run({ page }) {
-      const backend = await open(page, { seed: { ...SEED, people: { Ajen: { photo: require("../fixtures/picture.json").jpeg } } }, me: null, nowMs: NOON12 });
-      await until(() => visible(page, '.who-pick [data-me="Ajen"] .seal'), "the picker shows");
-      const sel = '.who-pick [data-me="Ajen"] .seal';
-      const s = await waitSeal(page, sel, (x) => x.pic, "Ajen's seal shows the picture");
+      const backend = await open(page, { seed: { ...SEED, people: { Izzah: { photo: require("../fixtures/picture.json").jpeg } } }, me: null, nowMs: NOON12 });
+      await until(() => visible(page, '.who-pick [data-me="Izzah"] .seal'), "the picker shows");
+      const sel = '.who-pick [data-me="Izzah"] .seal';
+      const s = await waitSeal(page, sel, (x) => x.pic, "Izzah's seal shows the picture");
       assert.equal(s.filter, "none");
       assert.equal(s.ring, SHU);
       assert.equal((await sealOf(page, '.who-pick [data-me="Mo"] .seal')).text, "MO");

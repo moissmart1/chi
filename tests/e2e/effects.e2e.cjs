@@ -186,9 +186,9 @@ module.exports = [
       // Money stamp.
       await moneyReady(page);
       assert.equal(await page.locator(".stamp.wet").count(), 0, "nothing wet on load");
-      await page.click('#slip button.spot[data-key="Ajen>Mo"]');
+      await page.click('#slip button.spot[data-key="Izzah>Mo"]');
       await until(() => page.locator('#slip button.spot.is-armed').count().then((n) => n === 1), "armed");
-      await page.click('#slip button.spot[data-key="Ajen>Mo"]');
+      await page.click('#slip button.spot[data-key="Izzah>Mo"]');
       await until(() => page.locator("#slip .s-row.is-paid .stamp.hit.wet").count().then((n) => n === 1), "the stamp lands wet");
       const f = await page.evaluate(() => getComputedStyle(document.querySelector("#slip .stamp.wet")).filter);
       assert.match(f, /saturate\(1\.35\)/);
@@ -219,9 +219,9 @@ module.exports = [
     async run({ page, newPhone }) {
       await page.emulateMedia({ reducedMotion: "reduce" });
       await moneyReady(page);
-      await page.click('#slip button.spot[data-key="Ajen>Mo"]');
+      await page.click('#slip button.spot[data-key="Izzah>Mo"]');
       await until(() => page.locator('#slip button.spot.is-armed').count().then((n) => n === 1), "armed");
-      await page.click('#slip button.spot[data-key="Ajen>Mo"]');
+      await page.click('#slip button.spot[data-key="Izzah>Mo"]');
       await until(() => page.locator("#slip .s-row.is-paid .stamp").count().then((n) => n === 1), "the stamp");
       assert.equal(await page.locator(".stamp.wet").count(), 0);
       const p2 = await newPhone();
@@ -308,7 +308,7 @@ module.exports = [
       assert.equal(ring.pos, "absolute");
       assert.equal(layers(ring.shadow), 2, ring.shadow);
       assert.match(ring.shadow, /inset/);
-      const plain = await style(page, '#xPayer .seal[data-p="Ajen"]', "::after");
+      const plain = await style(page, '#xPayer .seal[data-p="Izzah"]', "::after");
       assert.equal(plain.content === "none" || plain.content === "normal", true, "no ring on initials");
     },
   },

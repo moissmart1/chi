@@ -28,7 +28,8 @@ test("dayHead", () => {
 });
 
 test("issuer is the first letters of the names in order", () => {
-  assert.equal(issuer([{ name: "Mo" }, { name: "Ajen" }, { name: "Trenton" }]), "MAT");
+  assert.equal(issuer([{ name: "Mo" }, { name: "Izzah" }]), "MI");
+  assert.equal(issuer([{ name: "Mo" }, { name: "Izzah" }, { name: "Sam" }]), "MIS");
 });
 
 test("tripSpan", () => {
@@ -54,7 +55,7 @@ test("clock is the phone's local time", () => {
 });
 
 test("sentence", () => {
-  assert.equal(sentence({ kind: "owed", who: "Ajen", cents: 25030 }), "Ajen owes you $250.30.");
+  assert.equal(sentence({ kind: "owed", who: "Izzah", cents: 25030 }), "Izzah owes you $250.30.");
   assert.equal(sentence({ kind: "owed", who: null, cents: 57657 }), "You’re owed $576.57.");
   assert.equal(sentence({ kind: "owe", who: "Mo", cents: 28829 }), "You owe Mo $288.29.");
   assert.equal(sentence({ kind: "owe", who: null, cents: 600 }), "You owe $6.00.");
@@ -68,7 +69,7 @@ test("changeText", () => {
   assert.equal(changeText({ action: "edit", kind: "expense", item: dinner }), "Changed Dinner.");
   assert.equal(changeText({ action: "delete", kind: "expense", item: dinner }), "Deleted Dinner.");
   assert.equal(changeText({ action: "restore", kind: "expense", item: dinner }), "Brought back Dinner.");
-  const pay = { from: "Ajen", to: "Mo", cad: 250 };
+  const pay = { from: "Izzah", to: "Mo", cad: 250 };
   assert.equal(changeText({ action: "stamp", kind: "payment", item: pay }), "Stamped $250.00 to Mo.");
   assert.equal(changeText({ action: "unstamp", kind: "payment", item: pay }), "Stamp removed.");
   assert.equal(changeText({ action: "restamp", kind: "payment", item: pay }), "Stamp put back.");

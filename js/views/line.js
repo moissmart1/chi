@@ -125,7 +125,7 @@ export function mountLine(root, store, { onEdit = () => {} } = {}) {
     const uneven = !!e.splitMode && e.splitMode !== "equal";
     dl.replaceChildren(
       row("Day", e.day === "pre" ? "Before the trip" : dayHead(e.day, s.days).en),
-      row("Shared by", ...e.split.map(seal), ...(everyone ? [el("span", "", "all three")] : []), ...(uneven ? [el("span", "", "uneven")] : [])),
+      row("Shared by", ...e.split.map(seal), ...(everyone ? [el("span", "", names.length === 2 ? "both" : names.length === 3 ? "all three" : "everyone")] : []), ...(uneven ? [el("span", "", "uneven")] : [])),
     );
 
     if (s.me) {

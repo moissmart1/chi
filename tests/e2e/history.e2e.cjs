@@ -7,7 +7,7 @@ const { SEED, NOON12, makeBackend, open, advance, until, text, expectText, visib
 
 // ---- small tools for this file ----
 
-const NAMES = ["Mo", "Ajen", "Trenton"];
+const NAMES = ["Mo", "Izzah"];
 const classOf = (page, id) => page.evaluate((i) => document.getElementById(i).className, id);
 const isOpen = (page, id) => page.evaluate((i) => document.getElementById(i).classList.contains("is-open"), id);
 // Open, and risen all the way (the sheet slides up over 500 ms).
@@ -83,7 +83,7 @@ function hold(backend, action) {
   };
 }
 
-const otherPhone = (backend, action, args, { actor = "Ajen", via = "app" } = {}) => backend.handle({ key: "test-key", actor, via, action, args });
+const otherPhone = (backend, action, args, { actor = "Izzah", via = "app" } = {}) => backend.handle({ key: "test-key", actor, via, action, args });
 const idOfSeed = (title) => SEED.expenses.find((e) => e.title === title).id;
 const tables = (backend) => JSON.stringify(["Expenses", "Settlements", "Log"].map((t) => backend.fake.primitives.readTable_(t)));
 const savedExpense = (backend, id) => backend.fake.primitives.readTable_("Expenses").map(P.expenseFromRow).find((e) => e.id === id);
@@ -118,7 +118,7 @@ module.exports = [
       assert.deepEqual(await days(page), ["Fri Nov 20 | 11月20日(金)"]);
       assert.equal(rows[0].time, "09:00");
 
-      assert.ok(rowFor(rows, "Ajen deleted Konbini snacks US$7.80"), "the delete reads as a sentence");
+      assert.ok(rowFor(rows, "Izzah deleted Konbini snacks US$7.80"), "the delete reads as a sentence");
       assert.ok(rowFor(rows, "Mo rang up Niseko lodge US$1,870.00"), "so does the first add");
       assert.equal(await page.locator("#histMore").count(), 0, "ten entries: no Show older");
     },
@@ -132,7 +132,7 @@ module.exports = [
       await otherPhone(backend, "updateExpense", { id: idOfSeed("Shibuya dinner"), patch: { title: "Shibuya dinner out" } }, { via: "claude" });
       await openTape(page, 11);
       const rows = await tape(page);
-      assert.equal(rows[0].sentence, "Ajen renamed Shibuya dinner to Shibuya dinner out (through Claude)");
+      assert.equal(rows[0].sentence, "Izzah renamed Shibuya dinner to Shibuya dinner out (through Claude)");
       assert.equal(rows[0].time, "01:00");
       assert.ok(!rows[1].sentence.includes("through Claude"));
       assert.deepEqual(await days(page), ["Sun Dec 13 | 12月13日(日)", "Fri Nov 20 | 11月20日(金)"]);
@@ -145,11 +145,11 @@ module.exports = [
       const backend = await ready(page);
       // History and the line sheet go by the trip's clock, not the phone's.
       backend.now = Date.parse("2026-12-11T23:20:00-06:00");
-      await otherPhone(backend, "addExpense", { expense: { ...SHARED(1), id: "torontoline1", title: "Tempura", day: "2026-12-11", paidBy: "Ajen", splitMode: "equal", splitVals: [], note: "", kind: "" } });
+      await otherPhone(backend, "addExpense", { expense: { ...SHARED(1), id: "torontoline1", title: "Tempura", day: "2026-12-11", paidBy: "Izzah", splitMode: "equal", splitVals: [], note: "", kind: "" } });
       await page.evaluate(() => globalThis.__matTest.store.refresh());
       await openTape(page, 11);
       const rows = await tape(page);
-      assert.equal(rows[0].sentence, "Ajen rang up Tempura US$101.00");
+      assert.equal(rows[0].sentence, "Izzah rang up Tempura US$101.00");
       assert.equal(rows[0].time, "23:20");
       assert.deepEqual(await days(page), ["Fri Dec 11 | 12月11日(金)", "Fri Nov 20 | 11月20日(金)"]);
       await page.click("#histDone");
@@ -158,7 +158,7 @@ module.exports = [
       const id = await page.evaluate(() => [...document.querySelectorAll("#rc .rc-row")].find((r) => r.querySelector(".rc-t").firstChild.textContent === "Tempura").dataset.id);
       await page.click('#rc .rc-row[data-id="' + id + '"]');
       await until(() => isOpen(page, "line"), "the line sheet opens");
-      await expectText(page, "#lnBy", "Rung up by Ajen, Fri Dec 11");
+      await expectText(page, "#lnBy", "Rung up by Izzah, Fri Dec 11");
       await until(() => page.evaluate(() => /Fri Dec 11/.test(document.getElementById("lnLog").textContent)), "its history date");
     },
   },
@@ -168,8 +168,8 @@ module.exports = [
       await ready(page);
       await openTape(page, 10);
       const rows = await tape(page);
-      assert.equal(rowFor(rows, "Ajen deleted Konbini snacks US$7.80").undo, true);
-      assert.equal(rowFor(rows, "Ajen rang up Konbini snacks US$7.80").undo, false, "older than the delete");
+      assert.equal(rowFor(rows, "Izzah deleted Konbini snacks US$7.80").undo, true);
+      assert.equal(rowFor(rows, "Izzah rang up Konbini snacks US$7.80").undo, false, "older than the delete");
       assert.equal(rowFor(rows, "Mo rang up Niseko lodge US$1,870.00").undo, true, "its only change");
       assert.equal(await text(page, "#tape .tp-row button.tp-undo"), "Undo");
       const box = await page.locator("#tape button.tp-undo").first().boundingBox();
@@ -182,7 +182,7 @@ module.exports = [
       const backend = await ready(page);
       await openTape(page, 10);
       const sayBefore = await text(page, "#say");
-      const del = rowFor(await tape(page), "Ajen deleted Konbini snacks US$7.80");
+      const del = rowFor(await tape(page), "Izzah deleted Konbini snacks US$7.80");
       await page.click(undoBtn(del.id));
 
       const rows = await waitRowsN(page, 11);
@@ -207,12 +207,12 @@ module.exports = [
   {
     name: "Undo on a stamp entry takes the stamp off the slip",
     async run({ page }) {
-      const pay = { id: "seedpay1aaaa", from: "Ajen", to: "Mo", cad: 224.72, seed: 777, rot: 4, stampedBy: "Ajen", removed: false };
+      const pay = { id: "seedpay1aaaa", from: "Izzah", to: "Mo", cad: 224.72, seed: 777, rot: 4, stampedBy: "Izzah", removed: false };
       const backend = await ready(page, { seed: { ...SEED, payments: [pay] } });
       const stamps = () => page.locator("#slip .s-row.is-paid").count();
       await until(async () => (await stamps()) === 1, "the seeded stamp");
       await openTape(page, 11);
-      const row = (await tape(page)).find((r) => r.sentence.startsWith("Ajen stamped"));
+      const row = (await tape(page)).find((r) => r.sentence.startsWith("Izzah stamped"));
       assert.ok(row && row.undo, "the stamp entry has Undo");
       await page.click(undoBtn(row.id));
       await until(async () => (await stamps()) === 0, "the stamp comes off");
@@ -226,12 +226,12 @@ module.exports = [
     async run({ page }) {
       const backend = await ready(page);
       const id = idOfSeed("Shibuya dinner");
-      await otherPhone(backend, "updateExpense", { id, patch: { amount: 14600 } }); // Ajen, first edit
+      await otherPhone(backend, "updateExpense", { id, patch: { amount: 14600 } }); // Izzah, first edit
       await openTape(page, 11);
-      const first = (await tape(page)).find((r) => r.sentence.startsWith("Ajen changed Shibuya dinner"));
+      const first = (await tape(page)).find((r) => r.sentence.startsWith("Izzah changed Shibuya dinner"));
       assert.equal(first.undo, true, "newest change to it when the tape loaded");
 
-      await otherPhone(backend, "updateExpense", { id, patch: { amount: 15000 } }, { actor: "Trenton" }); // after the tape loaded
+      await otherPhone(backend, "updateExpense", { id, patch: { amount: 15000 } }, { actor: "Mo" }); // from Mo's other phone, after the tape loaded
       const before = tables(backend);
       await page.click(undoBtn(first.id));
       await expectText(page, "#ubarT", "That was changed again since. Undo the newer change first.");
@@ -240,7 +240,7 @@ module.exports = [
       assert.equal(savedExpense(backend, id).amount, 15000);
 
       const rows = await waitRowsN(page, 12);
-      assert.match(rows[0].sentence, /^Trenton changed Shibuya dinner/);
+      assert.match(rows[0].sentence, /^Mo changed Shibuya dinner/);
       assert.equal(rows[0].undo, true);
       assert.equal(rows.find((r) => r.id === first.id).undo, false, "the outdated one lost its Undo");
       assert.equal(rows.find((r) => r.id === first.id).undone, false);
@@ -251,7 +251,7 @@ module.exports = [
     async run({ page }) {
       const backend = await ready(page);
       await openTape(page, 10);
-      const del = rowFor(await tape(page), "Ajen deleted Konbini snacks US$7.80");
+      const del = rowFor(await tape(page), "Izzah deleted Konbini snacks US$7.80");
       const release = hold(backend, "undo");
       await page.dblclick(undoBtn(del.id));
       assert.equal(await page.evaluate((s) => document.querySelector(s).disabled, undoBtn(del.id)), true, "disabled while it is sent");
@@ -282,7 +282,7 @@ module.exports = [
     async run({ page }) {
       const seen = Date.parse("2026-12-01T00:00:00Z");
       const backend = await ready(page, { storage: { "chi.seen": String(seen) } });
-      await otherPhone(backend, "addExpense", { expense: { ...SHARED(1), id: "freshline001", title: "Tempura", paidBy: "Ajen", splitMode: "equal", splitVals: [], note: "", kind: "" } });
+      await otherPhone(backend, "addExpense", { expense: { ...SHARED(1), id: "freshline001", title: "Tempura", paidBy: "Izzah", splitMode: "equal", splitVals: [], note: "", kind: "" } });
       await page.evaluate(() => globalThis.__matTest.store.refresh());
       await expectText(page, "#histN", "1");
       assert.equal(await visible(page, "#histN"), true);
@@ -388,7 +388,7 @@ module.exports = [
       await openTape(page, 10);
       const wide = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth || document.getElementById("tape").scrollWidth > document.getElementById("tape").clientWidth);
       assert.equal(wide, false);
-      const del = rowFor(await tape(page), "Ajen deleted Konbini snacks US$7.80");
+      const del = rowFor(await tape(page), "Izzah deleted Konbini snacks US$7.80");
       await page.click(undoBtn(del.id));
       await expectText(page, "#ubarT", "Undone.");
       const top = await page.evaluate(() => document.getElementById("ubar").getBoundingClientRect().top);

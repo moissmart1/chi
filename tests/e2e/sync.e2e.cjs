@@ -59,13 +59,13 @@ async function ready(page, opts = {}) {
   return backend;
 }
 
-// Two phones on one backend: Mo on A, Ajen on B, who last looked a minute
+// Two phones on one backend: Mo on A, Izzah on B, who last looked a minute
 // before NOON12 (so lines rung up now are new to him).
 async function twoPhones(ctx) {
   const a = ctx.page;
   const backend = await ready(a);
   const b = await ctx.newPhone();
-  await ready(b, { backend, me: "Ajen", storage: { "chi.seen": String(NOON12 - 60000) } });
+  await ready(b, { backend, me: "Izzah", storage: { "chi.seen": String(NOON12 - 60000) } });
   return { a, b, backend };
 }
 

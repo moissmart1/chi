@@ -138,7 +138,7 @@ module.exports = [
       await until(async () => (await inView(page)) === "2026-12-12", "today is in view");
       await page.click("#pager .sq:nth-child(6)");
       await until(async () => (await inView(page)) === "2026-12-15", "Day 6 is in view");
-      const env = await backend.handle({ key: "test-key", actor: "Ajen", via: "app", action: "addStop", args: { stop: { id: "ajenstop0001", date: "2026-12-12", time: "16:00", title: "Tower Records" } } });
+      const env = await backend.handle({ key: "test-key", actor: "Izzah", via: "app", action: "addStop", args: { stop: { id: "ajenstop0001", date: "2026-12-12", time: "16:00", title: "Tower Records" } } });
       assert.equal(env.ok, true, JSON.stringify(env));
       await advance(page, backend, 20000);
       await until(() => page.evaluate((sel) => document.querySelectorAll(sel + " .r[data-id]").length === 6, tk("2026-12-12")), "the new stop is on the Dec 12 ticket");

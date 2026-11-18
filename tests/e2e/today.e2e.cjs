@@ -291,10 +291,10 @@ module.exports = [
       await until(() => has(page, row(MEIJI), "is-open"), "Meiji Shrine opens");
       await page.focus(row(MEIJI) + ' [role="button"]');
       await advance(page, backend, 20000);
-      const env = await backend.handle({ key: "test-key", actor: "Ajen", via: "app", action: "addStop", args: { stop: { id: "ajenstop0001", date: "2026-12-12", time: "16:00", title: "Tower Records" } } });
+      const env = await backend.handle({ key: "test-key", actor: "Izzah", via: "app", action: "addStop", args: { stop: { id: "ajenstop0001", date: "2026-12-12", time: "16:00", title: "Tower Records" } } });
       assert.equal(env.ok, true, JSON.stringify(env));
       await advance(page, backend, 20000);
-      await until(() => page.evaluate(() => !!document.querySelector('.r[data-id="ajenstop0001"]')), "Ajen’s stop is on the ticket");
+      await until(() => page.evaluate(() => !!document.querySelector('.r[data-id="ajenstop0001"]')), "Izzah’s stop is on the ticket");
       assert.deepEqual(await openRows(page), [MEIJI]);
       await expectText(page, "#dayCount", /^Day 3 of 11/);
       assert.equal(await page.evaluate(() => !!document.activeElement.closest('.r[data-id="planstop1201"]')), true, "focus stays on Meiji Shrine");

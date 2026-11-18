@@ -5,7 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { ORIGIN, SEED, NOON12, makeBackend, open, until, text, expectText, visible } = require("./helpers.cjs");
 
-const NAMES = ["Mo", "Ajen", "Trenton"];
+const NAMES = ["Mo", "Izzah"];
 const lib = async () => ({ ...(await import("../../js/money.js")), ...(await import("../../js/format.js")) });
 const live = (seed) => seed.expenses.filter((e) => !e.deleted);
 const rowCount = (page) => page.evaluate(() => document.querySelectorAll("#rc .rc-row").length);
@@ -21,7 +21,7 @@ function withExtras(extra = {}) {
 
 const BOARD = {
   id: "seedexp010", day: "pre", title: "Board rental", amount: 730, currency: "CAD", rate: 0.72,
-  paidBy: "Ajen", split: ["Mo", "Ajen", "Trenton"], splitMode: "equal", splitVals: [], note: "", kind: "", addedBy: "Ajen", deleted: false,
+  paidBy: "Izzah", split: ["Mo", "Izzah"], splitMode: "equal", splitVals: [], note: "", kind: "", addedBy: "Izzah", deleted: false,
 };
 
 module.exports = [
@@ -95,9 +95,9 @@ module.exports = [
       }
       assert.ok((await text(page, '.rc-group[data-day="2026-12-11"] .rc-sub')).includes("US$182.45"));
 
-      assert.ok((await text(page, '.rc-row[data-id="seedexp008"]')).includes("Ajen + Trenton only"));
+      assert.ok((await text(page, '.rc-row[data-id="seedexp008"]')).includes("Izzah only"));
       const onlyNames = await page.$$eval('.rc-row[data-id="seedexp008"] small b', (els) => els.map((b) => [b.textContent, getComputedStyle(b).fontWeight]));
-      assert.deepEqual(onlyNames, [["Ajen", "700"], ["Trenton", "700"]]);
+      assert.deepEqual(onlyNames, [["Izzah", "700"]]);
       await expectText(page, '.rc-row[data-id="seedexp001"] .rc-note', "ref NK-4471");
       assert.equal(await page.locator("#rc .rc-note").count(), 1, "only the line with a note has .rc-note");
 
@@ -294,12 +294,26 @@ module.exports = [
     async run({ page }) {
       await open(page, { seed: SEED, nowMs: NOON12, key: null, me: null, how: null, hash: "#k=test-key" });
       await until(() => visible(page, "#first"), "#first shows");
-      assert.equal(await page.locator("#first [data-me]").count(), 3, "three seals");
+      assert.equal(await page.locator("#first [data-me]").count(), 2, "two seals");
+      // Two keys, centred, each the size one of three would be.
+      const keys = await page.evaluate(() => {
+        const box = document.querySelector("#first .who-pick").getBoundingClientRect();
+        return { box: [box.left, box.width], keys: [...document.querySelectorAll("#first [data-me]")].map((b) => { const r = b.getBoundingClientRect(); return [r.left, r.width, r.height]; }) };
+      });
+      const [left, width] = keys.box;
+      const third = (width - 12) / 3;
+      for (const [, w, h] of keys.keys) {
+        assert.ok(Math.abs(w - third) < 1, "a third of the row: " + w + " vs " + third);
+        assert.ok(h >= 90, "the keys keep their height: " + h);
+      }
+      const gapLeft = keys.keys[0][0] - left;
+      const gapRight = left + width - (keys.keys[1][0] + keys.keys[1][1]);
+      assert.ok(Math.abs(gapLeft - gapRight) < 1, "centred: " + gapLeft + " vs " + gapRight);
       assert.equal(await page.evaluate(() => localStorage.getItem("chi.key")), "test-key");
       assert.equal(await visible(page, "#how"), false);
 
-      await page.click('#first [data-me="Ajen"]');
-      await until(() => page.evaluate(() => localStorage.getItem("chi.me") === "Ajen"), "chi.me stored");
+      await page.click('#first [data-me="Izzah"]');
+      await until(() => page.evaluate(() => localStorage.getItem("chi.me") === "Izzah"), "chi.me stored");
       assert.equal(await page.evaluate(() => location.hash), "");
       assert.ok(!(await page.evaluate(() => location.href)).includes("k="), "key gone from the address");
       await until(() => visible(page, "#how"), "#how shows");
@@ -329,7 +343,7 @@ module.exports = [
     async run({ page }) {
       await open(page, { seed: SEED, nowMs: NOON12, key: null, me: null, how: null, hash: "#k=test-key" });
       await until(() => visible(page, "#first"), "#first shows");
-      await page.click('#first [data-me="Trenton"]');
+      await page.click('#first [data-me="Izzah"]');
       await until(() => visible(page, "#how"), "#how shows");
       await page.reload();
       await waitRows(page, 8);
@@ -369,7 +383,7 @@ module.exports.push(
       const backend = makeBackend(SEED, { now: NOON12 });
       // Mo mistypes a name by hand in the Sheet.
       const row = backend.fake.tables.Expenses.find((r) => r.id === "seedexp004");
-      row.split = "Mo,Ajen,Trent";
+      row.split = "Mo,Izzah,Trent";
       await open(page, { backend, nowMs: NOON12 });
       await waitRows(page, 7);
       await expectText(page, "#asideNote", "1 line in the Sheet can’t be read (a name the app doesn’t know). It’s left out of the totals. Tell Mo.");
@@ -386,7 +400,7 @@ module.exports.push(
       await until(() => page.evaluate(() => document.getElementById("line").classList.contains("is-open")), "a line opens");
       assert.equal(await visible(page, "#rateNote"), false);
       // Mo fixes the Sheet; a reload loads it.
-      row.split = "Mo,Ajen,Trenton";
+      row.split = "Mo,Izzah";
       await page.reload();
       await waitRows(page, 8);
       assert.equal(await visible(page, "#asideNote"), false);

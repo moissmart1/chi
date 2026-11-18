@@ -47,16 +47,16 @@ test("a press inside the window writes one row and one History line", async () =
 
 test("the issue stamp's line reads: stamped the book", async () => {
   const call = book();
-  assert.equal((await call("pressStamp", { def: "iss", at: IN_D1 }, "Ajen")).ok, true);
+  assert.equal((await call("pressStamp", { def: "iss", at: IN_D1 }, "Izzah")).ok, true);
   assert.equal(lines(call)[0].summary, "stamped the book");
 });
 
 test("a seed the phone sends is kept, so the ink does not change when the answer comes; an odd one is replaced", async () => {
   const call = book();
   assert.equal((await call("pressStamp", { def: "d1", at: IN_D1, seed: 123456 })).data.stamp.seed, 123456);
-  const other = (await call("pressStamp", { def: "d1", at: IN_D1, seed: 0 }, "Ajen")).data.stamp.seed;
+  const other = (await call("pressStamp", { def: "d1", at: IN_D1, seed: 0 }, "Izzah")).data.stamp.seed;
   assert.ok(other >= 1 && other <= 4294967295);
-  const frac = (await call("pressStamp", { def: "d1", at: IN_D1, seed: 1.5 }, "Trenton")).data.stamp.seed;
+  const frac = (await call("pressStamp", { def: "d1", at: IN_D1, seed: 1.5 }, "Izzah")).data.stamp.seed;
   assert.ok(Number.isInteger(frac));
 });
 
@@ -79,8 +79,8 @@ test("the same press twice is one row and one History line, and the second answe
 test("two people stamping the same day are two rows", async () => {
   const call = book();
   await call("pressStamp", { def: "d1", at: IN_D1 }, "Mo");
-  await call("pressStamp", { def: "d1", at: IN_D1 }, "Ajen");
-  assert.deepEqual(rows(call).map((r) => r.id).sort(), ["d1|Ajen", "d1|Mo"]);
+  await call("pressStamp", { def: "d1", at: IN_D1 }, "Izzah");
+  assert.deepEqual(rows(call).map((r) => r.id).sort(), ["d1|Izzah", "d1|Mo"]);
 });
 
 test("pressed offline, arriving 30 hours later (window closed): accepted, stored with the time it was pressed", async () => {
@@ -202,38 +202,38 @@ test("Claude can lift a stamp through undo (lifting is not pressing)", async () 
 test("History: another person's press is not blocked by mine; each can undo only their own", async () => {
   const call = book();
   const a = (await call("pressStamp", { def: "d1", at: IN_D1 }, "Mo")).data;
-  const b = (await call("pressStamp", { def: "d1", at: IN_D1 }, "Ajen")).data;
+  const b = (await call("pressStamp", { def: "d1", at: IN_D1 }, "Izzah")).data;
   const h = (await call("history")).data.entries;
   assert.deepEqual(h.map((e) => e.canUndo), [true, true]);
   assert.equal((await call("undo", { logId: a.logId }, "Mo")).ok, true);
-  assert.equal((await call("undo", { logId: b.logId }, "Ajen")).ok, true);
+  assert.equal((await call("undo", { logId: b.logId }, "Izzah")).ok, true);
 });
 
-test("nobody acts on someone else's stamp: Mo cannot lift Ajen's press, nor put back Ajen's lift; Ajen can do both", async () => {
+test("nobody acts on someone else's stamp: Mo cannot lift Izzah's press, nor put back Izzah's lift; Izzah can do both", async () => {
   const call = book();
-  const press = (await call("pressStamp", { def: "d1", at: IN_D1 }, "Ajen")).data;
+  const press = (await call("pressStamp", { def: "d1", at: IN_D1 }, "Izzah")).data;
   const refused = await call("undo", { logId: press.logId }, "Mo");
   assert.deepEqual([refused.ok, refused.error, refused.message], [false, "bad_input", "You can only change your own stamp."]);
   assert.equal(rows(call)[0].gone, "", "still pressed");
   assert.equal(lines(call).length, 1, "no new line");
-  const lift = await call("undo", { logId: press.logId }, "Ajen");
+  const lift = await call("undo", { logId: press.logId }, "Izzah");
   assert.equal(lift.ok, true);
   const putBack = await call("undo", { logId: lift.data.logId }, "Mo");
   assert.deepEqual([putBack.ok, putBack.error], [false, "bad_input"]);
   assert.equal(rows(call)[0].gone, "yes");
-  assert.equal((await call("undo", { logId: lift.data.logId }, "Ajen")).ok, true);
+  assert.equal((await call("undo", { logId: lift.data.logId }, "Izzah")).ok, true);
   assert.equal(rows(call)[0].gone, "");
 });
 
-test("the Claude connector obeys the same rule: a link acting as Mo cannot undo Ajen's stamp", async () => {
+test("the Claude connector obeys the same rule: a link acting as Mo cannot undo Izzah's stamp", async () => {
   const call = book();
-  const press = (await call("pressStamp", { def: "d1", at: IN_D1 }, "Ajen")).data;
+  const press = (await call("pressStamp", { def: "d1", at: IN_D1 }, "Izzah")).data;
   const r = await call("undo", { logId: press.logId }, "Mo", { via: "claude" });
   assert.deepEqual([r.ok, r.message], [false, "You can only change your own stamp."]);
   const viaTool = call.fake.mcp({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "undo", arguments: { log_id: press.logId } } }, { t: "claude-token", as: "Mo" });
   assert.match(JSON.stringify(viaTool), /own stamp/);
   assert.equal(rows(call)[0].gone, "");
-  const own = call.fake.mcp({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "undo", arguments: { log_id: press.logId } } }, { t: "claude-token", as: "Ajen" });
+  const own = call.fake.mcp({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "undo", arguments: { log_id: press.logId } } }, { t: "claude-token", as: "Izzah" });
   assert.doesNotMatch(JSON.stringify(own), /own stamp/);
   assert.equal(rows(call)[0].gone, "yes");
 });
@@ -241,8 +241,8 @@ test("the Claude connector obeys the same rule: a link acting as Mo cannot undo 
 test("load lists the definitions in full and everyone's stamps without the lifted ones", async () => {
   const call = book();
   await call("pressStamp", { def: "d1", at: IN_D1 }, "Mo");
-  const ajen = (await call("pressStamp", { def: "d1", at: IN_D1 }, "Ajen")).data;
-  await call("undo", { logId: ajen.logId }, "Ajen");
+  const izzah = (await call("pressStamp", { def: "d1", at: IN_D1 }, "Izzah")).data;
+  await call("undo", { logId: izzah.logId }, "Izzah");
   const d = (await call("load")).data;
   assert.deepEqual(d.stampDefs, DEFS);
   assert.deepEqual(d.stamps.map((s) => [s.def, s.who]), [["d1", "Mo"]]);
@@ -253,7 +253,7 @@ test("load on a sheet without the two tabs answers empty lists, and a press is t
   const call = book({ over: { missingTabs: ["StampDefs", "Stamps"] }, defs: [] });
   const d = (await call("load")).data;
   assert.deepEqual([d.stampDefs, d.stamps], [[], []]);
-  assert.equal(d.people.length, 3, "everything else still loads");
+  assert.equal(d.people.length, 2, "everything else still loads");
   const r = await call("pressStamp", { def: "d1", at: IN_D1 });
   assert.deepEqual([r.ok, r.error], [false, "needs_migrate"]);
   // then migrate adds them

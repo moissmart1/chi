@@ -304,7 +304,9 @@ export function mountSlip(slip, store) {
       rows.push(older);
     }
     const foot = el("div", "slip-f", "Stamp it the moment you send. What’s left is always what’s shown here.");
-    slip.replaceChildren(head, ...rows, foot, ...(v.me ? [simpBlock(v)] : []));
+    // With two people there is never anything to simplify: the switch and its
+    // question are left off (the setting and its maths stay, for three or more).
+    slip.replaceChildren(head, ...rows, foot, ...(v.me && v.people.length >= 3 ? [simpBlock(v)] : []));
 
     if (focus) {
       const again = slip.querySelector(focus.sel);

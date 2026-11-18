@@ -5,11 +5,12 @@
 
 const assert = require("node:assert/strict");
 const P = require("../../backend/Pure.js");
-const { SEED, NOON12, open, advance, until, text, expectText, visible } = require("./helpers.cjs");
+// Three people (Mo, Izzah, Sam): the slip here has more than one debt.
+const { THREE: SEED, NOON12, open, advance, until, text, expectText, visible } = require("./helpers.cjs");
 
 // ---- small tools for this file ----
 
-const NAMES = ["Mo", "Ajen", "Trenton"];
+const NAMES = ["Mo", "Izzah", "Sam"];
 const TODAY = "Sat Dec 12"; // NOON12, on Chicago time
 const money = () => import("../../js/money.js");
 const fmt = () => import("../../js/format.js");
@@ -50,8 +51,8 @@ async function arm(page, key) {
   await until(async () => (await armed(page)).includes(key), key + " is armed");
 }
 
-// The seed's open transfers with Simplify on: Trenton → Mo $1,124.29, Ajen → Mo $224.72.
-const pay = (o) => ({ id: "seedpay" + o.n + "aaaa", from: o.from || "Ajen", to: o.to || "Mo", cad: o.cad, seed: o.seed || 100 + o.n, rot: o.rot === undefined ? 2 : o.rot, stampedBy: o.by, stampedAt: o.at, removed: false });
+// The seed's open transfers with Simplify on: Sam → Mo $1,124.29, Izzah → Mo $224.72.
+const pay = (o) => ({ id: "seedpay" + o.n + "aaaa", from: o.from || "Izzah", to: o.to || "Mo", cad: o.cad, seed: o.seed || 100 + o.n, rot: o.rot === undefined ? 2 : o.rot, stampedBy: o.by, stampedAt: o.at, removed: false });
 
 module.exports = [
   {
@@ -84,21 +85,21 @@ module.exports = [
     async run({ page }) {
       const backend = await ready(page);
       await waitOpen(page, 2);
-      await arm(page, "Ajen>Mo");
+      await arm(page, "Izzah>Mo");
       assert.equal(await page.inputValue("#stampAmt"), "224.72");
       assert.equal(await page.getAttribute("#stampAmt", "inputmode"), "decimal");
       const size = await page.evaluate(() => parseFloat(getComputedStyle(document.getElementById("stampAmt")).fontSize));
       assert.ok(size >= 16, "no zoom on focus: " + size);
-      await expectText(page, '#slip .s-row[data-key="Ajen>Mo"] .s-sub', "Did it land? Tap again to stamp.");
+      await expectText(page, '#slip .s-row[data-key="Izzah>Mo"] .s-sub', "Did it land? Tap again to stamp.");
       assert.equal(await page.locator("#sendTo").count(), 0, "Mo has no e-Transfer address");
-      assert.deepEqual(await armed(page), ["Ajen>Mo"], "only one row armed");
+      assert.deepEqual(await armed(page), ["Izzah>Mo"], "only one row armed");
       await idle(page);
       assert.equal(backend.fake.tables.Settlements.length, 0, "nothing saved yet");
       assert.equal(backend.requests.filter((r) => r.action === "addPayment").length, 0);
 
       // Arming another row disarms the first.
-      await arm(page, "Trenton>Mo");
-      assert.deepEqual(await armed(page), ["Trenton>Mo"]);
+      await arm(page, "Sam>Mo");
+      assert.deepEqual(await armed(page), ["Sam>Mo"]);
       assert.equal(await page.inputValue("#stampAmt"), "1124.29");
     },
   },
@@ -108,8 +109,8 @@ module.exports = [
       await ready(page, { seed: { ...SEED, people: { Mo: { etransfer: "mo@example.com" } } } });
       await waitOpen(page, 2);
       assert.equal(await page.locator("#sendTo").count(), 0, "not until a row is armed");
-      await arm(page, "Ajen>Mo");
-      await expectText(page, '#slip .s-row[data-key="Ajen>Mo"] #sendTo', "mo@example.com");
+      await arm(page, "Izzah>Mo");
+      await expectText(page, '#slip .s-row[data-key="Izzah>Mo"] #sendTo', "mo@example.com");
       await page.click("#copyTo");
       await until(async () => (await page.evaluate(() => navigator.clipboard.readText())) === "mo@example.com", "the address is on the clipboard");
       await expectText(page, "#ubarT", "Address copied.");
@@ -121,8 +122,8 @@ module.exports = [
       const backend = await ready(page);
       await waitOpen(page, 2);
       await expectText(page, "#say", "You’re owed $1,349.01.");
-      await arm(page, "Ajen>Mo");
-      await page.click(spot("Ajen>Mo"));
+      await arm(page, "Izzah>Mo");
+      await page.click(spot("Izzah>Mo"));
       // Drawn at once, with the hit, before the backend answers.
       await until(async () => (await paidRows(page)).length === 1, "a stamped row");
       assert.equal(await page.locator("#slip .s-row.is-paid .stamp.hit").count(), 1, "the stamp lands with the hit");
@@ -130,11 +131,11 @@ module.exports = [
       await idle(page);
       const rows = saved(backend);
       assert.equal(rows.length, 1);
-      assert.deepEqual({ from: rows[0].from, to: rows[0].to, cad: rows[0].cad, stampedBy: rows[0].stampedBy }, { from: "Ajen", to: "Mo", cad: 224.72, stampedBy: "Mo" });
+      assert.deepEqual({ from: rows[0].from, to: rows[0].to, cad: rows[0].cad, stampedBy: rows[0].stampedBy }, { from: "Izzah", to: "Mo", cad: 224.72, stampedBy: "Mo" });
       const [paid] = await paidRows(page);
-      assert.deepEqual(paid, { id: rows[0].id, who: "Ajen → you", amt: "$224.72", sub: "Paid " + TODAY + ". Nothing more to send." });
-      assert.deepEqual((await openRows(page)).map((r) => r.key), ["Trenton>Mo"], "open transfers first, the transfer is gone");
-      await expectText(page, "#say", "Trenton owes you $1,124.29.");
+      assert.deepEqual(paid, { id: rows[0].id, who: "Izzah → you", amt: "$224.72", sub: "Paid " + TODAY + ". Nothing more to send." });
+      assert.deepEqual((await openRows(page)).map((r) => r.key), ["Sam>Mo"], "open transfers first, the transfer is gone");
+      await expectText(page, "#say", "Sam owes you $1,124.29.");
       await expectText(page, "#ubarT", "Stamped $224.72 to Mo.");
       assert.ok(await visible(page, "#ubarU"));
 
@@ -151,22 +152,22 @@ module.exports = [
     async run({ page }) {
       const backend = await ready(page);
       await waitOpen(page, 2);
-      await arm(page, "Ajen>Mo"); // arm one, then another
-      await arm(page, "Trenton>Mo");
+      await arm(page, "Izzah>Mo"); // arm one, then another
+      await arm(page, "Sam>Mo");
       await page.fill("#stampAmt", "100");
-      await page.click(spot("Trenton>Mo"));
+      await page.click(spot("Sam>Mo"));
       await idle(page);
       const rows = saved(backend);
       assert.equal(rows.length, 1);
-      assert.deepEqual({ from: rows[0].from, to: rows[0].to, cad: rows[0].cad }, { from: "Trenton", to: "Mo", cad: 100 });
+      assert.deepEqual({ from: rows[0].from, to: rows[0].to, cad: rows[0].cad }, { from: "Sam", to: "Mo", cad: 100 });
       const open = await openRows(page);
       assert.deepEqual(open, [
-        { key: "Trenton>Mo", who: "Trenton → you", amt: "$1,024.29" },
-        { key: "Ajen>Mo", who: "Ajen → you", amt: "$224.72" },
+        { key: "Sam>Mo", who: "Sam → you", amt: "$1,024.29" },
+        { key: "Izzah>Mo", who: "Izzah → you", amt: "$224.72" },
       ]);
       const paid = await paidRows(page);
       assert.equal(paid.length, 1);
-      assert.deepEqual({ who: paid[0].who, amt: paid[0].amt, sub: paid[0].sub }, { who: "Trenton → you", amt: "$100.00", sub: "Paid " + TODAY + "." }, "still more to send: no 'Nothing more to send.'");
+      assert.deepEqual({ who: paid[0].who, amt: paid[0].amt, sub: paid[0].sub }, { who: "Sam → you", amt: "$100.00", sub: "Paid " + TODAY + "." }, "still more to send: no 'Nothing more to send.'");
       // The stamped row comes after every open row.
       const order = await page.$$eval("#slip .s-row", (els) => els.map((e) => (e.classList.contains("is-paid") ? "paid" : "open")));
       assert.deepEqual(order, ["open", "open", "paid"]);
@@ -177,12 +178,12 @@ module.exports = [
     async run({ page }) {
       const backend = await ready(page);
       await waitOpen(page, 2);
-      await arm(page, "Ajen>Mo");
+      await arm(page, "Izzah>Mo");
       for (const bad of ["0", "", "-5", "12.345", "abc", "100001"]) {
         await page.fill("#stampAmt", bad);
-        await page.click(spot("Ajen>Mo"));
-        await expectText(page, '#slip .s-row[data-key="Ajen>Mo"] .s-sub', "Enter what was sent.");
-        assert.deepEqual(await armed(page), ["Ajen>Mo"], "still armed after " + JSON.stringify(bad));
+        await page.click(spot("Izzah>Mo"));
+        await expectText(page, '#slip .s-row[data-key="Izzah>Mo"] .s-sub', "Enter what was sent.");
+        assert.deepEqual(await armed(page), ["Izzah>Mo"], "still armed after " + JSON.stringify(bad));
         assert.equal(await page.locator("#slip .stamp").count(), 0);
       }
       await idle(page);
@@ -190,7 +191,7 @@ module.exports = [
       assert.equal(backend.requests.filter((r) => r.action === "addPayment").length, 0);
       // A good amount then goes through.
       await page.fill("#stampAmt", "250.3");
-      await page.click(spot("Ajen>Mo"));
+      await page.click(spot("Izzah>Mo"));
       await idle(page);
       assert.equal(saved(backend)[0].cad, 250.3);
     },
@@ -200,23 +201,23 @@ module.exports = [
     async run({ page }) {
       const backend = await ready(page);
       await waitOpen(page, 2);
-      await arm(page, "Ajen>Mo");
+      await arm(page, "Izzah>Mo");
       assert.equal(await page.inputValue("#stampAmt"), "224.72");
-      // Another phone: Mo paid $30 that Ajen and Mo share, so Ajen owes $15 more.
-      const lunch = { id: "otherexp001", day: "2026-12-12", title: "Lunch", amount: 30, currency: "CAD", paidBy: "Mo", split: ["Mo", "Ajen"], splitMode: "equal", splitVals: [], note: "", kind: "" };
-      await otherPhone(backend, "Trenton", "addExpense", { expense: lunch });
+      // Another phone: Mo paid $30 that Izzah and Mo share, so Izzah owes $15 more.
+      const lunch = { id: "otherexp001", day: "2026-12-12", title: "Lunch", amount: 30, currency: "CAD", paidBy: "Mo", split: ["Mo", "Izzah"], splitMode: "equal", splitVals: [], note: "", kind: "" };
+      await otherPhone(backend, "Sam", "addExpense", { expense: lunch });
       await page.evaluate(() => globalThis.__matTest.store.checkRev());
-      await until(async () => (await page.inputValue("#stampAmt")) === "236.73", "the field follows the new amount");
-      assert.deepEqual(await armed(page), ["Ajen>Mo"], "still armed");
+      await until(async () => (await page.inputValue("#stampAmt")) === "239.72", "the field follows the new amount");
+      assert.deepEqual(await armed(page), ["Izzah>Mo"], "still armed");
 
       // Typed by hand: a sync leaves it alone.
       await page.fill("#stampAmt", "200");
-      await otherPhone(backend, "Trenton", "addExpense", { expense: { ...lunch, id: "otherexp002" } });
+      await otherPhone(backend, "Sam", "addExpense", { expense: { ...lunch, id: "otherexp002" } });
       await page.evaluate(() => globalThis.__matTest.store.checkRev());
       // The seed's 8 lines plus the two lunches.
       await until(() => page.evaluate(() => document.querySelectorAll("#rc .rc-row").length === 10), "the second sync lands");
       assert.equal(await page.inputValue("#stampAmt"), "200");
-      await page.click(spot("Ajen>Mo"));
+      await page.click(spot("Izzah>Mo"));
       await idle(page);
       assert.equal(saved(backend)[0].cad, 200);
     },
@@ -226,13 +227,13 @@ module.exports = [
     async run({ page }) {
       const backend = await ready(page);
       await waitOpen(page, 2);
-      await arm(page, "Ajen>Mo");
+      await arm(page, "Izzah>Mo");
       await advance(page, backend, 7900);
-      assert.deepEqual(await armed(page), ["Ajen>Mo"], "still armed at 7.9 s");
+      assert.deepEqual(await armed(page), ["Izzah>Mo"], "still armed at 7.9 s");
       await advance(page, backend, 200);
       await until(async () => (await armed(page)).length === 0, "disarmed after 8 s");
       assert.equal(await page.locator("#stampAmt").count(), 0);
-      await expectText(page, '#slip .s-row[data-key="Ajen>Mo"] .s-amt', "$224.72");
+      await expectText(page, '#slip .s-row[data-key="Izzah>Mo"] .s-amt', "$224.72");
     },
   },
   {
@@ -240,8 +241,8 @@ module.exports = [
     async run({ page }) {
       const backend = await ready(page);
       await waitOpen(page, 2);
-      await arm(page, "Ajen>Mo");
-      await page.click(spot("Ajen>Mo"));
+      await arm(page, "Izzah>Mo");
+      await page.click(spot("Izzah>Mo"));
       await idle(page);
       const look = () => page.evaluate(() => {
         const s = document.querySelector("#slip .s-row.is-paid .stamp");
@@ -312,8 +313,8 @@ module.exports = [
       await page.emulateMedia({ reducedMotion: "reduce" });
       await ready(page);
       await waitOpen(page, 2);
-      await arm(page, "Ajen>Mo");
-      await page.click(spot("Ajen>Mo"));
+      await arm(page, "Izzah>Mo");
+      await page.click(spot("Izzah>Mo"));
       await until(async () => (await page.locator("#slip .stamp").count()) === 1, "the stamp");
       assert.equal(await page.locator("#slip .stamp.hit").count(), 0);
     },
@@ -322,24 +323,24 @@ module.exports = [
     name: "a stamp made by someone else since you looked counts in #histN; your own does not",
     async run({ page }) {
       const half = new Date(NOON12 - 30 * 60 * 1000).toISOString();
-      const payments = [pay({ n: 1, cad: 10, by: "Ajen", at: half }), pay({ n: 2, cad: 5, from: "Trenton", by: "Mo", at: half })];
+      const payments = [pay({ n: 1, cad: 10, by: "Izzah", at: half }), pay({ n: 2, cad: 5, from: "Sam", by: "Mo", at: half })];
       await ready(page, { seed: { ...SEED, payments }, storage: { "chi.seen": String(NOON12 - 60 * 60 * 1000) } });
       await expectText(page, "#histN", "1");
       assert.ok(await visible(page, "#histN"));
     },
   },
   {
-    name: "any of the three can stamp any row: Ajen stamps Trenton → Mo",
+    name: "any of the three can stamp any row: Izzah stamps Sam → Mo",
     async run({ page }) {
-      const backend = await ready(page, { me: "Ajen" });
+      const backend = await ready(page, { me: "Izzah" });
       await waitOpen(page, 2);
-      assert.deepEqual((await openRows(page)).map((r) => r.who), ["Trenton → Mo", "You → Mo"]);
-      await arm(page, "Trenton>Mo");
-      await expectText(page, '#slip .s-row[data-key="Trenton>Mo"] .s-sub', "Did Mo get it? Tap again to stamp.");
-      await page.click(spot("Trenton>Mo"));
+      assert.deepEqual((await openRows(page)).map((r) => r.who), ["Sam → Mo", "You → Mo"]);
+      await arm(page, "Sam>Mo");
+      await expectText(page, '#slip .s-row[data-key="Sam>Mo"] .s-sub', "Did Mo get it? Tap again to stamp.");
+      await page.click(spot("Sam>Mo"));
       await idle(page);
       const [row] = saved(backend);
-      assert.deepEqual({ from: row.from, to: row.to, cad: row.cad, stampedBy: row.stampedBy }, { from: "Trenton", to: "Mo", cad: 1124.29, stampedBy: "Ajen" });
+      assert.deepEqual({ from: row.from, to: row.to, cad: row.cad, stampedBy: row.stampedBy }, { from: "Sam", to: "Mo", cad: 1124.29, stampedBy: "Izzah" });
     },
   },
   {
@@ -348,12 +349,12 @@ module.exports = [
       const backend = await ready(page);
       await waitOpen(page, 2);
       backend.failWith = "network";
-      await arm(page, "Ajen>Mo");
-      await page.click(spot("Ajen>Mo"));
+      await arm(page, "Izzah>Mo");
+      await page.click(spot("Izzah>Mo"));
       await idle(page);
       assert.notEqual(await ubar(page), "No signal. That wasn’t saved.");
       assert.equal(await page.locator("#slip .s-row.is-paid").count(), 1, "the stamp stays on the slip");
-      assert.deepEqual((await openRows(page)).map((r) => r.key), ["Trenton>Mo"], "the transfer is not offered again");
+      assert.deepEqual((await openRows(page)).map((r) => r.key), ["Sam>Mo"], "the transfer is not offered again");
       assert.deepEqual(await armed(page), [], "no row is left armed");
       assert.equal(await page.locator("#stampAmt").count(), 0, "the amount field is gone");
       assert.equal(backend.fake.tables.Settlements.length, 0);
@@ -375,8 +376,8 @@ module.exports = [
         if (body.action === "addPayment") throw new Error("reply lost"); // it reached the Sheet
         return env;
       };
-      await arm(page, "Ajen>Mo");
-      await page.click(spot("Ajen>Mo"));
+      await arm(page, "Izzah>Mo");
+      await page.click(spot("Izzah>Mo"));
       await idle(page);
       assert.equal(backend.fake.tables.Settlements.length, 1);
       assert.equal(await page.locator("#slip .s-row.is-paid.is-pending").count(), 1, "still shown, as pending");
@@ -384,7 +385,7 @@ module.exports = [
       const faded = await page.evaluate(() => Number(getComputedStyle(document.querySelector("#slip .s-row.is-pending .s-l")).opacity));
       assert.ok(faded < 1, "faded like a pending line: " + faded);
       await expectText(page, "#net", /1 to send\.$/);
-      assert.deepEqual((await openRows(page)).map((r) => r.key), ["Trenton>Mo"]);
+      assert.deepEqual((await openRows(page)).map((r) => r.key), ["Sam>Mo"]);
       backend.handle = handle;
       await page.evaluate(() => globalThis.__matTest.store.checkRev());
       await idle(page);
@@ -409,8 +410,8 @@ module.exports = [
         if (body.action === "addPayment") throw new Error("reply lost");
         return env;
       };
-      await arm(page, "Ajen>Mo");
-      await page.click(spot("Ajen>Mo"));
+      await arm(page, "Izzah>Mo");
+      await page.click(spot("Izzah>Mo"));
       await idle(page);
       await page.waitForSelector("#slip .s-row.is-pending .stamp");
       const settled = () =>
@@ -434,20 +435,20 @@ module.exports = [
     async run({ page }) {
       const backend = await ready(page);
       await waitOpen(page, 2);
-      await arm(page, "Ajen>Mo");
+      await arm(page, "Izzah>Mo");
       // A part payment: the row stays open under the finger, so only the
       // disarm before saving stops the second tap from stamping again.
       await page.fill("#stampAmt", "100");
-      const box = await page.locator(spot("Ajen>Mo")).boundingBox();
+      const box = await page.locator(spot("Izzah>Mo")).boundingBox();
       await page.mouse.dblclick(box.x + box.width / 2, box.y + box.height / 2);
       await until(async () => (await paidRows(page)).length >= 1, "a stamped row");
       await idle(page);
       assert.equal(backend.fake.tables.Settlements.length, 1, "one row in Settlements");
       assert.equal(backend.requests.filter((r) => r.action === "addPayment").length, 1, "one addPayment request");
       assert.equal(saved(backend)[0].cad, 100);
-      assert.ok((await openRows(page)).some((r) => r.key === "Ajen>Mo"), "the remainder is still open");
+      assert.ok((await openRows(page)).some((r) => r.key === "Izzah>Mo"), "the remainder is still open");
       // A payment another phone adds meanwhile shows on the next load.
-      await otherPhone(backend, "Trenton", "addPayment", { payment: { id: "otherpay001", from: "Trenton", to: "Mo", cad: 1, seed: 5, rot: 1 } });
+      await otherPhone(backend, "Sam", "addPayment", { payment: { id: "otherpay001", from: "Sam", to: "Mo", cad: 1, seed: 5, rot: 1 } });
       await page.evaluate(() => globalThis.__matTest.store.refresh());
       await until(async () => (await paidRows(page)).length === 2, "the other phone's stamp shows");
     },
@@ -458,8 +459,8 @@ module.exports = [
     async run({ page }) {
       const backend = await ready(page);
       await waitOpen(page, 2);
-      await arm(page, "Ajen>Mo");
-      await page.click(spot("Ajen>Mo"));
+      await arm(page, "Izzah>Mo");
+      await page.click(spot("Izzah>Mo"));
       await until(async () => (await paidRows(page)).length === 1, "a stamped row");
       await idle(page);
       // 13:20 Sat Dec 12 in Chicago is 04:20 Sun Dec 13 in Tokyo.

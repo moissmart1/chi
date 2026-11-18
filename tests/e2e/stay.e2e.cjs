@@ -340,7 +340,7 @@ module.exports = [
       await until(() => page.evaluate(() => !document.querySelector("#net:not([hidden])")), "signal is back");
       assert.equal(await kept(), true, "the same node when signal is back");
 
-      const r = await backend.handle({ key: "test-key", actor: "Ajen", via: "app", action: "setDay", args: { date: "2026-12-13", patch: { city: "Sapporo" } } });
+      const r = await backend.handle({ key: "test-key", actor: "Izzah", via: "app", action: "setDay", args: { date: "2026-12-13", patch: { city: "Sapporo" } } });
       assert.equal(r.ok, true, JSON.stringify(r));
       await advance(page, backend, 20000);
       await expectText(page, "#allDays .ad-row:nth-child(4)", /Sun Dec 13 ?Sapporo/);

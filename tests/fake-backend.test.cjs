@@ -6,7 +6,7 @@ const { createFakeBackend } = require("./fake-backend.cjs");
 const { TABS } = require("../backend/Pure.js");
 
 const KEY = "test-key";
-const ALL = ["Mo", "Ajen", "Trenton"];
+const ALL = ["Mo", "Izzah"];
 const SEED = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "seed.json"), "utf8"));
 
 // A caller bound to one fake: call(action, args, extra) sends { key, actor: "Mo", action, args, ...extra }.
@@ -22,7 +22,7 @@ function ramen(over = {}) {
 }
 
 function stampOf(over = {}) {
-  return { id: "pay0000001", from: "Ajen", to: "Mo", cad: 25, seed: 3, rot: -2.5, ...over };
+  return { id: "pay0000001", from: "Izzah", to: "Mo", cad: 25, seed: 3, rot: -2.5, ...over };
 }
 
 async function historyAll(call, args = {}) {
@@ -33,14 +33,14 @@ async function historyAll(call, args = {}) {
 
 // ---------- the brief's contract tests ----------
 
-test("load returns the trip, three people with Simplify on and no email, no expenses, the rate and eleven days", async () => {
+test("load returns the trip, two people with Simplify on and no email, no expenses, the rate and eleven days", async () => {
   const call = client();
   const r = await call("load");
   assert.equal(r.ok, true);
   assert.equal(r.rev, 0);
   const d = r.data;
   assert.deepEqual(d.trip, { name: "Japan 2026", start: "2026-12-10", end: "2026-12-20", home: "CAD", currency: "USD", tz: "America/Chicago" });
-  assert.equal(d.people.length, 3);
+  assert.equal(d.people.length, 2);
   assert.deepEqual(d.people.map((p) => p.name), ALL);
   for (const p of d.people) {
     assert.equal(p.simplify, true);
@@ -93,11 +93,11 @@ test("a wrong or missing key is refused with bad_key and no data", async () => {
 test("addExpense stamps the rate and the actor, is live, gets a numeric logId and bumps rev by one", async () => {
   const call = client(undefined, { clock: () => "2026-12-10T05:00:00.000Z" });
   const before = (await call("rev")).rev;
-  const r = await call("addExpense", { expense: ramen() }, { actor: "Ajen" });
+  const r = await call("addExpense", { expense: ramen() }, { actor: "Izzah" });
   assert.equal(r.ok, true);
   const e = r.data.expense;
   assert.equal(e.rate, 0.72);
-  assert.equal(e.addedBy, "Ajen");
+  assert.equal(e.addedBy, "Izzah");
   assert.equal(e.addedAt, "2026-12-10T05:00:00.000Z");
   assert.equal(e.deleted, false);
   assert.equal(e.title, "Ramen");
@@ -174,13 +174,13 @@ test("deleteExpense then restoreExpense toggles deleted and logs both; an unknow
 
 test("addPayment, removePayment, restorePayment toggle removed and log stamp, unstamp, restamp; a repeat add is recorded once", async () => {
   const call = client();
-  const a = await call("addPayment", { payment: stampOf() }, { actor: "Ajen" });
+  const a = await call("addPayment", { payment: stampOf() }, { actor: "Izzah" });
   assert.equal(a.ok, true);
   assert.equal(a.data.payment.removed, false);
-  assert.equal(a.data.payment.stampedBy, "Ajen");
+  assert.equal(a.data.payment.stampedBy, "Izzah");
   assert.equal(a.data.payment.seed, 3);
   assert.equal(a.data.payment.rot, -2.5);
-  const again = await call("addPayment", { payment: stampOf() }, { actor: "Ajen" });
+  const again = await call("addPayment", { payment: stampOf() }, { actor: "Izzah" });
   assert.deepEqual(again.data, a.data);
   const rm = await call("removePayment", { id: "pay0000001" });
   assert.equal(rm.data.payment.removed, true);
@@ -188,19 +188,19 @@ test("addPayment, removePayment, restorePayment toggle removed and log stamp, un
   assert.equal(back.data.payment.removed, false);
   const hist = await historyAll(call);
   assert.deepEqual(hist.map((e) => e.action), ["restamp", "unstamp", "stamp"]);
-  assert.equal(hist[2].summary, "stamped Ajen → Mo $25.00");
+  assert.equal(hist[2].summary, "stamped Izzah → Mo $25.00");
   assert.equal((await call("load")).data.payments.length, 1);
   assert.equal((await call("removePayment", { id: "nosuchpay1" })).error, "not_found");
 });
 
-test("setPerson turns Simplify off for Trenton, load shows it, rev rises and history gains nothing", async () => {
+test("setPerson turns Simplify off for Izzah, load shows it, rev rises and history gains nothing", async () => {
   const call = client();
-  const r = await call("setPerson", { name: "Trenton", patch: { simplify: false } });
+  const r = await call("setPerson", { name: "Izzah", patch: { simplify: false } });
   assert.equal(r.ok, true);
-  assert.deepEqual(r.data.person, { name: "Trenton", initials: "TR", etransfer: "", simplify: false, photo: "" });
+  assert.deepEqual(r.data.person, { name: "Izzah", initials: "IZ", etransfer: "", simplify: false, photo: "" });
   assert.equal(r.rev, 1);
   const load = await call("load");
-  assert.equal(load.data.people.find((p) => p.name === "Trenton").simplify, false);
+  assert.equal(load.data.people.find((p) => p.name === "Izzah").simplify, false);
   assert.equal(load.rev, 1);
   assert.equal((await historyAll(call)).length, 0);
 });
@@ -256,16 +256,16 @@ test("undo the undo brings the line back", async () => {
 });
 
 test("undo an edit puts the amount back and keeps the rate, adder and time it was added", async () => {
-  const added = { rate: 98, addedBy: "Trenton", addedAt: "2026-12-09T01:00:00.000Z" };
+  const added = { rate: 98, addedBy: "Izzah", addedAt: "2026-12-09T01:00:00.000Z" };
   const call = client({ expenses: [ramen(added)] }, { clock: () => "2026-12-10T05:00:00.000Z" });
-  const ed = await call("updateExpense", { id: "exp0000001", patch: { amount: 4500 } }, { actor: "Ajen" });
+  const ed = await call("updateExpense", { id: "exp0000001", patch: { amount: 4500 } }, { actor: "Izzah" });
   assert.equal(ed.data.expense.amount, 4500);
-  const u = await call("undo", { logId: ed.data.logId }, { actor: "Ajen" });
+  const u = await call("undo", { logId: ed.data.logId }, { actor: "Izzah" });
   assert.equal(u.ok, true);
   for (const e of [u.data.expense, (await call("load")).data.expenses[0]]) {
     assert.equal(e.amount, 4200);
     assert.equal(e.rate, 98);
-    assert.equal(e.addedBy, "Trenton");
+    assert.equal(e.addedBy, "Izzah");
     assert.equal(e.addedAt, "2026-12-09T01:00:00.000Z");
   }
 });
@@ -274,7 +274,7 @@ test("a repeat add with the same id but different content returns the first line
   const call = client();
   const first = await call("addExpense", { expense: ramen() });
   const logLen = call.fake.tables.Log.length;
-  const again = await call("addExpense", { expense: ramen({ title: "Different", amount: 999, paidBy: "Ajen" }) }, { actor: "Trenton" });
+  const again = await call("addExpense", { expense: ramen({ title: "Different", amount: 999, paidBy: "Izzah" }) }, { actor: "Izzah" });
   assert.equal(again.ok, true);
   assert.deepEqual(again.data.expense, first.data.expense);
   assert.equal(again.data.expense.title, "Ramen");
@@ -287,7 +287,7 @@ test("a repeat add with the same id but different content returns the first line
 
 test("undoing an edit to an exact split restores the equal split and payer, and undoing that brings the exact split back", async () => {
   const call = client({ expenses: [ramen()] });
-  const ed = await call("updateExpense", { id: "exp0000001", patch: { splitMode: "exact", splitVals: [2000, 1200, 1000], paidBy: "Ajen" } });
+  const ed = await call("updateExpense", { id: "exp0000001", patch: { splitMode: "exact", splitVals: [2000, 2200], paidBy: "Izzah" } });
   assert.equal(ed.ok, true);
   assert.equal(ed.data.expense.splitMode, "exact");
   const u1 = await call("undo", { logId: ed.data.logId });
@@ -302,8 +302,8 @@ test("undoing an edit to an exact split restores the equal split and payer, and 
   assert.equal(u2.ok, true);
   for (const e of [u2.data.expense, (await call("load")).data.expenses[0]]) {
     assert.equal(e.splitMode, "exact");
-    assert.deepEqual(e.splitVals, [2000, 1200, 1000]);
-    assert.equal(e.paidBy, "Ajen");
+    assert.deepEqual(e.splitVals, [2000, 2200]);
+    assert.equal(e.paidBy, "Izzah");
   }
 });
 
@@ -352,7 +352,7 @@ test("a fake built from the seed fixture has nine expenses, one deleted, and ten
   assert.equal(lodge.kind, "stay");
   assert.equal(lodge.rate, 0.72);
   assert.equal(lodge.addedBy, "Mo");
-  assert.deepEqual(load.data.expenses.find((e) => e.id === "seedexp008").split, ["Ajen", "Trenton"]);
+  assert.deepEqual(load.data.expenses.find((e) => e.id === "seedexp008").split, ["Izzah"]);
   const hist = await historyAll(call);
   assert.equal(hist.length, 10);
   const five = await historyAll(call, { ref: "seedexp005" });
@@ -365,7 +365,7 @@ test("a fake built from the seed fixture has nine expenses, one deleted, and ten
 
 test("updateExpense refuses patch keys it does not allow", async () => {
   const call = client({ expenses: [ramen()] });
-  for (const patch of [{ rate: 1 }, { addedBy: "Ajen" }, { deleted: true }, { id: "other00001" }, { amount: 10, color: "red" }]) {
+  for (const patch of [{ rate: 1 }, { addedBy: "Izzah" }, { deleted: true }, { id: "other00001" }, { amount: 10, color: "red" }]) {
     const r = await call("updateExpense", { id: "exp0000001", patch });
     assert.equal(r.ok, false, JSON.stringify(patch));
     assert.equal(r.error, "bad_input");
@@ -507,7 +507,7 @@ test("odd request bodies are refused with bad_input and a message", async () => 
     assert.equal(typeof r.message, "string");
   }
   const call = client();
-  for (const [action, args] of [["nonsense", {}], ["load", "x"], ["addExpense", { expense: null }], ["undo", { logId: "abc" }], ["undo", {}], ["setPerson", { name: "Trenton", patch: { initials: "XX" } }], ["history", { ref: 5 }], ["deleteExpense", { id: 7 }]]) {
+  for (const [action, args] of [["nonsense", {}], ["load", "x"], ["addExpense", { expense: null }], ["undo", { logId: "abc" }], ["undo", {}], ["setPerson", { name: "Izzah", patch: { initials: "XX" } }], ["history", { ref: 5 }], ["deleteExpense", { id: 7 }]]) {
     const r = await call(action, args);
     assert.equal(r.ok, false, action + " " + JSON.stringify(args));
     assert.equal(r.error, "bad_input", action + " " + JSON.stringify(args));
@@ -573,24 +573,24 @@ test("the fake keeps every request, and requests and answers are copies", async 
 
 test("seed people and days are applied as patches, and seeded log rows use the seeded who and when", async () => {
   const call = client({
-    people: { Trenton: { simplify: false, etransfer: "tr@example.com" } },
+    people: { Izzah: { simplify: false, etransfer: "tr@example.com" } },
     days: { "2026-12-11": { city: "Tokyo", title: "Shibuya" } },
-    expenses: [ramen({ addedBy: "Ajen", addedAt: "2026-12-10T03:00:00.000Z" })],
+    expenses: [ramen({ addedBy: "Izzah", addedAt: "2026-12-10T03:00:00.000Z" })],
     payments: [stampOf({ stampedAt: "2026-12-12T03:00:00.000Z" })],
   });
   const d = (await call("load")).data;
-  assert.deepEqual(d.people[2], { name: "Trenton", initials: "TR", etransfer: "tr@example.com", simplify: false, photo: "" });
+  assert.deepEqual(d.people[1], { name: "Izzah", initials: "IZ", etransfer: "tr@example.com", simplify: false, photo: "" });
   const day = d.days.find((x) => x.date === "2026-12-11");
   assert.equal(day.city, "Tokyo");
   assert.equal(day.title, "Shibuya");
   assert.equal(d.days.find((x) => x.date === "2026-12-10").city, "");
-  assert.equal(d.expenses[0].addedBy, "Ajen");
-  assert.equal(d.payments[0].stampedBy, "Ajen");
+  assert.equal(d.expenses[0].addedBy, "Izzah");
+  assert.equal(d.payments[0].stampedBy, "Izzah");
   assert.equal(d.payments[0].seed, 3);
   const hist = await historyAll(call);
   assert.deepEqual(hist.map((e) => [e.action, e.who, e.at]), [
-    ["stamp", "Ajen", "2026-12-12T03:00:00.000Z"],
-    ["add", "Ajen", "2026-12-10T03:00:00.000Z"],
+    ["stamp", "Izzah", "2026-12-12T03:00:00.000Z"],
+    ["add", "Izzah", "2026-12-10T03:00:00.000Z"],
   ]);
   const next = await call("addExpense", { expense: ramen({ id: "exp0000002" }) });
   assert.equal(next.data.logId, 3);
@@ -713,37 +713,37 @@ test("load says where today's rate came from: live by default, or what the fake 
 
 test("changing an e-Transfer address is logged without the address; a Simplify flip alone is not (F9)", async () => {
   const call = client();
-  const r = await call("setPerson", { name: "Trenton", patch: { etransfer: "t@example.com" } });
+  const r = await call("setPerson", { name: "Izzah", patch: { etransfer: "t@example.com" } });
   assert.equal(r.ok, true);
   assert.equal(r.rev, 1);
   const [entry] = await historyAll(call);
   assert.deepEqual(
     { action: entry.action, kind: entry.kind, ref: entry.ref, who: entry.who, summary: entry.summary, canUndo: entry.canUndo },
-    { action: "edit", kind: "person", ref: "Trenton", who: "Mo", summary: "changed Trenton’s e-Transfer address", canUndo: false },
+    { action: "edit", kind: "person", ref: "Izzah", who: "Mo", summary: "changed Izzah’s e-Transfer address", canUndo: false },
   );
   assert.equal(JSON.stringify(entry).includes("t@example.com"), false, "the address is not in what history returns");
   const row = call.fake.tables.Log[0];
-  assert.deepEqual(JSON.parse(row.before), { name: "Trenton", etransfer: "" });
-  assert.deepEqual(JSON.parse(row.after), { name: "Trenton", etransfer: "t@example.com" });
+  assert.deepEqual(JSON.parse(row.before), { name: "Izzah", etransfer: "" });
+  assert.deepEqual(JSON.parse(row.after), { name: "Izzah", etransfer: "t@example.com" });
 
-  await call("setPerson", { name: "Trenton", patch: { simplify: false } });
-  await call("setPerson", { name: "Trenton", patch: { etransfer: "t@example.com", simplify: true } }); // same address
+  await call("setPerson", { name: "Izzah", patch: { simplify: false } });
+  await call("setPerson", { name: "Izzah", patch: { etransfer: "t@example.com", simplify: true } }); // same address
   assert.equal((await historyAll(call)).length, 1, "a Simplify flip writes no Log row");
 
-  await call("setPerson", { name: "Trenton", patch: { etransfer: "new@example.com", simplify: false } });
+  await call("setPerson", { name: "Izzah", patch: { etransfer: "new@example.com", simplify: false } });
   assert.equal((await historyAll(call)).length, 2);
 });
 
 test("a person entry can never be undone: undo answers stale and changes nothing (F9)", async () => {
   const call = client();
-  await call("setPerson", { name: "Ajen", patch: { etransfer: "a@example.com" } });
+  await call("setPerson", { name: "Izzah", patch: { etransfer: "a@example.com" } });
   const [entry] = await historyAll(call);
   const r = await call("undo", { logId: entry.id });
   assert.equal(r.ok, false);
   assert.equal(r.error, "stale");
   assert.equal(r.message, "That change can’t be undone.");
   const load = await call("load");
-  assert.equal(load.data.people.find((p) => p.name === "Ajen").etransfer, "a@example.com");
+  assert.equal(load.data.people.find((p) => p.name === "Izzah").etransfer, "a@example.com");
   assert.equal(call.fake.tables.Log.length, 1);
 });
 
@@ -773,12 +773,12 @@ test("a stop: add, repeat, edit, delete, restore, each logged", async () => {
   const stop = { id: "stopAAAA0001", date: "2026-12-12", title: "Shibuya Sky", time: "14:00" };
   const a = await call("addStop", { stop });
   assert.equal(a.data.stop.title, "Shibuya Sky");
-  const again = await call("addStop", { stop }, AS("Ajen"));
+  const again = await call("addStop", { stop }, AS("Izzah"));
   assert.equal(again.data.logId, a.data.logId);
   assert.equal(call.fake.tables.Stops.length, 1);
-  const e = await call("updateStop", { id: stop.id, patch: { time: "15:30" } }, AS("Ajen"));
+  const e = await call("updateStop", { id: stop.id, patch: { time: "15:30" } }, AS("Izzah"));
   assert.equal(e.data.stop.time, "15:30");
-  assert.equal((await call("updateStop", { id: stop.id, patch: { time: "15:30" } }, AS("Ajen"))).data.logId, null);
+  assert.equal((await call("updateStop", { id: stop.id, patch: { time: "15:30" } }, AS("Izzah"))).data.logId, null);
   assert.equal((await call("updateStop", { id: stop.id, patch: { time: "nope" } })).error, "bad_input");
   assert.equal((await call("updateStop", { id: stop.id, patch: { id: "other000001" } })).error, "bad_input");
   const d = await call("deleteStop", { id: stop.id });
@@ -792,7 +792,7 @@ test("a stop: add, repeat, edit, delete, restore, each logged", async () => {
 test("undo puts a stop back, and refuses once it changed again", async () => {
   const call = client({ stops: [{ id: "stopAAAA0001", date: "2026-12-12", title: "Shibuya Sky", time: "14:00" }] });
   const e1 = await call("updateStop", { id: "stopAAAA0001", patch: { time: "15:30" } });
-  const e2 = await call("updateStop", { id: "stopAAAA0001", patch: { title: "Sky deck" } }, AS("Ajen"));
+  const e2 = await call("updateStop", { id: "stopAAAA0001", patch: { title: "Sky deck" } }, AS("Izzah"));
   assert.equal((await call("undo", { logId: e1.data.logId })).error, "stale");
   const u = await call("undo", { logId: e2.data.logId });
   assert.equal(u.data.stop.title, "Shibuya Sky");
@@ -917,7 +917,7 @@ test("saveStay with merge: true lays the given fields over the row as it is unde
   const call = client({});
   const full = { id: "stayAAAA0001", name: "Ryokan", nameJp: "旅館", addressJp: "京都", firstNight: "2026-12-14", lastNight: "2026-12-15", note: "orig", place: "Gion", link: "https://example.test/r" };
   await call("saveStay", { stay: full });
-  await call("saveStay", { stay: { ...full, note: "phone B edit" } }, AS("Ajen")); // just before Claude's call
+  await call("saveStay", { stay: { ...full, note: "phone B edit" } }, AS("Izzah")); // just before Claude's call
   const m = await call("saveStay", { stay: { id: full.id, lastNight: "2026-12-16" }, merge: true });
   assert.equal(m.ok, true, JSON.stringify(m));
   assert.deepEqual(m.data.stay, { ...full, photo: "", note: "phone B edit", lastNight: "2026-12-16", deleted: false });
@@ -1106,21 +1106,21 @@ test("a hand-typed stay link survives a name change", async () => {
 
 test("pinned: addExpense and updateExpense answer, store and log exactly as before", async () => {
   const call = client(undefined, { clock: () => "2026-12-11T02:00:00.000Z" });
-  const added = { id: "pinexp0001", day: "2026-12-11", title: "Udon", amount: 980, currency: "USD", rate: 0.72, paidBy: "Mo", split: ALL, splitMode: "equal", splitVals: [], note: "hot", kind: "food", addedBy: "Ajen", addedAt: "2026-12-11T02:00:00.000Z", deleted: false };
-  const a = await call("addExpense", { expense: { id: "pinexp0001", day: "2026-12-11", title: " Udon ", amount: 980.004, currency: "USD", paidBy: "Mo", split: ALL, note: " hot ", kind: "food" } }, { actor: "Ajen" });
+  const added = { id: "pinexp0001", day: "2026-12-11", title: "Udon", amount: 980, currency: "USD", rate: 0.72, paidBy: "Mo", split: ALL, splitMode: "equal", splitVals: [], note: "hot", kind: "food", addedBy: "Izzah", addedAt: "2026-12-11T02:00:00.000Z", deleted: false };
+  const a = await call("addExpense", { expense: { id: "pinexp0001", day: "2026-12-11", title: " Udon ", amount: 980.004, currency: "USD", paidBy: "Mo", split: ALL, note: " hot ", kind: "food" } }, { actor: "Izzah" });
   assert.deepEqual(a, { ok: true, rev: 1, data: { expense: added, logId: 1 } });
-  const again = await call("addExpense", { expense: { id: "pinexp0001", day: "2026-12-11", title: "Other", amount: 1, currency: "USD", paidBy: "Mo", split: ALL } }, { actor: "Ajen" });
+  const again = await call("addExpense", { expense: { id: "pinexp0001", day: "2026-12-11", title: "Other", amount: 1, currency: "USD", paidBy: "Mo", split: ALL } }, { actor: "Izzah" });
   assert.deepEqual(again, a, "a repeated add answers the first");
   // A hand-typed split cell: the app's own edit writes every editable column, so it is rewritten.
-  call.fake.tables.Expenses[0].split = "Mo, Ajen, Trenton";
+  call.fake.tables.Expenses[0].split = "Mo, Izzah";
   const edited = { ...added, amount: 1200 };
   const u = await call("updateExpense", { id: "pinexp0001", patch: { amount: 1200 } });
   assert.deepEqual(u, { ok: true, rev: 2, data: { expense: edited, logId: 2 } });
   assert.deepEqual(await call("updateExpense", { id: "pinexp0001", patch: { amount: 1200 } }), { ok: true, rev: 2, data: { expense: edited, logId: null } });
   assert.deepEqual(await call("updateExpense", { id: "pinexp0001", patch: { amount: -1 } }), { ok: false, error: "bad_input", message: "The amount has to be more than zero.", rev: 2 });
-  assert.deepEqual(call.fake.tables.Expenses, [{ id: "pinexp0001", day: "2026-12-11", title: "Udon", amount: 1200, currency: "USD", rate: 0.72, paid_by: "Mo", split: "Mo,Ajen,Trenton", split_mode: "equal", split_vals: "", note: "hot", kind: "food", receipt: "", added_by: "Ajen", added_at: "2026-12-11T02:00:00.000Z", deleted_at: "", planner_id: "" }], "R40 adds the planner_id column; the app's own writes leave it empty");
+  assert.deepEqual(call.fake.tables.Expenses, [{ id: "pinexp0001", day: "2026-12-11", title: "Udon", amount: 1200, currency: "USD", rate: 0.72, paid_by: "Mo", split: "Mo,Izzah", split_mode: "equal", split_vals: "", note: "hot", kind: "food", receipt: "", added_by: "Izzah", added_at: "2026-12-11T02:00:00.000Z", deleted_at: "", planner_id: "" }], "R40 adds the planner_id column; the app's own writes leave it empty");
   assert.deepEqual(call.fake.tables.Log, [
-    { id: 1, at: "2026-12-11T02:00:00.000Z", who: "Ajen", via: "app", action: "add", kind: "expense", ref: "pinexp0001", summary: "rang up Udon US$980.00", before: "", after: JSON.stringify(added), undoes: "", undone_by: "" },
+    { id: 1, at: "2026-12-11T02:00:00.000Z", who: "Izzah", via: "app", action: "add", kind: "expense", ref: "pinexp0001", summary: "rang up Udon US$980.00", before: "", after: JSON.stringify(added), undoes: "", undone_by: "" },
     { id: 2, at: "2026-12-11T02:00:00.000Z", who: "Mo", via: "app", action: "edit", kind: "expense", ref: "pinexp0001", summary: "changed Udon US$980.00 → US$1,200.00", before: JSON.stringify(added), after: JSON.stringify(edited), undoes: "", undone_by: "" },
   ]);
 });
@@ -1131,8 +1131,8 @@ test("pinned: addExpense and updateExpense answer, store and log exactly as befo
 const PLANNER_ID = "fakePlannerSheet_0123456789abcdefXYZ";
 const PHEAD = ["payment_id", "date_paid", "payer", "description", "category", "vendor", "booking_ref", "amount", "currency", "amount_cad", "cad_is_exact", "split_between", "split_type", "status", "include_in_split", "source", "added_by", "notes"];
 const prow = (o) => PHEAD.map((h) => (o[h] === undefined ? "" : o[h]));
-const PX7 = { payment_id: "X7", date_paid: "2026-12-11", payer: "Mo", description: "Rail pass", category: "transport", vendor: "North Rail", booking_ref: "AB12", amount: 24750, currency: "USD", amount_cad: 221.52, cad_is_exact: "yes", split_between: "Mo, Ajen, Trenton", split_type: "equal", include_in_split: "yes" };
-const PQ3 = { payment_id: "Q3", date_paid: "2026-12-12", payer: "ajen", description: "Noodle bar", category: "food", vendor: "Ramen Ya", amount: "US$3,600.00", currency: "USD", split_between: "Mo, Ajen", split_type: "equal", include_in_split: "Yes" };
+const PX7 = { payment_id: "X7", date_paid: "2026-12-11", payer: "Mo", description: "Rail pass", category: "transport", vendor: "North Rail", booking_ref: "AB12", amount: 24750, currency: "USD", amount_cad: 221.52, cad_is_exact: "yes", split_between: "Mo, Izzah", split_type: "equal", include_in_split: "yes" };
+const PQ3 = { payment_id: "Q3", date_paid: "2026-12-12", payer: "izzah", description: "Noodle bar", category: "food", vendor: "Ramen Ya", amount: "US$3,600.00", currency: "USD", split_between: "Mo, Izzah", split_type: "equal", include_in_split: "Yes" };
 const PZ1 = { ...PX7, payment_id: "Z1", description: "Later tickets", include_in_split: "no (until charged)" };
 const PP5 = { ...PX7, payment_id: "P5", description: "Own souvenir", split_type: "personal" };
 const PU2 = { ...PX7, payment_id: "U2", payer: "Nadia" };
@@ -1151,12 +1151,12 @@ const PROBLEMS = [
   { id: "P5", message: "Only payments split equally can be brought in.", row: 6, what: "Own souvenir" },
   { id: "U2", message: "The payer isn’t one of the people on this trip.", row: 7, what: "Rail pass" },
 ];
-const HAND = { id: "handexp0001", day: "pre", title: "Rail pass", amount: 221.52, currency: "CAD", paidBy: "Mo", split: ["Trenton", "Mo", "Ajen"], note: NOTE_X7, kind: "" };
+const HAND = { id: "handexp0001", day: "pre", title: "Rail pass", amount: 221.52, currency: "CAD", paidBy: "Mo", split: ["Izzah", "Mo"], note: NOTE_X7, kind: "" };
 
 test("a first pull adds each included payment as an expense, as addExpense would, tied by planner_id, logged as from the planner", async () => {
   const call = linked();
   const rev = (await call("rev")).rev;
-  const r = await call("syncPayments", {}, { actor: "Trenton" });
+  const r = await call("syncPayments", {}, { actor: "Izzah" });
   assert.equal(r.ok, true, JSON.stringify(r));
   assert.deepEqual(r.data, reply({ added: 2, problems: PROBLEMS }));
   assert.equal(r.rev, rev + 2);
@@ -1167,10 +1167,10 @@ test("a first pull adds each included payment as an expense, as addExpense would
   assert.equal(stored(call, x7.id).planner_id, "X7");
   const q3 = exps.find((e) => e.note === "Q3 · Ramen Ya");
   assert.equal(stored(call, q3.id).planner_id, "Q3");
-  assert.deepEqual([q3.title, q3.amount, q3.currency, q3.paidBy, q3.split, q3.day, q3.kind], ["Noodle bar", 3600, "USD", "Ajen", ["Mo", "Ajen"], "2026-12-12", "food"]);
+  assert.deepEqual([q3.title, q3.amount, q3.currency, q3.paidBy, q3.split, q3.day, q3.kind], ["Noodle bar", 3600, "USD", "Izzah", ["Mo", "Izzah"], "2026-12-12", "food"]);
   assert.equal(exps.length, 2, "nothing for the personal, the unknown payer or the not-included rows");
   const log = call.fake.tables.Log;
-  assert.deepEqual(log.map((l) => [l.who, l.via, l.action, l.kind]), [["Mo", "planner", "add", "expense"], ["Ajen", "planner", "add", "expense"]]);
+  assert.deepEqual(log.map((l) => [l.who, l.via, l.action, l.kind]), [["Mo", "planner", "add", "expense"], ["Izzah", "planner", "add", "expense"]]);
   assert.deepEqual(log.map((l) => l.summary), ["rang up Rail pass $221.52", "rang up Noodle bar US$3,600.00"]);
   const hist = await historyAll(call);
   assert.deepEqual(hist.map((e) => e.via), ["planner", "planner"]);
@@ -1220,10 +1220,10 @@ test("a changed amount_cad changes that one expense: one edit, before/after diff
   const call = linked();
   await call("syncPayments");
   const id = byPayment(call, "X7")[0].id;
-  stored(call, id).split = "Mo, Ajen, Trenton"; // typed by hand: left as it is
+  stored(call, id).split = "Mo, Izzah"; // typed by hand: left as it is
   const logs = call.fake.tables.Log.length;
   call.fake.planner.rows = [PHEAD, prow({ ...PX7, amount_cad: 230.1 }), prow(PQ3)];
-  const r = await call("syncPayments", {}, { actor: "Ajen" });
+  const r = await call("syncPayments", {}, { actor: "Izzah" });
   assert.deepEqual(r.data, reply({ changed: 1, same: 1 }));
   assert.equal(call.fake.tables.Log.length, logs + 1);
   const edit = call.fake.tables.Log.at(-1);
@@ -1233,7 +1233,7 @@ test("a changed amount_cad changes that one expense: one edit, before/after diff
   assert.deepEqual(Object.keys(after).filter((k) => JSON.stringify(after[k]) !== JSON.stringify(before[k])), ["amount"]);
   assert.deepEqual([before.amount, after.amount], [221.52, 230.1]);
   assert.equal(stored(call, id).amount, 230.1);
-  assert.equal(stored(call, id).split, "Mo, Ajen, Trenton", "a column the pull did not change is not written");
+  assert.equal(stored(call, id).split, "Mo, Izzah", "a column the pull did not change is not written");
   const u = await call("undo", { logId: edit.id });
   assert.equal(u.ok, true, JSON.stringify(u));
   assert.equal(u.data.expense.amount, 221.52);
@@ -1244,11 +1244,11 @@ test("each planner-owned field that differs is changed; day and kind are the app
   await call("syncPayments");
   const id = byPayment(call, "X7")[0].id;
   await call("updateExpense", { id, patch: { day: "2026-12-13", kind: "activity" } });
-  call.fake.planner.rows = [PHEAD, prow({ ...PX7, description: "Rail pass (7 days)", payer: "Ajen", split_between: "Trenton, Mo, Ajen", vendor: "North Rail Co", date_paid: "2026-12-10", category: "food" }), prow(PQ3)];
+  call.fake.planner.rows = [PHEAD, prow({ ...PX7, description: "Rail pass (7 days)", payer: "Izzah", split_between: "Izzah, Mo", vendor: "North Rail Co", date_paid: "2026-12-10", category: "food" }), prow(PQ3)];
   const r = await call("syncPayments");
   assert.equal(r.data.changed, 1);
   const e = (await call("load")).data.expenses.find((x) => x.id === id);
-  assert.deepEqual([e.title, e.paidBy, e.split, e.note, e.day, e.kind], ["Rail pass (7 days)", "Ajen", ALL, "X7 · North Rail Co · ref AB12 · US$24,750.00 charged", "2026-12-13", "activity"]);
+  assert.deepEqual([e.title, e.paidBy, e.split, e.note, e.day, e.kind], ["Rail pass (7 days)", "Izzah", ALL, "X7 · North Rail Co · ref AB12 · US$24,750.00 charged", "2026-12-13", "activity"]);
   assert.deepEqual(JSON.parse(call.fake.tables.Log.at(-1).after).split, ALL, "the same people in another order is the same split");
 });
 
@@ -1256,18 +1256,18 @@ test("fix 9: a line set to exact amounts or shares is put back to an equal split
   const call = linked();
   await call("syncPayments");
   const id = byPayment(call, "X7")[0].id;
-  await call("updateExpense", { id, patch: { splitMode: "exact", splitVals: [100, 100, 21.52] } });
+  await call("updateExpense", { id, patch: { splitMode: "exact", splitVals: [100, 121.52] } });
   let r = await call("syncPayments");
   assert.equal(r.data.changed, 1, JSON.stringify(r.data));
   let e = (await call("load")).data.expenses.find((x) => x.id === id);
   assert.deepEqual([e.splitMode, e.splitVals, e.split], ["equal", [], ALL]);
 
-  await call("updateExpense", { id, patch: { splitMode: "parts", splitVals: [1, 2, 3] } });
-  call.fake.planner.rows = [PHEAD, prow({ ...PX7, split_between: "Mo, Ajen" }), prow(PQ3)];
+  await call("updateExpense", { id, patch: { splitMode: "parts", splitVals: [1, 2] } });
+  call.fake.planner.rows = [PHEAD, prow({ ...PX7, split_between: "Izzah, Mo" }), prow(PQ3)];
   r = await call("syncPayments");
   assert.deepEqual(r.data.problems, []);
   e = (await call("load")).data.expenses.find((x) => x.id === id);
-  assert.deepEqual([e.splitMode, e.splitVals, e.split], ["equal", [], ["Mo", "Ajen"]]);
+  assert.deepEqual([e.splitMode, e.splitVals, e.split], ["equal", [], ["Izzah", "Mo"]]);
 });
 
 test("an expense deleted in the app is not brought back, nor changed, and counts as removed", async () => {
@@ -1534,9 +1534,9 @@ test("each person sets, changes and removes their own picture: one History sente
 
 test("nobody sets another person's picture; a name not on the trip is refused; a bad picture is refused", async () => {
   const call = client();
-  const other = await call("setPerson", { name: "Ajen", patch: { photo: JPEG } });
+  const other = await call("setPerson", { name: "Izzah", patch: { photo: JPEG } });
   assert.deepEqual([other.ok, other.error, other.message], [false, "bad_input", "You can only change your own picture."]);
-  const both = await call("setPerson", { name: "Ajen", patch: { etransfer: "a@example.com", photo: "" } });
+  const both = await call("setPerson", { name: "Izzah", patch: { etransfer: "a@example.com", photo: "" } });
   assert.equal(both.ok, false, "not even alongside an address");
   assert.equal((await call("setPerson", { name: "Nobody", patch: { photo: JPEG } }, { actor: "Nobody" })).error, "bad_input", "an actor not on the trip");
   const png = await call("setPerson", { name: "Mo", patch: { photo: "data:image/png;base64,iVBORw0KGgo=" } });
@@ -1594,7 +1594,7 @@ test("an older picture change cannot be undone over a newer one, and only its ow
   await call("setPerson", { name: "Mo", patch: { photo: JPEG2 } });
   assert.equal((await call("undo", { logId: first.id })).error, "stale");
   const last = (await historyAll(call))[0];
-  const theirs = await call("undo", { logId: last.id }, { actor: "Ajen" });
+  const theirs = await call("undo", { logId: last.id }, { actor: "Izzah" });
   assert.deepEqual([theirs.ok, theirs.message], [false, "You can only change your own picture."]);
   assert.equal((await call("load")).data.people.find((p) => p.name === "Mo").photo, JPEG2);
 });
@@ -1673,19 +1673,19 @@ test("auto has to be true or false", async () => {
 
 test("a planner line is credited to who paid, not to whichever phone asked", async () => {
   const call = linked();
-  const r = await call("syncPayments", { auto: true }, { actor: "Trenton" });
+  const r = await call("syncPayments", { auto: true }, { actor: "Izzah" });
   assert.equal(r.data.added, 2);
   const exps = (await call("load")).data.expenses;
   assert.equal(exps.find((e) => e.title === "Rail pass").addedBy, "Mo", "X7 was paid by Mo");
-  assert.equal(exps.find((e) => e.title === "Noodle bar").addedBy, "Ajen", "Q3 was paid by Ajen");
-  assert.deepEqual(call.fake.tables.Log.map((l) => [l.who, l.via]), [["Mo", "planner"], ["Ajen", "planner"]]);
+  assert.equal(exps.find((e) => e.title === "Noodle bar").addedBy, "Izzah", "Q3 was paid by Izzah");
+  assert.deepEqual(call.fake.tables.Log.map((l) => [l.who, l.via]), [["Mo", "planner"], ["Izzah", "planner"]]);
 });
 
 test("a planner change is credited to who paid", async () => {
   const call = linked();
-  await call("syncPayments", {}, { actor: "Trenton" });
+  await call("syncPayments", {}, { actor: "Izzah" });
   call.fake.planner.rows[1] = prow({ ...PX7, amount_cad: 230 });
-  const r = await call("syncPayments", {}, { actor: "Ajen" });
+  const r = await call("syncPayments", {}, { actor: "Izzah" });
   assert.equal(r.data.changed, 1);
   const last = call.fake.tables.Log[call.fake.tables.Log.length - 1];
   assert.deepEqual([last.who, last.via, last.action], ["Mo", "planner", "edit"]);
@@ -1714,14 +1714,14 @@ test("a pull whose read is older than one that already landed writes nothing", a
   call.fake.planner.rows[1] = prow({ ...PX7, amount_cad: 199 }); // what A read: the old value
   call.fake.props.PAYMENTS_READ_AT = "2026-12-12T03:00:05.000Z"; // B has landed
   at.now = "2026-12-12T03:00:04.000Z";
-  const a = await call("syncPayments", {}, { actor: "Trenton" });
+  const a = await call("syncPayments", {}, { actor: "Izzah" });
   assert.equal(a.ok, true);
   assert.equal(a.data.skipped, true, "A's older read is dropped");
   assert.equal(call.fake.tables.Log.length, logged, "nothing written");
   assert.equal(call.fake.props.PAYMENTS_READ_AT, "2026-12-12T03:00:05.000Z");
   // A read made after B's goes through.
   at.now = "2026-12-12T03:00:06.000Z";
-  const c = await call("syncPayments", {}, { actor: "Trenton" });
+  const c = await call("syncPayments", {}, { actor: "Izzah" });
   assert.equal(c.data.changed, 1);
   assert.equal(call.fake.props.PAYMENTS_READ_AT, "2026-12-12T03:00:06.000Z");
 });
@@ -1741,9 +1741,9 @@ const badRows = (n) => {
 test("a pull with one bad row stores it, and load hands it to any phone", async () => {
   const call = linked({}, [PHEAD, prow(PX7), prow({ ...PX7, payment_id: "U9", description: "Hotel   deposit", payer: "Nadia" })]);
   assert.deepEqual((await call("load")).data.paymentProblems, NOPROB, "never pulled");
-  await call("syncPayments", {}, { actor: "Trenton" });
+  await call("syncPayments", {}, { actor: "Izzah" });
   const want = { at: "2026-12-12T03:00:00.000Z", list: [{ id: "U9", message: "The payer isn’t one of the people on this trip.", row: 3, what: "Hotel deposit" }], more: 0 };
-  assert.deepEqual((await call("load", {}, { actor: "Ajen" })).data.paymentProblems, want);
+  assert.deepEqual((await call("load", {}, { actor: "Izzah" })).data.paymentProblems, want);
   assert.deepEqual(JSON.parse(call.fake.props.PAYMENT_PROBLEMS), want);
 });
 

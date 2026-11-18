@@ -182,7 +182,7 @@ for (const size of [...SIZES, TAB]) {
         await waitClosed(page, "you");
         await page.click("#ring");
         await waitOpen(page, "reg");
-        for (const sel of ["#regDone", "#xWhat", '#pad .key[data-k="7"]', '#pad .key[data-k="0"]', "#kGo", '#xPayer .seal[data-p="Trenton"]', '#xSplit .seal[data-p="Trenton"]', "#xUneven"]) {
+        for (const sel of ["#regDone", "#xWhat", '#pad .key[data-k="7"]', '#pad .key[data-k="0"]', "#kGo", '#xPayer .seal[data-p="Izzah"]', '#xSplit .seal[data-p="Izzah"]', "#xUneven"]) {
           await expectReach(page, sel);
         }
       },
@@ -196,7 +196,7 @@ for (const size of [...SIZES, TAB]) {
         await waitOpen(page, "reg");
         await page.fill("#xWhat", "Sideways tea");
         await keys(page, "8 0 0");
-        await page.click('#xPayer .seal[data-p="Ajen"]');
+        await page.click('#xPayer .seal[data-p="Izzah"]');
         await until(() => page.evaluate(() => !document.getElementById("kGo").disabled), "Ring it up is on");
         await page.click("#kGo");
         await until(
@@ -209,7 +209,7 @@ for (const size of [...SIZES, TAB]) {
         const saved = backend.fake.primitives.readTable_("Expenses").map(P.expenseFromRow).filter((e) => e.title === "Sideways tea");
         assert.equal(saved.length, 1);
         assert.equal(saved[0].amount, 800);
-        assert.equal(saved[0].paidBy, "Ajen");
+        assert.equal(saved[0].paidBy, "Izzah");
         await expectReach(page, '#nav [data-tab="days"]');
       },
     },
@@ -242,7 +242,7 @@ for (const size of [...SIZES, TAB]) {
         await expectReach(page, "#lnDone");
         await page.click("#lnDone");
         await waitClosed(page, "line");
-        await page.click('#slip button.spot[data-key="Trenton>Mo"]');
+        await page.click('#slip button.spot[data-key="Izzah>Mo"]');
         await until(() => page.evaluate(() => !!document.querySelector("#slip .spot.is-armed")), "armed");
         await expectReach(page, "#stampAmt", true);
         await expectReach(page, "#slip .spot.is-armed", true);

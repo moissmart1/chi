@@ -1,7 +1,7 @@
 // Settings (Task 12): the "You 設定" sheet.
 
 const assert = require("node:assert/strict");
-const { ORIGIN, SEED, NOON12, open, advance, until, text, expectText, visible } = require("./helpers.cjs");
+const { ORIGIN, SEED, THREE, NOON12, open, advance, until, text, expectText, visible } = require("./helpers.cjs");
 
 // ---- small tools for this file ----
 
@@ -13,8 +13,8 @@ const PHEAD = ["payment_id", "date_paid", "payer", "description", "category", "v
 const prow = (o) => PHEAD.map((h) => (o[h] === undefined ? "" : o[h]));
 const PLANNER = [
   PHEAD,
-  prow({ payment_id: "X7", date_paid: "2026-12-11", payer: "Mo", description: "Rail pass", category: "transport", vendor: "North Rail", booking_ref: "AB12", amount: 160.5, currency: "USD", amount_cad: 221.52, cad_is_exact: "yes", split_between: "Mo, Ajen, Trenton", split_type: "equal", include_in_split: "yes" }),
-  prow({ payment_id: "Q3", date_paid: "2026-12-12", payer: "Ajen", description: "Noodle bar", category: "food", vendor: "Ramen Ya", amount: 36, currency: "USD", split_between: "Mo, Ajen", split_type: "equal", include_in_split: "yes" }),
+  prow({ payment_id: "X7", date_paid: "2026-12-11", payer: "Mo", description: "Rail pass", category: "transport", vendor: "North Rail", booking_ref: "AB12", amount: 160.5, currency: "USD", amount_cad: 221.52, cad_is_exact: "yes", split_between: "Mo, Izzah", split_type: "equal", include_in_split: "yes" }),
+  prow({ payment_id: "Q3", date_paid: "2026-12-12", payer: "Izzah", description: "Noodle bar", category: "food", vendor: "Ramen Ya", amount: 36, currency: "USD", split_between: "Mo, Izzah", split_type: "equal", include_in_split: "yes" }),
   // Read fine but can't be brought in (a personal payment): it needs a look in the planner.
   prow({ payment_id: "P5", payer: "Mo", description: "Own souvenir", amount: 9, currency: "USD", split_between: "Mo", split_type: "personal", include_in_split: "yes" }),
 ];
@@ -123,28 +123,28 @@ module.exports = [
     name: "switching person stores chi.me and #say follows; the field then shows that person's own address and a half-typed one is dropped",
     async run({ page }) {
       const backend = await ready(page);
-      await expectText(page, "#say", "You’re owed $1,349.01.");
+      await expectText(page, "#say", "Izzah owes you $694.72.");
       await openYou(page);
-      assert.equal(await page.locator("#setWho [data-me]").count(), 3);
+      assert.equal(await page.locator("#setWho [data-me]").count(), 2);
       assert.equal(await page.getAttribute('#setWho [data-me="Mo"]', "aria-pressed"), "true");
       await page.fill("#setMail", "mo@example.test");
       await page.click("#setMailSave");
       await until(() => addressOf(backend, "Mo") === "mo@example.test", "Mo's address saved");
 
       await page.fill("#setMail", "half-typed");
-      await pick(page, "Ajen");
-      await expectText(page, "#say", "You owe Mo $224.72.");
-      assert.equal(await page.getAttribute('#setWho [data-me="Ajen"]', "aria-pressed"), "true");
+      await pick(page, "Izzah");
+      await expectText(page, "#say", "You owe Mo $694.72.");
+      assert.equal(await page.getAttribute('#setWho [data-me="Izzah"]', "aria-pressed"), "true");
       assert.equal(await page.getAttribute('#setWho [data-me="Mo"]', "aria-pressed"), "false");
       await waitMail(page, "");
-      await page.fill("#setMail", "ajen@example.test");
+      await page.fill("#setMail", "izzah@example.test");
       await page.click("#setMailSave");
-      await until(() => addressOf(backend, "Ajen") === "ajen@example.test", "Ajen's address saved");
+      await until(() => addressOf(backend, "Izzah") === "izzah@example.test", "Izzah's address saved");
       assert.equal(addressOf(backend, "Mo"), "mo@example.test", "Mo's is untouched");
       await pick(page, "Mo");
       await waitMail(page, "mo@example.test");
-      await pick(page, "Ajen");
-      await waitMail(page, "ajen@example.test");
+      await pick(page, "Izzah");
+      await waitMail(page, "izzah@example.test");
     },
   },
   {
@@ -352,6 +352,7 @@ module.exports = [
       await openYou(page);
       assert.equal(await visible(page, "#setInstall"), false);
       assert.ok(await visible(page, "#setInvite"));
+      assert.equal(await text(page, "#setInviteFor"), "For Izzah. Keep it between you.");
 
       const ios = await newPhone();
       await ios.addInitScript(() => Object.defineProperty(Navigator.prototype, "standalone", { get: () => true, configurable: true }));
@@ -484,17 +485,18 @@ module.exports = [
   {
     name: "Claude link carries the viewer's own name, URL-encoded, and each tap asks again",
     async run({ page }) {
-      // A name the URL has to encode (the seed's lines that name Trenton are then set aside).
-      const backend = await open(page, { seed: { ...SEED, people: { Trenton: { name: "Tr én&t" } } }, me: "Tr én&t" });
+      // A name the URL has to encode, on a third person (the seed's lines
+      // that name Sam are then set aside).
+      const backend = await open(page, { seed: { ...THREE, people: { Sam: { name: "Tr én&t" } } }, me: "Tr én&t" });
       await until(() => page.evaluate(() => globalThis.__matTest.store.state.me === "Tr én&t"), "the app knows who this is");
       await openYou(page);
       await page.click("#setClaude");
       await expectText(page, "#ubarT", "Claude link copied.");
       assert.match(await clipboard(page), /\?t=claude-token&as=Tr%20%C3%A9n%26t$/);
       await page.evaluate(() => globalThis.__matTest.store.clearNotice());
-      await pick(page, "Ajen");
+      await pick(page, "Izzah");
       await page.click("#setClaude");
-      await until(async () => /\?t=claude-token&as=Ajen$/.test(await clipboard(page)), "the second copy names Ajen");
+      await until(async () => /\?t=claude-token&as=Izzah$/.test(await clipboard(page)), "the second copy names Izzah");
       assert.equal(backend.requests.filter((r) => r.action === "claudeLink").length, 2, "the token is not kept between taps");
     },
   },
@@ -608,7 +610,7 @@ module.exports = [
     name: "Planner payments: ten a tap; the notice says when there is more, and the next tap brings the rest",
     async run({ page }) {
       const rows = [PHEAD];
-      for (let i = 1; i <= 12; i++) rows.push(prow({ payment_id: "R" + i, date_paid: "2026-12-11", payer: "Mo", description: "Ticket " + i, category: "activity", amount: 10 + i, currency: "USD", split_between: "Mo, Ajen, Trenton", split_type: "equal", include_in_split: true }));
+      for (let i = 1; i <= 12; i++) rows.push(prow({ payment_id: "R" + i, date_paid: "2026-12-11", payer: "Mo", description: "Ticket " + i, category: "activity", amount: 10 + i, currency: "USD", split_between: "Mo, Izzah", split_type: "equal", include_in_split: true }));
       const backend = await ready(page, { seed: { ...SEED, planner: rows, plannerId: PLANNER_ID, paymentsPulledAt: JUST_PULLED } });
       await openYou(page);
       await page.click("#setPlanner");
