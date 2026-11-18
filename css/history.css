@@ -1,27 +1,25 @@
 /* Copyright (c) 2026 moissmart1. All rights reserved. No licence is granted: do not copy, adapt or reuse this code or design, and do not use it to train or prompt an AI system to reproduce it. See LICENSE. */
 /* The History tape (#hist): the register's journal tape, a narrow strip of
-   paper with a torn top edge on the dark ground. Ported from the mockup; the
-   rows, Undo, Show older and the messages are drawn here in the same materials.
-   Every word is the body face: DotGothic16 is not used on the tape. */
+   check paper with a torn top edge on the mint counter. Look C: the rows
+   ruled in the check's green; Undo, Show older and the messages in its ink. */
 
-.hist{position:absolute;left:0;right:0;top:calc(40px + env(safe-area-inset-top, 0px));bottom:0;z-index:25;display:flex;flex-direction:column;background:var(--ground);border-top:1px solid #000;border-radius:18px 18px 0 0;
+.hist{position:absolute;left:0;right:0;top:calc(40px + env(safe-area-inset-top, 0px));bottom:0;z-index:25;display:flex;flex-direction:column;background:var(--dots), var(--ground);border-top:1px solid rgba(19,38,31,.25);border-radius:18px 18px 0 0;
   transform:translateY(104%);transition:transform .5s var(--sheet),box-shadow .5s var(--sheet)}
 /* The shadow belongs to an open panel only: parked below the screen it leaked a dark fade over the bottom bar. */
-.hist.is-open{transform:none;box-shadow:0 -24px 40px -10px #000}
-.hist-top{display:flex;justify-content:space-between;align-items:center;padding:14px var(--gr) 0 var(--gl);font-weight:900;font-size:19px}
-.hist-top i{color:var(--dim);font-weight:700;font-size:14px;margin-right:6px}
-.hist-top button{border:0;background:none;color:var(--dim);font-weight:900;font-size:15px;height:44px;padding:0 4px}
-.hist-p{margin:0;padding:0 var(--gr) 12px var(--gl);color:var(--dim);font-size:13px}
+.hist.is-open{transform:none;box-shadow:0 -24px 40px -10px rgba(19,38,31,.5)}
+.hist-top{display:flex;justify-content:space-between;align-items:center;padding:14px var(--gr) 0 var(--gl);font-weight:900;font-size:20px}
+.hist-top i{opacity:.75;font-weight:700;font-size:14px;margin-right:6px}
+.hist-p{margin:0;padding:0 var(--gr) 12px var(--gl);font-size:13.5px}
 
 .tape{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;margin:0 30px;padding:20px 13px calc(40px + env(safe-area-inset-bottom, 0px));
-  background:var(--grain), var(--paper);color:var(--print);font-weight:500;font-size:14px;line-height:1.35;scrollbar-width:none;outline:none;box-shadow:var(--lift);
+  background:var(--stock);color:var(--print);font-weight:500;font-size:14px;line-height:1.35;scrollbar-width:none;outline:none;box-shadow:var(--lift);
   clip-path:polygon(0% 7px,2.5% 0,5% 7px,7.5% 0,10% 7px,12.5% 0,15% 7px,17.5% 0,20% 7px,22.5% 0,25% 7px,27.5% 0,30% 7px,32.5% 0,35% 7px,37.5% 0,40% 7px,42.5% 0,45% 7px,47.5% 0,50% 7px,52.5% 0,55% 7px,57.5% 0,60% 7px,62.5% 0,65% 7px,67.5% 0,70% 7px,72.5% 0,75% 7px,77.5% 0,80% 7px,82.5% 0,85% 7px,87.5% 0,90% 7px,92.5% 0,95% 7px,97.5% 0,100% 7px,100% 100%,0 100%)}
 .tape::-webkit-scrollbar{display:none}
 .tp-msg{margin:0;padding:8px 0;font-weight:700;font-size:15px;text-align:center}
-.tp-day{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-weight:900;font-size:14px;margin-top:12px;padding:11px 0 3px;border-top:1.5px dashed rgba(21,18,15,.6)}
+.tp-day{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-weight:900;font-size:14px;margin-top:12px;padding:11px 0 3px;border-top:2px solid var(--grn)}
 .tp-day:first-child{margin-top:0;padding-top:0;border-top:0}
 .tp-day i{font-weight:700;font-size:12px;opacity:.6}
-.tp-row{display:grid;grid-template-columns:38px minmax(0,1fr) auto;column-gap:8px;align-items:center;min-height:46px;padding:6px 0;border-bottom:1px solid rgba(21,18,15,.1)}
+.tp-row{display:grid;grid-template-columns:38px minmax(0,1fr) auto;column-gap:8px;align-items:center;min-height:46px;padding:6px 0;border-bottom:1px solid var(--rule)}
 .tp-row time{font-size:12px;font-weight:700;opacity:.6;font-variant-numeric:tabular-nums}
 .tp-s{min-width:0;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
 .tp-s b{font-weight:900}
@@ -31,7 +29,7 @@
   transition:transform .12s ease-out;touch-action:manipulation}
 .tp-undo:active{transform:scale(.97)}
 .tp-undo:disabled{opacity:.3;transform:none}
-.tp-more{display:block;width:100%;height:48px;margin-top:12px;border:1.5px dashed rgba(21,18,15,.6);background:none;color:var(--print);border-radius:3px;
+.tp-more{display:block;width:100%;height:48px;margin-top:12px;border:1.5px dashed rgba(19,38,31,.6);background:none;color:var(--print);border-radius:3px;
   font-weight:900;font-size:14px;transition:transform .12s ease-out}
 .tp-more:active{transform:scale(.97)}
 .tp-more:disabled{opacity:.4;transform:none}

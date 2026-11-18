@@ -28,10 +28,11 @@ const isOpen = (page, id) => page.evaluate((i) => {
   return !!el && el.classList.contains("is-open");
 }, id);
 
-// The text of each child of the ticket's last part before the footer.
+// The text of the check's last line before its total and stub.
 const lastPart = (page, date) => page.evaluate((sel) => {
   const foot = document.querySelector(sel + " .tk-foot");
-  const before = foot && foot.previousElementSibling;
+  let before = foot && foot.previousElementSibling;
+  if (before && before.classList.contains("tk-kind")) before = before.previousElementSibling;
   return before ? { cls: before.className, text: before.textContent.replace(/\s+/g, " ").trim() } : null;
 }, tk(date));
 
@@ -160,8 +161,8 @@ module.exports = [
       await ready(page);
       await openCard(page, "2026-12-28");
       await expectFullCard(page);
-      assert.ok((await size(page, "#stay .sy-name")) >= 28, "the Japanese name is large: " + (await size(page, "#stay .sy-name")));
-      assert.equal(await text(page, "#stay .sy-name"), "浅草ホテル");
+      assert.ok((await size(page, "#stay .sy-name")) >= 28, "the name is large: " + (await size(page, "#stay .sy-name")));
+      assert.equal(await text(page, "#stay .sy-name"), "Asakusa hotel", "the English name first");
       assert.ok((await size(page, "#stay .sy-ad")) >= 20, "the address is large: " + (await size(page, "#stay .sy-ad")));
       assert.equal(await page.evaluate(() => document.activeElement && document.activeElement.id), "stayDone", "focus on Done");
       await page.click("#stayDone");
@@ -289,7 +290,7 @@ module.exports = [
       await until(() => isOpen(page, "allDays"), "the list opens");
       const rows = await dayRows(page);
       assert.equal(rows.length, 7);
-      for (const s of ["D 03", "Mon Dec 28", "Tokyo", "today"]) assert.ok(rows[2].includes(s), "the third row reads " + s + ": " + rows[2]);
+      for (const s of ["No.0003", "Mon Dec 28", "Tokyo", "today"]) assert.ok(rows[2].includes(s), "the third row reads " + s + ": " + rows[2]);
       for (const s of ["Temples, then the view", "used"]) assert.ok(rows[1].includes(s), "the second row reads " + s + ": " + rows[1]);
       assert.equal(/today|used/.test(rows[5]), false, "an ahead day is neither: " + rows[5]);
       assert.equal(rows.some((r) => r.includes("undefined")), false);

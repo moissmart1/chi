@@ -3,37 +3,38 @@
    and .ln-btns are ported from the mockup; the note field, the history list
    and the scrim are drawn here in the same materials. */
 
-.scrim{position:absolute;inset:0;z-index:23;background:rgba(13,11,10,.5)}
+.scrim{position:absolute;inset:0;z-index:23;background:rgba(19,38,31,.4)}
 
-.ln{background:var(--paper);color:var(--print);padding:15px 14px 8px;border-radius:3px}
+/* The line on check paper: its name, its figure, then the check's ruled lines. */
+.ln{background:var(--stock);color:var(--print);padding:15px 14px 8px;border-radius:2px;box-shadow:var(--lift);border-top:3px double var(--grn)}
 .ln-t{font-weight:900;font-size:20px;line-height:1.2;overflow-wrap:anywhere}
 .ln-a{font-weight:900;font-size:35px;line-height:1.15;letter-spacing:-.01em;margin-top:2px;font-variant-numeric:tabular-nums}
 .ln-a i{font-size:14px;font-weight:500;letter-spacing:0;margin-left:8px}
 .ln-paid{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:15px}
 .ln-paid b{font-weight:900}
-.ln-d{margin:11px 0 0;border-top:1.5px dashed rgba(21,18,15,.6)}
-.ln-d>div{display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:44px;border-bottom:1px solid rgba(21,18,15,.1);font-size:15px}
+.ln-d{margin:11px 0 0;border-top:1.5px dashed rgba(19,38,31,.6)}
+.ln-d>div{display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:44px;border-bottom:1px solid rgba(19,38,31,.1);font-size:15px}
 .ln-d dt{font-weight:500;opacity:.7}
 .ln-d dd{margin:0;font-weight:900;display:flex;align-items:center;gap:6px;text-align:right}
 .ln .mini{width:26px;height:26px;font-size:9.5px}
-.ln-share{display:flex;justify-content:space-between;align-items:baseline;gap:10px;min-height:48px;padding-top:12px;border-bottom:1px solid rgba(21,18,15,.1);
+.ln-share{display:flex;justify-content:space-between;align-items:baseline;gap:10px;min-height:48px;padding-top:12px;border-bottom:1px solid rgba(19,38,31,.1);
   font-size:15px;font-weight:700}
 .ln-share span{font-weight:500;opacity:.7}
 .ln-share b{font-weight:900;font-size:22px;font-variant-numeric:tabular-nums}
 .ln-share.is-none{justify-content:flex-start}
 .ln-by{min-height:40px;display:flex;align-items:center;font-size:14px;font-weight:500;opacity:.8}
 .ln-note{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin-top:4px}
-.ln-note input{width:100%;height:46px;padding:0 12px;border:1.5px solid rgba(21,18,15,.35);border-radius:6px;background:none;color:var(--print);
+.ln-note input{width:100%;height:46px;padding:0 12px;border:1.5px solid var(--grn);border-radius:4px;background:var(--mat);color:var(--print);
   font-size:16px;font-weight:700;outline:none}
-.ln-note input::placeholder{color:rgba(21,18,15,.5);font-weight:500}
+.ln-note input::placeholder{color:rgba(19,38,31,.5);font-weight:500}
 .ln-note input:focus{border-color:var(--print)}
-.ln-note button{height:46px;padding:0 16px;border:0;border-radius:6px;background:var(--print);color:var(--paper);font-weight:900;font-size:15px;
+.ln-note button{height:46px;padding:0 16px;border:0;border-radius:6px;background:var(--print);color:var(--stock);font-weight:900;font-size:15px;
   transition:transform .12s ease-out}
 .ln-note button:active{transform:scale(.97)}
 .ln-note button:disabled{opacity:.3;transform:none}
-.ln-h{font-weight:900;font-size:13px;margin-top:14px;padding-top:10px;border-top:1.5px dashed rgba(21,18,15,.6)}
+.ln-h{font-weight:900;font-size:13px;margin-top:14px;padding-top:10px;border-top:1.5px dashed rgba(19,38,31,.6)}
 .ln-log{padding-bottom:4px}
-.ln-ev{display:grid;row-gap:1px;padding:7px 0;border-bottom:1px solid rgba(21,18,15,.1);font-size:14px;font-weight:500;line-height:1.35;overflow-wrap:anywhere}
+.ln-ev{display:grid;row-gap:1px;padding:7px 0;border-bottom:1px solid rgba(19,38,31,.1);font-size:14px;font-weight:500;line-height:1.35;overflow-wrap:anywhere}
 .ln-ev:last-child{border-bottom:0}
 .ln-ev time{font-size:12px;opacity:.6}
 .ln-ev span{font-weight:700}
@@ -41,34 +42,34 @@
 .ln-btns{display:flex;gap:8px;margin-top:10px}
 .ln-btns button{flex:1;height:52px;border:0;border-radius:8px;background:var(--key);font-weight:900;font-size:16px;box-shadow:var(--key-edge);transition:transform .1s,box-shadow .1s}
 .ln-btns button:active{transform:translateY(1.5px);background:var(--key-hi);box-shadow:var(--key-down)}
-.ln-btns .danger{color:#FF8F73}
-#lnRetry{background:var(--paper);color:var(--print);box-shadow:var(--paper-edge)}
-#lnRetry:active{background:var(--paper);box-shadow:var(--paper-down)}
+.ln-btns .danger{color:var(--red)}
+#lnRetry{background:var(--red);color:#fff;box-shadow:var(--paper-edge)}
+#lnRetry:active{background:var(--red);box-shadow:var(--paper-down)}
 
 /* While the sheet is open the undo bar sits at the top, clear of its buttons. */
 .phone.line-open .ubar{top:calc(12px + env(safe-area-inset-top, 0px));bottom:auto}
 
 /* ---------- Settings (#you), ported from the mockup's .set rules ---------- */
 .set{display:grid;gap:6px}
-.set-h{color:var(--dim);font-size:13px;font-weight:700}
+.set-h{color:var(--grn);font-family:var(--slab);font-size:14px;font-weight:600}
 /* As .who-pick: a third of the row each, two centred. */
 .set-who{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-bottom:4px}
 .set-who>button{flex:0 0 calc((100% - 12px) / 3);min-width:0}
 .set-who button{height:82px;border:0;border-radius:8px;background:var(--key);display:grid;justify-items:center;align-content:center;gap:6px;font-weight:900;font-size:14.5px;
   box-shadow:var(--key-edge);transition:transform .15s ease-out,background .12s,box-shadow .15s}
 .set-who button:active{transform:translateY(1.5px);box-shadow:var(--key-down)}
-.set-who button.is-on{background:var(--paper);color:var(--print);box-shadow:var(--paper-edge)}
-.set-who button.is-on:active{box-shadow:var(--paper-down)}
+.set-who button.is-on{background:var(--key-hi);color:var(--print);box-shadow:var(--key-edge), 0 0 0 2px var(--red)}
+.set-who button.is-on:active{box-shadow:var(--key-down), 0 0 0 2px var(--red)}
 .set-who .seal{display:grid;place-items:center;pointer-events:none}
-.set-who .seal.is-on{background:var(--shu);border-color:var(--shu);color:#fff}
+.set-who .seal.is-on{background:var(--red);border-color:var(--red);color:#fff}
 .set-r{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;min-height:58px;padding:9px 14px;border:0;border-radius:8px;background:var(--key);
   color:var(--text);text-align:left;text-decoration:none;font-weight:700;font-size:15.5px;transition:transform .15s ease-out,background .12s,box-shadow .15s}
 /* The rows that press (buttons and the link) are keys; the plain rows are not. */
 button.set-r,a.set-r{box-shadow:var(--key-edge)}
 .set-r>span,.set-col>label{min-width:0}
 button.set-r:active,a.set-r:active{background:var(--key-hi);transform:translateY(1.5px);box-shadow:var(--key-down)}
-.set-r small{display:block;color:var(--dim);font-size:12.5px;font-weight:500}
-.set-r b{font-weight:900;color:var(--dim);white-space:nowrap;font-size:14.5px;font-variant-numeric:tabular-nums}
+.set-r small{display:block;color:var(--key-ink);font-size:12.5px;font-weight:500}
+.set-r b{font-weight:900;color:var(--grn);white-space:nowrap;font-size:14.5px;font-variant-numeric:tabular-nums}
 /* A word that answers a tap (Copy, Copied ✓, Not copied...) keeps the room
    of the widest it can say (data-w), so the row never changes height under
    the finger. */
@@ -93,11 +94,11 @@ button.set-r:active,a.set-r:active{background:var(--key-hi);transform:translateY
 .set-pic-b #setPicDel{color:var(--dim)}
 .set-pic-b button:disabled{opacity:.35;transform:none}
 .set-mail{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
-.set-mail input{width:100%;height:46px;padding:0 12px;border:1.5px solid var(--key-hi);border-radius:6px;background:var(--ground);color:var(--text);font-size:16px;font-weight:700;outline:none}
+.set-mail input{width:100%;height:46px;padding:0 12px;border:1.5px solid var(--grn);border-radius:4px;background:var(--mat);color:var(--text);font-size:16px;font-weight:700;outline:none}
 .set-mail input::placeholder{color:var(--dim);font-weight:500}
 .set-mail input:focus{border-color:var(--text)}
 .set-mail input:disabled{opacity:.4}
-.set-mail button{height:46px;padding:0 16px;border:0;border-radius:6px;background:var(--paper);color:var(--print);font-weight:900;font-size:15px;box-shadow:var(--paper-edge);transition:transform .12s ease-out,box-shadow .12s}
+.set-mail button{height:46px;padding:0 16px;border:0;border-radius:6px;background:var(--print);color:var(--stock);font-weight:900;font-size:15px;box-shadow:var(--paper-edge);transition:transform .12s ease-out,box-shadow .12s}
 .set-mail button:active{transform:translateY(1.5px);box-shadow:var(--paper-down)}
 .set-mail button:disabled{opacity:.3;transform:none;box-shadow:var(--paper-edge)}
 /* The payments the last pull could not bring in: plain text on a key, wrapping, never sideways. */
@@ -125,41 +126,43 @@ button.set-r:active,a.set-r:active{background:var(--key-hi);transform:translateY
 .phone.stay-open .ubar,.phone.days-open .ubar,.phone.stop-open .ubar{top:calc(12px + env(safe-area-inset-top, 0px));bottom:auto}
 
 /* ---------- the stop sheet (#stop) ----------
-   A form cut from the ticket stock: each field is a blank on the ticket,
-   filled in black print. It sits on top of the phone's keyboard (--kb, set
+   A form on check paper: each field is a blank on the check, ruled in
+   green, filled in ink. It sits on top of the phone's keyboard (--kb, set
    by js/views/stopsheet.js while the keyboard is up). */
-.sheet.stop{background:var(--stock) var(--mat-pattern);color:var(--print);border-top:0;padding-top:14px;
+.sheet.stop{background:var(--stock);color:var(--print);border-top:3px double var(--grn);padding-top:14px;
   bottom:var(--kb, 0px);max-height:calc(min(90%, 100% - 76px - var(--inset-t)) - var(--kb, 0px))}
-.stop .sheet-top button{color:var(--print);height:44px}
+.stop .sheet-top button{height:44px}
 .st{display:grid;gap:10px;padding-bottom:4px}
-.st-day{display:flex;align-items:baseline;gap:8px;padding-bottom:9px;border-bottom:2px dashed rgba(21,18,15,.38);font-size:15px}
+.st-day{display:flex;align-items:baseline;gap:8px;padding-bottom:9px;border-bottom:2px solid var(--grn);font-size:15px}
 .st-day b{font-weight:900}
 .st-day i{font-size:13px;font-weight:500}
 .st-f{display:grid;gap:4px;font-size:12.5px;font-weight:700}
-.st-f input,.st-f textarea{width:100%;min-height:46px;padding:10px 12px;border:1.5px solid rgba(21,18,15,.4);border-radius:4px;background:var(--paper);
+/* Each blank's label in the check's slab, green, as the boxes' labels. */
+.st-f>span{color:var(--grn);font-family:var(--slab);font-weight:600;font-size:13px}
+.st-f input,.st-f textarea{width:100%;min-height:46px;padding:10px 12px;border:1.5px solid var(--grn);border-radius:4px;background:var(--mat);
   color:var(--print);font:inherit;font-size:16px;font-weight:700;line-height:1.3;outline:none;-webkit-appearance:none;appearance:none}
 .st-f textarea{resize:none;display:block}
 .st-f input:focus,.st-f textarea:focus{border-color:var(--print);box-shadow:0 0 0 1px var(--print)}
 .st-f #stWhat{font-size:18px;font-weight:900}
 .st-time{max-width:12em}
 .st-time input{font-variant-numeric:tabular-nums}
-/* The time can't slip: a switch, 指定 boxed as on the ticket. */
+/* The time can't slip: a switch, its word boxed in green as on the check. */
 .st-sw{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:48px;font-size:15px;font-weight:900}
-.st-sw i{border:1.5px solid var(--print);border-radius:2px;padding:0 4px 1px;margin-left:8px;font-size:12.5px;font-weight:900}
-.st-sw input{flex:none;position:relative;width:50px;height:30px;margin:0;border:1.5px solid var(--print);border-radius:15px;background:var(--paper);
+.st-sw i{border:1.5px solid var(--grn);color:var(--grn);border-radius:2px;padding:0 4px 1px;margin-left:8px;font-size:12.5px;font-weight:900}
+.st-sw input{flex:none;position:relative;width:50px;height:30px;margin:0;border:1.5px solid var(--print);border-radius:15px;background:var(--mat);
   -webkit-appearance:none;appearance:none;cursor:pointer;transition:background .15s}
 .st-sw input::after{content:"";position:absolute;top:3px;left:3px;width:21px;height:21px;border-radius:50%;background:var(--print);transition:transform .15s ease-out}
-.st-sw input:checked{background:var(--print)}
+.st-sw input:checked{background:var(--grn);border-color:var(--grn)}
 .st-sw input:checked::after{background:var(--stock);transform:translateX(20px)}
 .st-msg{margin:0;font-size:14.5px;font-weight:900}
 .st-msg:empty{display:none}
-.st-msg::before{content:"";display:inline-block;width:9px;height:9px;margin-right:8px;border-radius:50%;border:1.7px solid var(--shu)}
+.st-msg::before{content:"";display:inline-block;width:9px;height:9px;margin-right:8px;border-radius:50%;border:1.7px solid var(--red)}
 .st-btns{display:flex;gap:8px;margin-top:2px}
 .st-btns button{height:52px;border-radius:6px;font-weight:900;font-size:16px;transition:transform .12s ease-out}
 .st-btns button:active{transform:scale(.97)}
 .st-btns button:disabled{opacity:.3;transform:none}
-#stSave{flex:1;border:0;background:var(--print);color:var(--stock)}
-#stDel{flex:none;padding:0 18px;border:1.5px solid var(--shu);background:none;color:var(--shu)}
+#stSave{flex:1;border:0;background:var(--red);color:#fff;box-shadow:var(--paper-edge)}
+#stDel{flex:none;padding:0 18px;border:1.5px solid var(--red);background:none;color:var(--red)}
 /* Saving (R36): the fields cannot be changed but stay in black print, and
    Saving… on the button stays readable. */
 .st-f input:disabled,.st-f textarea:disabled{opacity:1;color:var(--print);-webkit-text-fill-color:var(--print);border-style:dashed}

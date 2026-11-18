@@ -41,7 +41,7 @@ function dayRow(day, i, state) {
     b.setAttribute("aria-current", "date");
   }
   const num = el("span", "num");
-  num.append(el("small", "", "D"), " " + String(i + 1).padStart(2, "0"));
+  num.append(el("small", "", "No."), String(i + 1).padStart(4, "0"));
   const main = el("span", "ad-main");
   const top = el("span", "ad-top");
   top.append(el("b", "", dayHead(day.date).en));

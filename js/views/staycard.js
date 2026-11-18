@@ -6,9 +6,9 @@
 // root is the phone. The card draws from store.state.stays only, so it opens
 // with no signal; nothing is fetched. It redraws on every store change while
 // open, and closes itself when its stay is gone. The name and the address are
-// large, in Japanese when there is Japanese; under them "Please take me here."
-// (Please take me here.), the note, a map link and the booking link. A stay's optional photo comes
-// first, as a stop's does on its ticket. Text from
+// large, the English name first; under them "Please take me here.", the
+// note, a map link and the booking link. A stay's optional photo comes
+// first, as a stop's does on its check. Text from
 // the Sheet goes in with textContent; a link only through safeHref.
 
 import { safeHref, stayMapsUrl } from "../plan.js";
@@ -54,11 +54,12 @@ function card(stay) {
     img.src = photo;
     nodes.push(img);
   }
+  // The name large (English first); a second name from the Sheet, if any, under it.
   const jp = str(stay.nameJp);
   const en = str(stay.name);
-  const big = jp || en;
+  const big = en || jp;
   if (big) nodes.push(el("div", "sy-name", big));
-  if (jp && en) nodes.push(el("div", "sy-en", en));
+  if (jp && en) nodes.push(el("div", "sy-en", jp));
   const address = str(stay.addressJp);
   if (address) nodes.push(el("div", "sy-ad", address));
   const ask = el("div", "sy-ask");
