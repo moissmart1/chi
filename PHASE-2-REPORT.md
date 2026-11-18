@@ -15,7 +15,7 @@ Phase 1 ended at 16fe69c. Nothing here touches `mat`, the live Japan app, a remo
 | Every other screen in the same materials | DONE | 901d28e |
 | Phase 1 list, items 1 to 18 | DONE (16 kept on purpose, below) | db301cc (and the screens above) |
 | Items 19 and 20: the dormant planner pieces removed; 21 and 22 kept | DONE | a523cc7 |
-| Fixes from the full run (tests that pinned the Japan look, the payer seals) and this report | DONE | the last commit |
+| Fixes from the full run (tests that pinned the Japan look, the payer seals) and this report | DONE | 7079472 |
 
 How the commits were made: the three screens and the other screens were built together (they share one set of tokens in `css/base.css`), then committed one piece at a time by file. So each commit is one piece, but the commits before the last were not each run green on their own; the final tree is (totals below). `css/base.css` (tokens, sheets, gates) went in with Days.
 
