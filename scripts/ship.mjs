@@ -12,20 +12,27 @@
 // 2. If the live backend is not this commit's backend: clasp push, new version
 //    on the same deployment, then wait until the live backend answers with
 //    this commit's stamp.
-// 3. The live trip still loads with the trip's key (from ~/.config/chi/env).
+// 3. The live trip still loads, read with the release check's read-only key
+//    (CHI_CHECK_KEY from ~/.config/chi/env; CHI_KEY only when there is none).
 // 4. git push origin main (the push check runs again there).
 // 5. Wait until the site serves this version, then compare every file the
 //    phones cache, byte for byte, with this commit.
-// 6. Open the live site in a headless browser: it starts with no script error.
+// 6. Open the live site in a headless browser with the check key in the fragment
+//    (never in the query string): the trip loads and there is no script error.
 //
 // It never prints a key. If a step fails it stops and says where things stand.
+//
+// Once issueLinks has run (the security release, 2026-11-18), never roll the
+// backend back past that version: an older backend knows only the shared key,
+// refuses every personal key, and each phone that hears that clears itself.
+// Fix forward.
 
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
-import { ROOT, SITE, call, git, gitOk, liveStamp, privateEnv, readConfig, readReceipt, writtenBackendStamp } from "./release-lib.mjs";
+import { ROOT, SITE, askUntil, call, checkKey, tripLoaded, git, gitOk, liveStamp, privateEnv, readConfig, readReceipt, withoutKeys, writtenBackendStamp } from "./release-lib.mjs";
 import { shellList } from "./stamp-sw.mjs";
 
 const check = process.argv.includes("--check");
@@ -50,7 +57,9 @@ if (!receipt) stop("This commit has not passed the gate.", "Run `npm run gate` (
 git(["fetch", "origin", "main"]);
 if (!gitOk(["merge-base", "--is-ancestor", "origin/main", "HEAD"])) stop("origin/main has commits this one does not.", "Merge them, then `npm run gate` again.");
 const env = privateEnv();
-if (!env.CHI_KEY) stop("No trip key to check the live trip with.", "Put CHI_KEY=... in ~/.config/chi/env (never in the repository).");
+const KEY = checkKey(env);
+if (!KEY) stop("No key to check the live trip with.", "Put CHI_CHECK_KEY=... in ~/.config/chi/env (never in the repository).");
+if (!env.CHI_CHECK_KEY) step("no CHI_CHECK_KEY: checking with the old shared CHI_KEY");
 step("commit " + head.slice(0, 7) + ", version " + cfg.appVersion + ", gate passed " + receipt.at + " (" + receipt.unit.pass + " unit, " + receipt.e2e.pass + " browser)");
 
 // 2 ---------------------------------------------------------------------------
@@ -67,7 +76,7 @@ if (live === want) {
     const clasp = (args) => spawnSync("npx", ["clasp", ...args], { cwd: ROOT, encoding: "utf8" });
     const before = clasp(["list-deployments"]);
     const was = ((before.stdout || "").split("\n").find((l) => l.includes(cfg.deployId)) || "").match(/@(\d+)/);
-    step("backend: live deployment is at version " + (was ? was[1] : "unknown") + " (the one to go back to if this goes wrong)");
+    step("backend: live deployment is at version " + (was ? was[1] : "unknown") + " (fix forward: once issueLinks has run, never roll back past the security release)");
     const push = clasp(["push", "-f"]);
     if (push.status !== 0) stop("clasp push failed.", (push.stderr || push.stdout || "").trim().split("\n").slice(-3).join("\n      "));
     const dep = clasp(["create-deployment", "-i", cfg.deployId, "-d", "v" + cfg.appVersion + " " + head.slice(0, 7)]);
@@ -92,8 +101,9 @@ if (migrate && !check) {
   let added = [];
   let settled = false;
   for (let i = 0; i < 6 && !settled; i++) {
-    const r = await call(cfg.apiUrl, env.CHI_KEY, "migrate");
-    if (!r || r.ok !== true) stop("migrate did not succeed (" + ((r && (r.message || r.error)) || "no answer") + ").", "The site was NOT published.");
+    // A request that lands on the old version refuses the check key: asked again.
+    const r = await askUntil(() => call(cfg.apiUrl, KEY, "migrate"), (x) => !!x && x.ok === true);
+    if (!r || r.ok !== true) stop("migrate did not succeed (" + withoutKeys((r && (r.message || r.error)) || "no answer", env) + ").", "The site was NOT published. Run `npm run ship` again in a minute; fix forward, do not roll the backend back.");
     const now = (r.data && r.data.added) || [];
     added = added.concat(now);
     settled = i > 0 && now.length === 0;
@@ -102,9 +112,12 @@ if (migrate && !check) {
   if (!settled) stop("migrate kept adding columns after six calls.", "Look at the Sheet. The site was NOT published.");
   step("backend: migrate ran" + (added.length ? ", added " + added.join(", ") : ", nothing to add"));
 }
-const load = await call(cfg.apiUrl, env.CHI_KEY, "load").catch(() => null);
-if (!load || load.ok !== true || !Array.isArray(load.data.days) || !load.data.days.length || !Array.isArray(load.data.stops)) {
-  stop("The live trip does not load (" + ((load && (load.message || load.error)) || "no answer") + ").", "The site was NOT published. Fix or roll back the backend first.");
+// Asked for about 30 seconds: right after a deploy a request can still land
+// on the old version, which refuses the check key.
+const load = await askUntil(() => call(cfg.apiUrl, KEY, "load"), tripLoaded);
+if (!tripLoaded(load)) {
+  stop("The live trip does not load (" + withoutKeys((load && (load.message || load.error)) || "no answer", env) + ").",
+    "The site was NOT published. Run `npm run ship` again in a minute. If it still does not load, fix forward: do not roll the backend back once issueLinks has run (every phone on a personal link would clear itself).");
 }
 step("live trip loads: " + load.data.days.length + " days, " + load.data.stops.length + " stops, rev " + load.rev);
 
@@ -161,16 +174,17 @@ try {
   // sent to the site's server (a query string is, and until 2026-11-18 this
   // step put the key in one). The app reads it there, so this is also the only
   // way the check really signs in: it waits for the trip's own day count.
-  await page.goto(SITE + "#k=" + encodeURIComponent(env.CHI_KEY), { waitUntil: "load", timeout: 45000 });
+  // The check key's phone has no one chosen (me is "") and shows the trip read-only.
+  await page.goto(SITE + "#k=" + encodeURIComponent(KEY), { waitUntil: "load", timeout: 45000 });
   await page.waitForSelector("#phone", { timeout: 20000 });
   await page.waitForSelector("#dayCount", { state: "visible", timeout: 30000 });
   await sleep(4000);
 } catch (e) {
-  errors.push("the page did not start: " + String(e.message || e).split("\n")[0].replace(env.CHI_KEY, "(key)"));
+  errors.push("the page did not start: " + withoutKeys(String(e.message || e).split("\n")[0], env));
 } finally {
   await browser.close();
 }
-if (errors.length) stop("The live site started with " + errors.length + " error(s): " + errors.slice(0, 3).join(" | "), "This is live now. Fix forward or revert the commit and ship again.");
+if (errors.length) stop("The live site started with " + errors.length + " error(s): " + withoutKeys(errors.slice(0, 3).join(" | "), env), "This is live now. Fix forward or revert the commit and ship again.");
 step("live site starts with no script error");
 
 console.log("\nship: DONE. Version " + cfg.appVersion + " (" + head.slice(0, 7) + ") is live, backend " + want + ". Record it in the ledger and MEMORY.md.");
