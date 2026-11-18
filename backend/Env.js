@@ -44,6 +44,21 @@ function newPersonKey_() {
   return Utilities.getUuid().replace(/-/g, "") + Utilities.getUuid().replace(/-/g, "");
 }
 
+// A JSON body POSTed to an address (mailLinks, Setup.js: the mail desk), and
+// its JSON answer; null when there is no usable answer. An Apps Script web app
+// answers a POST with a redirect to its output, fetched as a GET
+// (followRedirects). Nothing here is logged: the body holds a link.
+function postJson_(url, body) {
+  try {
+    var res = UrlFetchApp.fetch(url, { method: "post", contentType: "application/json", payload: JSON.stringify(body),
+      muteHttpExceptions: true, followRedirects: true });
+    if (res.getResponseCode() !== 200) return null;
+    return JSON.parse(res.getContentText());
+  } catch (e) {
+    return null;
+  }
+}
+
 // Runs fn under the script lock. If the lock is not free within 8 seconds,
 // returns the busy envelope instead (handle_ adds rev). Sheet writes are
 // buffered: they are flushed before the lock is let go, so the next request

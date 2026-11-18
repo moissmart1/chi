@@ -103,6 +103,9 @@ function createFakeBackend(seed, { clock, lockFails, keepsApostrophe = false } =
   let lockWaited = 0; // ms the in-memory lock has made callers wait
   // The owner's run log (Logger.log) and the executions log (console.error).
   const logged = [];
+  // The mail desk at DESK_URL (postJson_ above).
+  const deskPosts = [];
+  const fakeDesk = { answer: () => ({ ok: true }) };
   const consoleLines = [];
 
   const headers = (tab) => {
@@ -194,6 +197,19 @@ function createFakeBackend(seed, { clock, lockFails, keepsApostrophe = false } =
     // cached shared key forgotten.
     sha256Hex_: (t) => sha256(t),
     newPersonKey_: () => crypto.randomBytes(32).toString("hex"),
+    // Same as Env.js: a JSON body POSTed to an address, its JSON answer or
+    // null. Test-only: fake.desk(url, body) plays the other end (default
+    // { ok: true }; return null or throw for no usable answer); every call is
+    // kept in fake.deskPosts with PERSON_KEYS as it was at that moment.
+    postJson_(url, body) {
+      deskPosts.push({ url, body: copy(body), personKeys: Object.prototype.hasOwnProperty.call(props, "PERSON_KEYS") ? props.PERSON_KEYS : null });
+      try {
+        const answer = fakeDesk.answer(url, copy(body));
+        return answer === undefined ? null : copy(answer);
+      } catch (e) {
+        return null;
+      }
+    },
     forgetTripKey_() {
       delete cache.TRIP_KEY;
     },
@@ -310,6 +326,8 @@ function createFakeBackend(seed, { clock, lockFails, keepsApostrophe = false } =
       },
     };
   };
+  fake.deskPosts = deskPosts;
+  Object.defineProperty(fake, "desk", { get: () => fakeDesk.answer, set: (fn) => { fakeDesk.answer = fn; } });
   fake.props = props;
   fake.logged = logged;
   fake.consoleLines = consoleLines;

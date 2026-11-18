@@ -250,6 +250,164 @@ function cancelLinkForPerson4() { cancelLinkFor_(4); }
 function cancelLinkForPerson5() { cancelLinkFor_(5); }
 function cancelLinkForPerson6() { cancelLinkFor_(6); }
 
+// ---- mailing each person their own link (2026-11-18) ----
+// mailLinks gives each person a new link and hands it to the mail desk (the
+// owner's newsletter script, at the Script Property DESK_URL), which mails it
+// to that person alone. Running it is the owner's go-ahead for those mails.
+// The link is made here, posted once, and written nowhere: not in a log, a
+// Sheet cell or a Script Property (PERSON_KEYS keeps only its hash). The desk
+// holds no key of this app and needs none: it checks the link with this app's
+// own load before it mails it. Request: { action: "link", app, name, link };
+// answer: { ok: true } when the mail went, else { ok: false, error: <word> }.
+
+var LINK_APP_ = "chi";
+var DESK_URL_RE_ = /^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/;
+// The app's address for a mailed link: https, plain characters, ending in "/".
+var MAIL_SITE_RE_ = /^https:\/\/[A-Za-z0-9.-]+(\/[A-Za-z0-9._~-]+)*\/$/;
+// A word from the desk that may go into the log: lower-case letters and spaces, short.
+var DESK_WORD_RE_ = /^[a-z][a-z ]{0,29}$/;
+
+// What is needed before anything changes: { site, desk }, or null after saying why.
+function mailReady_() {
+  if (personKeysOrSay_() === null) return null;
+  var desk = getProp_("DESK_URL");
+  if (typeof desk !== "string" || !DESK_URL_RE_.test(desk)) {
+    Logger.log("Not done: the Script Property DESK_URL must be the mail desk’s web app address (https://script.google.com/macros/s/…/exec). Nothing was changed.");
+    return null;
+  }
+  var site = getProp_("SITE_URL");
+  if (typeof site !== "string" || !MAIL_SITE_RE_.test(site)) {
+    Logger.log("Not done: the Script Property SITE_URL must be the app’s address, https://…/ ending in /. Nothing was changed.");
+    return null;
+  }
+  return { site: site, desk: desk };
+}
+
+// The People tab's names, or null after saying it can't be read or lists nobody.
+function mailNames_() {
+  var names;
+  try {
+    names = peopleNames_();
+  } catch (e) {
+    Logger.log("Not done: the People tab can’t be read. Nothing was changed.");
+    return null;
+  }
+  if (!names.length) {
+    Logger.log("Not done: the People tab lists nobody. Nothing was changed.");
+    return null;
+  }
+  return names;
+}
+
+// The desk's answer as one word for the log: "ok", the desk's own plain word,
+// or "no answer" for anything else (never the answer's text itself).
+function deskWord_(answer) {
+  if (!answer || typeof answer !== "object") return "no answer";
+  if (answer.ok === true) return "ok";
+  return answer.ok === false && typeof answer.error === "string" && DESK_WORD_RE_.test(answer.error) ? answer.error : "no answer";
+}
+
+// One person (n: their place in the People tab): a new key, its hash stored,
+// the link posted; on anything but ok the previous entry is put back (or the
+// new one removed). True when the desk says the mail went.
+function mailLinkTo_(name, n, ready) {
+  var key = newPersonKey_();
+  var hash = sha256Hex_(key);
+  var had = false;
+  var prev = null;
+  var stored;
+  try {
+    stored = withLock_(function () {
+      var keys = personKeys_();
+      had = hasLink_(keys, name);
+      prev = had ? keys[name] : null;
+      keys[name] = { hash: hash, at: nowIso_() };
+      setPersonKeys_(keys);
+      return { ok: true };
+    });
+  } catch (e) {
+    stored = null;
+  }
+  if (!stored || stored.ok !== true) {
+    Logger.log("Not sent to " + name + ": the app is busy saving. Nothing changed for " + name + ".");
+    return false;
+  }
+  var word;
+  try {
+    word = deskWord_(postJson_(ready.desk, { action: "link", app: LINK_APP_, name: name, link: ready.site + "#k=" + key }));
+  } catch (e) {
+    word = "no answer";
+  }
+  key = null;
+  if (word === "ok") {
+    Logger.log("Sent to " + name + ".");
+    return true;
+  }
+  var undone;
+  try {
+    undone = withLock_(function () {
+      var keys = personKeys_();
+      if (hasLink_(keys, name) && keys[name].hash === hash) {
+        if (had) keys[name] = prev;
+        else delete keys[name];
+        setPersonKeys_(keys);
+      }
+      return { ok: true };
+    });
+  } catch (e) {
+    undone = null;
+  }
+  if (undone && undone.ok === true) Logger.log("Not sent to " + name + ": " + word + ".");
+  else Logger.log("Not sent to " + name + ": " + word + ". The old link could not be put back (the app was busy), so it no longer works: run mailLinkForPerson" + n + " again later.");
+  return false;
+}
+
+// Mails everyone on the trip a new link of their own (each replaces that
+// person's previous link once the desk has mailed it).
+function mailLinks() {
+  var ready = mailReady_();
+  if (!ready) return;
+  var names = mailNames_();
+  if (!names) return;
+  var sent = 0;
+  var tried = 0;
+  names.forEach(function (name, i) {
+    if (!linkableName_(name)) {
+      Logger.log(name + ": no link made: that name can’t be used. Change it in the People tab.");
+      return;
+    }
+    tried++;
+    if (mailLinkTo_(name, i + 1, ready)) sent++;
+  });
+  Logger.log("Sent " + sent + " of " + tried + " links.");
+  if (getProp_("TRIP_KEY")) Logger.log("The old shared link still works until you run retireSharedLink.");
+}
+
+// The same for person n only.
+function mailLinkFor_(n) {
+  var ready = mailReady_();
+  if (!ready) return;
+  var names = mailNames_();
+  if (!names) return;
+  var name = n >= 1 && n <= names.length ? names[n - 1] : null;
+  if (name === null) {
+    Logger.log("There is no person " + n + " on this trip.");
+    return;
+  }
+  if (!linkableName_(name)) {
+    Logger.log(name + ": no link made: that name can’t be used. Change it in the People tab.");
+    return;
+  }
+  mailLinkTo_(name, n, ready);
+}
+
+function mailLinkForPerson1() { mailLinkFor_(1); }
+function mailLinkForPerson2() { mailLinkFor_(2); }
+function mailLinkForPerson3() { mailLinkFor_(3); }
+function mailLinkForPerson4() { mailLinkFor_(4); }
+function mailLinkForPerson5() { mailLinkFor_(5); }
+function mailLinkForPerson6() { mailLinkFor_(6); }
+
 // Who has a link and since when, links kept for names no longer on the trip,
 // and whether the shared link still works. Never a key.
 function linksStatus() {
