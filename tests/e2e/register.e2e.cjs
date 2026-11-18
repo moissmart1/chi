@@ -90,7 +90,7 @@ module.exports = [
       assert.equal(await disabled(page, "#kGo"), true);
       assert.deepEqual(
         await page.$$eval("#xQuick .chip", (els) => els.map((e) => e.dataset.q)),
-        ["Dinner", "Lunch", "Coffee", "Drinks", "Groceries", "Train", "Taxi", "Flight", "Stay", "Tickets", "Onsen", "Shopping"],
+        ["Dinner", "Lunch", "Coffee", "Drinks", "Groceries", "Train", "Taxi", "Flight", "Stay", "Tickets", "Museum", "Shopping"],
       );
     },
   },
@@ -199,8 +199,8 @@ module.exports = [
       const taxi = await until(() => savedTitled(backend, "Taxi to port")[0], "Taxi to port saved");
       assert.equal(taxi.kind, "");
 
-      await ringUp(page, { chip: "Onsen", seq: "1 5 0 0" });
-      assert.equal((await until(() => savedTitled(backend, "Onsen")[0], "Onsen saved")).kind, "activity");
+      await ringUp(page, { chip: "Museum", seq: "1 5 0 0" });
+      assert.equal((await until(() => savedTitled(backend, "Museum")[0], "Museum saved")).kind, "activity");
       assert.equal(await page.getAttribute("#xWhat", "maxlength"), "80");
     },
   },

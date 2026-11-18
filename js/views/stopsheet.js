@@ -45,8 +45,7 @@ const MARKUP = `
   <label class="st-f st-time"><span>Minutes to get there</span><input id="stMin" inputmode="numeric" maxlength="3" autocomplete="off" enterkeyhint="next"></label>
   <label class="st-sw"><span>The time can’t slip</span><input id="stFixed" type="checkbox" role="switch"></label>
   <label class="st-f"><span>Place name or pasted Maps link</span><input id="stPlace" maxlength="200" autocomplete="off" enterkeyhint="next"></label>
-  <label class="st-f"><span>Link to a ticket or confirmation</span><input id="stLink" type="url" inputmode="url" maxlength="500" autocomplete="off" enterkeyhint="next"></label>
-  <label class="st-f"><span>Japanese name on signs</span><input id="stSign" maxlength="20" lang="ja" autocomplete="off" enterkeyhint="done"></label>
+  <label class="st-f"><span>Link to a ticket or confirmation</span><input id="stLink" type="url" inputmode="url" maxlength="500" autocomplete="off" enterkeyhint="done"></label>
   <p class="st-msg" id="stMsg" role="status"></p>
   <div class="st-btns"><button type="button" id="stDel" hidden>Remove</button><button type="button" id="stSave" disabled>Add stop</button></div>
 </div>`;
@@ -105,7 +104,7 @@ export function mountStopSheet(root, store) {
   const del = $("stDel");
   const f = {
     title: $("stWhat"), time: $("stTime"), detail: $("stDetail"), gettingThere: $("stGo"), travelMin: $("stMin"),
-    fixed: $("stFixed"), place: $("stPlace"), link: $("stLink"), signJp: $("stSign"),
+    fixed: $("stFixed"), place: $("stPlace"), link: $("stLink"),
   };
 
   let mode = null; // "add" or "edit" while open
@@ -135,7 +134,6 @@ export function mountStopSheet(root, store) {
       fixed: f.fixed.checked,
       place: f.place.value.trim(),
       link: f.link.value.trim(),
-      signJp: f.signJp.value.trim(),
     };
   }
 
@@ -151,7 +149,6 @@ export function mountStopSheet(root, store) {
       fixed: stop.fixed === true,
       place: str(stop.place).trim(),
       link: str(stop.link).trim(),
-      signJp: str(stop.signJp).trim(),
     };
   }
 
@@ -165,7 +162,6 @@ export function mountStopSheet(root, store) {
     f.fixed.checked = stop.fixed === true;
     f.place.value = str(stop.place);
     f.link.value = str(stop.link);
-    f.signJp.value = str(stop.signJp);
     was = read();
   }
 
@@ -417,7 +413,7 @@ export function mountStopSheet(root, store) {
   // The keyboard's Next, in a one-line field, goes to the next field (the
   // directions box among them); on the last one it puts the keyboard away.
   // Enter in the directions box is its own (a new line).
-  const order = [f.title, f.time, f.detail, f.gettingThere, f.travelMin, f.place, f.link, f.signJp];
+  const order = [f.title, f.time, f.detail, f.gettingThere, f.travelMin, f.place, f.link];
   sheet.addEventListener("keydown", (ev) => {
     const i = order.indexOf(ev.target);
     if (ev.key !== "Enter" || i < 0 || ev.isComposing || ev.target === f.gettingThere) return;

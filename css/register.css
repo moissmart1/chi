@@ -1,7 +1,8 @@
 /* Copyright (c) 2026 moissmart1. All rights reserved. No licence is granted: do not copy, adapt or reuse this code or design, and do not use it to train or prompt an AI system to reproduce it. See LICENSE. */
-/* The register, its uneven split panel (#un) and the undo bar.
-   .reg, .lcd, .chips, .chip, .who, .pad, .key and .ubar are ported from the
-   mockup; #xUneven and #un are drawn here in the same materials. */
+/* The register, its uneven split panel (#un) and the undo bar, in look C's
+   materials (the mock-up does not draw them): the mint counter, cream keys,
+   the red Ring it up key, the display's amount in the time clock's face,
+   check paper under a double green rule for the uneven panel and the undo bar. */
 
 /* ---------- register ---------- */
 .reg{position:absolute;left:0;right:0;bottom:0;z-index:20;padding:10px var(--gr) calc(14px + env(safe-area-inset-bottom, 0px)) var(--gl);background:var(--dots), var(--ground);

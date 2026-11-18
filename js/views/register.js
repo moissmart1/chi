@@ -25,7 +25,7 @@ export const CHIPS = [
   { label: "Drinks", kind: "food" }, { label: "Groceries", kind: "food" },
   { label: "Train", kind: "transport" }, { label: "Taxi", kind: "transport" }, { label: "Flight", kind: "transport" },
   { label: "Stay", kind: "stay" },
-  { label: "Tickets", kind: "activity" }, { label: "Onsen", kind: "activity" },
+  { label: "Tickets", kind: "activity" }, { label: "Museum", kind: "activity" },
   { label: "Shopping", kind: "shopping" },
 ];
 

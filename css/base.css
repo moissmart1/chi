@@ -187,7 +187,7 @@ i{font-style:normal}
   .net{right:var(--rail)}
   .sheet{max-height:calc(100% - 16px)}
   /* Done stays in reach while a sheet's contents scroll under it: the bar
-     spans the sheet's padding box, so its paper or ticket stock lines up. */
+     spans the sheet's padding box, so its check paper lines up. */
   .sheet-top{position:sticky;top:-12px;z-index:1;margin:-12px calc(var(--gr) * -1) 8px calc(var(--gl) * -1);padding:12px var(--gr) 0 var(--gl);background:inherit}
   /* A sheet waiting below the screen casts no shadow up into it: sideways
      there is no bar along the bottom to hide it. */
@@ -207,14 +207,13 @@ i{font-style:normal}
   :is(.tk,.slip,.rc,.ln,.ubar,.un,.how,.bw-card,.tape,.lcd,.sheet.stay,.sheet.stop,.bk-leg) :focus-visible{outline-color:var(--print)}
 }
 
-/* WIDE: a ticket counter. One block, centred, the window's height, at most
-   1120 px: the day's ticket (Days, or Before in its place) on the left, the
-   money receipt on the right, both in use at once, and the bar as a rail on
-   the right edge (css/money.css) holding what is not a pane. Each pane is
-   half of what the rail leaves, at most 500 px, with a perforation between
-   them. Every sheet opens inside its own pane: the Days sheets over the
-   ticket, the Money ones (the register, a line, History, You) over the
-   receipt. Notices span both panes, never the rail. */
+/* WIDE: the diner's counter. One block, centred, the window's height, at
+   most 1120 px: the day's guest check (Days) on the left, the week's tab on
+   the right, both in use at once, and the bar as a rail on the right edge
+   (css/money.css) holding what is not a pane. Each pane is half of what the
+   rail leaves, at most 500 px, with a tear line between them. Every sheet
+   opens inside its own pane: the Days sheets over the check, the Money ones
+   (the register, a line, History, You) over the tab. Notices span both panes, never the rail. */
 @media (min-width:1000px) and (min-height:521px){
   :root{--rail:104px}
   .phone{width:min(100%, calc(1000px + var(--rail)))}

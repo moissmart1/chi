@@ -126,8 +126,8 @@ const removeDay = (backend, date) => {
   days.splice(i, 1);
 };
 // Everything in the sheet as typed, and whether each field can be changed.
-const sheetFields = (page) => page.evaluate(() => ["stWhat", "stTime", "stDetail", "stGo", "stMin", "stPlace", "stLink", "stSign"].map((id) => [id, document.getElementById(id).value, document.getElementById(id).disabled]));
-const TOWER = { "#stWhat": "Tower Records", "#stTime": "16:00", "#stDetail": "Seven floors", "#stGo": "Walk down Jingumae", "#stMin": "15", "#stPlace": "Tower Records Shibuya", "#stSign": "タワーレコード" };
+const sheetFields = (page) => page.evaluate(() => ["stWhat", "stTime", "stDetail", "stGo", "stMin", "stPlace", "stLink"].map((id) => [id, document.getElementById(id).value, document.getElementById(id).disabled]));
+const TOWER = { "#stWhat": "Tower Records", "#stTime": "16:00", "#stDetail": "Seven floors", "#stGo": "Walk down Jingumae", "#stMin": "15", "#stPlace": "Tower Records Shibuya" };
 async function typeTower(page) {
   await openAdd(page);
   for (const [sel, v] of Object.entries(TOWER)) await page.fill(sel, v);
@@ -306,7 +306,7 @@ module.exports = [
       await openAdd(page);
       const typed = {
         "#stWhat": "Tower Records", "#stTime": "16:00", "#stDetail": "Seven floors of records", "#stGo": "Walk from Shibuya Sky",
-        "#stMin": "15", "#stPlace": "Tower Records Shibuya", "#stLink": "javascript:alert(1)", "#stSign": "タワーレコード",
+        "#stMin": "15", "#stPlace": "Tower Records Shibuya", "#stLink": "javascript:alert(1)",
       };
       for (const [sel, v] of Object.entries(typed)) await page.fill(sel, v);
       await page.click("#stFixed");
@@ -396,16 +396,16 @@ module.exports = [
     },
   },
   {
-    name: "Escape while composing Japanese does not close the sheet",
+    name: "Escape while composing (a keyboard's input method) does not close the sheet",
     async run({ page }) {
       await ready(page);
       await openAdd(page);
-      await page.fill("#stSign", "たわ");
-      await page.evaluate(() => document.getElementById("stSign").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", isComposing: true, bubbles: true })));
+      await page.fill("#stLink", "たわ");
+      await page.evaluate(() => document.getElementById("stLink").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", isComposing: true, bubbles: true })));
       await page.waitForTimeout(100);
       assert.equal(await isOpen(page, "stop"), true);
-      assert.equal(await value(page, "#stSign"), "たわ");
-      await page.press("#stSign", "Escape");
+      assert.equal(await value(page, "#stLink"), "たわ");
+      await page.press("#stLink", "Escape");
       await waitSheetClosed(page);
     },
   },
@@ -436,10 +436,10 @@ module.exports = [
     async run({ page }) {
       await ready(page);
       await openAdd(page);
-      await page.focus("#stSign");
+      await page.focus("#stLink");
       await page.evaluate(() => { document.getElementById("stop").scrollTop = 0; });
       const below = () => page.evaluate(() => {
-        const f = document.getElementById("stSign").getBoundingClientRect();
+        const f = document.getElementById("stLink").getBoundingClientRect();
         return f.bottom > document.getElementById("stop").getBoundingClientRect().bottom;
       });
       assert.equal(await below(), true, "the field starts out of the sheet's view");

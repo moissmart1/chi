@@ -4,7 +4,6 @@
 import { HOME_CURRENCY, HOME_SIGN, TRIP_SIGN } from "./trip.js";
 
 const WD = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const WK = ["日", "月", "火", "水", "木", "金", "土"];
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 const grouped = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
@@ -35,13 +34,13 @@ export function typed(e) {
 const parts = (date) => date.split("-").map(Number); // "2026-12-11" -> [2026, 12, 11]
 const weekday = (y, m, d) => new Date(Date.UTC(y, m - 1, d)).getUTCDay();
 
-// A receipt day heading: { jp, en, city }.
+// A day heading: { en, city } ("Sun Dec 27", and the day's city from the Days rows).
 export function dayHead(day, days) {
-  if (day === "pre") return { jp: "出発前", en: "Before the trip", city: "" };
+  if (day === "pre") return { en: "Before the trip", city: "" };
   const [y, m, d] = parts(day);
   const w = weekday(y, m, d);
   const row = (days || []).find((x) => x.date === day);
-  return { jp: m + "月" + d + "日(" + WK[w] + ")", en: WD[w] + " " + MON[m - 1] + " " + d, city: (row && row.city) || "" };
+  return { en: WD[w] + " " + MON[m - 1] + " " + d, city: (row && row.city) || "" };
 }
 
 // The register's day: "Sat 12", or "Before" for before the trip.
@@ -58,7 +57,8 @@ export function tripSpan(trip) {
   return MON[m1 - 1] + " " + d1 + " to " + (m1 === m2 ? "" : MON[m2 - 1] + " ") + d2;
 }
 
-// The issuer's mark: first letters of the names, in order ("MAT").
+// The people's initials, in order ("MI" for Mo and Izzah). The app's printed
+// mark is its name (js/config.js APP_NAME); this stays for anything that needs the initials.
 export function issuer(people) {
   return people.map((p) => [...String(p.name)][0] || "").join("").toUpperCase();
 }

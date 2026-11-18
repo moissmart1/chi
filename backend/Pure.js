@@ -334,7 +334,7 @@ function validateStay(input) {
   if (typeof input.name !== "string" || input.name.trim() === "") return fail_("Say where you’re staying.");
   var name = input.name.trim();
   if (name.length > 80) return fail_("Keep the name under 80 letters.");
-  var nameJp = optText_(input.nameJp, 80, "Keep the Japanese name under 80 letters.");
+  var nameJp = optText_(input.nameJp, 80, "Keep the second name under 80 letters.");
   if (!nameJp.ok) return nameJp;
   var addressJp = optText_(input.addressJp, 200, "Keep the address under 200 letters.");
   if (!addressJp.ok) return addressJp;

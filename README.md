@@ -10,7 +10,7 @@ It began as a one-time copy of the Japan trip's app (MAT). The two share no code
 - **Backend:** one Google Apps Script web app bound to a Google Sheet (`backend/`). The Sheet is the database.
 - **Access:** a trip key, carried in the invite link after `#k=`. The key lives only in the script's Script Properties and in the links people are sent. It is never in this repo.
 
-The trip side: **Days** shows one ticket per trip day (its stops, the stay for the night, a card to show a driver) and a stop sheet to add, change or remove stops. You has **Try another day**, a demo clock that shows Days as it will look on a chosen day; a reload or Stop ends it.
+The trip side: **Days** shows one guest check per trip day (its stops, the stay for the night, a card to show a driver) and a stop sheet to add, change or remove stops. You has **Try another day**, a demo clock that shows Days as it will look on a chosen day; a reload or Stop ends it.
 
 ## The trip's fixed facts
 
@@ -82,7 +82,7 @@ Deploy to the same deployment id every time, or the address in `js/config.js` st
 
 The backend is also an MCP server, so someone's Claude can read the trip and make changes in it.
 
-- **It can:** read the trip (`get_trip`), explain who owes whom and why (`explain_debt`), add an expense, add, change or remove stops, save or remove a stay, change a day's ticket (`set_day`), and read History and undo an entry. Every change goes through the same checks as the app, is logged in History marked "(through Claude)", and can be undone.
+- **It can:** read the trip (`get_trip`), explain who owes whom and why (`explain_debt`), add an expense, add, change or remove stops, save or remove a stay, change a day's check (`set_day`), and read History and undo an entry. Every change goes through the same checks as the app, is logged in History marked "(through Claude)", and can be undone.
 - **It cannot:** stamp payments or press stamps, see or change e-Transfer addresses or emails, see or set anyone's picture, see the trip key or its own token, copy invite links, or change who is on the trip. Replies never contain the key, the token, an e-Transfer address or an email.
 - **The link:** You → Claude link → Copy. Anyone who has the invite link can copy it, and everyone's Claude link carries the same token. Treat it like the invite link: whoever has it can change the plan and add expenses. `as=` in the link names who the changes are logged as.
 - **Changing the token:** in the script editor, Project Settings → Script Properties, delete `CLAUDE_TOKEN` and run `migrate` to make a new one. Every Claude link copied before stops working.
@@ -95,11 +95,17 @@ The Japan app could pull payments and a "Before we go" list from a separate plan
 
 Money is kept in integer cents. A line is in US dollars (the trip's currency) or Canadian dollars (home), and every line carries the day's rate (US dollars per Canadian dollar, kept to four decimals, fetched from open.er-api.com at most once a Chicago day and accepted only between 0.5 and 1.0). When no rate has ever been fetched the app uses a stand-in 0.72 and says so above the slip. Debts are always in Canadian dollars. With two people there is at most one debt; the Simplify switch shows only with three or more people.
 
-## The stamp book
+## The look
 
-A book of stamps that each person presses by hand: one per trip day, and an issue stamp for the book itself. It opens from the stamp button on the Days bar or from the line on today's ticket. A press is a History line ("Mo stamped Dec 28") and can be undone from History.
+Look C, "The guest check" (Izzah's pick, 2026-11-18): each day is a diner guest check, Money is the week's tab that goes on the spindle when it is paid, and the keepsake is a souvenir placemat with a stamp a day. The faces are Libre Franklin, Zilla Slab and VT323 from Google Fonts. The Home Screen icons are drawn by `node scripts/make-icons.cjs` (needs local Chrome); run `npm run stamp` afterwards.
 
-**The definitions are data, not code.** The `StampDefs` tab (made by `setup` or `migrate`) has one row per stamp: `id`, `date` (`YYYY-MM-DD`, or empty for the issue stamp), `name_ja`, `name_en`, `place`, `motif` (one of `lantern, books, onsen, temple, mountain, snow, lamp, tower, record, sake, plane, crest`; any other word draws the ring with no drawing), `ink` (`shu`, `matsu` or `ai`) and `shape` (`round` or `square`).
+## The placemat
+
+A souvenir placemat of Chicago that each person stamps by hand: one spot per trip day, and the placemat's own stamp. It opens from the Placemat pill on the Days top line or from the line on today's check. A press is a History line ("Mo stamped Dec 28") and can be undone from History.
+
+**The definitions are data, not code.** The `StampDefs` tab (made by `setup` or `migrate`) has one row per stamp: `id`, `date` (`YYYY-MM-DD`, or empty for the placemat's own stamp), `name_ja` (kept, not printed), `name_en` (printed round the stamp), `place` (where the spot goes on the map and its label), `motif` (kept, not drawn: the date is the picture), `ink` (`shu` red, `matsu` green or `ai` blue) and `shape` (`round` or `square`; Dec 31 is always the fireworks burst).
+
+**Where a spot goes.** These places have their own spot on the hand-drawn map: O'Hare, Midway, Uptown, Andersonville, Wrigleyville, Lakeview, Lincoln Park, Logan Square, Wicker Park, Bucktown, The River, Gold Coast, Old Town, River North, Streeterville, Magnificent Mile, Navy Pier, West Loop, The Loop, Millennium Park, Grant Park, South Loop, Museum Campus, Chinatown, Pilsen, Hyde Park (`js/stampbook.js` `PLACES`). Any other place, or a second day in the same place, takes the next free spot.
 
 **When a stamp is open** is decided in Chicago time (fixed UTC−6), by the backend's `stampWindow` and the app's copy of it (`js/stampbook.js`): a day stamp from 00:00 on its date until 03:00 the next day (27 hours), so the Dec 31 stamp can still be pressed until 3 a.m. on New Year's Day; the issue stamp from the start until the last day stamp closes. A press made offline counts when the phone's own time for it falls inside the window and it arrives within 48 hours.
 

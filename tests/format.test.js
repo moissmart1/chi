@@ -21,10 +21,11 @@ test("typed shows the figure as entered", () => {
 });
 
 test("dayHead", () => {
-  assert.deepEqual(dayHead("pre", []), { jp: "出発前", en: "Before the trip", city: "" });
-  assert.deepEqual(dayHead("2026-12-27", [{ date: "2026-12-27", city: "Tokyo" }]), { jp: "12月27日(日)", en: "Sun Dec 27", city: "Tokyo" });
-  assert.deepEqual(dayHead("2026-12-26", [{ date: "2026-12-26", city: "" }]), { jp: "12月26日(土)", en: "Sat Dec 26", city: "" });
-  assert.deepEqual(dayHead("2026-12-29", []), { jp: "12月29日(火)", en: "Tue Dec 29", city: "" });
+  // English only: no Japanese date is worked out any more.
+  assert.deepEqual(dayHead("pre", []), { en: "Before the trip", city: "" });
+  assert.deepEqual(dayHead("2026-12-27", [{ date: "2026-12-27", city: "West Loop" }]), { en: "Sun Dec 27", city: "West Loop" });
+  assert.deepEqual(dayHead("2026-12-26", [{ date: "2026-12-26", city: "" }]), { en: "Sat Dec 26", city: "" });
+  assert.deepEqual(dayHead("2026-12-29", []), { en: "Tue Dec 29", city: "" });
 });
 
 test("issuer is the first letters of the names in order", () => {

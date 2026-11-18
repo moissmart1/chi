@@ -49,7 +49,7 @@
 /* While the sheet is open the undo bar sits at the top, clear of its buttons. */
 .phone.line-open .ubar{top:calc(12px + env(safe-area-inset-top, 0px));bottom:auto}
 
-/* ---------- Settings (#you), ported from the mockup's .set rules ---------- */
+/* ---------- Settings (#you): cream keys on the mint counter ---------- */
 .set{display:grid;gap:6px}
 .set-h{color:var(--grn);font-family:var(--slab);font-size:14px;font-weight:600}
 /* As .who-pick: a third of the row each, two centred. */
@@ -120,7 +120,7 @@ button.set-r:active,a.set-r:active{background:var(--key-hi);transform:translateY
 
 /* An open Days sheet (the hotel card, the all-days list) sits a layer above
    every other sheet, so the shadow a closed sheet casts up from below the
-   phone never shades its ticket stock. */
+   phone never shades its check paper. */
 #stay.is-open,#allDays.is-open,#stop.is-open{z-index:26}
 /* While a Days sheet is open the undo bar sits at the top. */
 .phone.stay-open .ubar,.phone.days-open .ubar,.phone.stop-open .ubar{top:calc(12px + env(safe-area-inset-top, 0px));bottom:auto}

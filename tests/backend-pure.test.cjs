@@ -408,7 +408,7 @@ test("validateStay", () => {
   assert.equal(P.validateStay({ ...stay, id: "x" }).message, "That stay has a bad id.");
   assert.equal(P.validateStay({ ...stay, firstNight: "nope" }).message, "Pick the first and last night.");
   assert.equal(P.validateStay({ ...stay, name: "x".repeat(81) }).message, "Keep the name under 80 letters.");
-  assert.equal(P.validateStay({ ...stay, nameJp: "x".repeat(81) }).message, "Keep the Japanese name under 80 letters.");
+  assert.equal(P.validateStay({ ...stay, nameJp: "x".repeat(81) }).message, "Keep the second name under 80 letters.");
   assert.equal(P.validateStay({ ...stay, addressJp: "x".repeat(201) }).message, "Keep the address under 200 letters.");
 });
 test("validateStay: an optional https photo, like a stop's", () => {
