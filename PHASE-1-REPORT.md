@@ -13,7 +13,7 @@ Survey: `triplit/docs/superpowers/specs/2026-11-17-second-trip-survey.md`.
 - [x] 5. The trip's own seed
 - [x] 6. No planner
 - [x] 7. Japanese words in the interface
-- [ ] 8. README and PHOTO-CREDITS
+- [x] 8. README and PHOTO-CREDITS
 - [ ] Finish: stamp, unit, full e2e, screenshots, this report
 
 ## What changed, per item
@@ -77,6 +77,10 @@ Survey: `triplit/docs/superpowers/specs/2026-11-17-second-trip-survey.md`.
 - Kept only the English half of every two-language label: the bar (Days, Money, You; Before has no Japanese line), sheet titles (You, History, Where you sleep), the History button, the receipt's day headings, subtotal (`Subtotal`), `Total`, `Each, about`, the foot (`Thank you, come again.`), the slip's title (`Trip settlement`), the ticket's `1-Day Ticket`, `Tonight`, `Fixed time`, `Directions ↗` / `Map ↗`, the date row's `Good for this day only` / `Valid in N days`, the driver card's `Please take me here.`, the stop sheet's day line and "The time can’t slip", the How-this-works line ("from You"), the (hidden) Before list's title.
 - MY CALLS: three labels had no English half: `こんど` (the next stop's tag) became `Next`, `レシート No.` became `Receipt No.`, and `当日限り有効` on the date row became `Good for this day only` (the survey's pair for it; the ticket's foot already says the same, so it now reads twice: a look question for phase 2).
 - Untouched, as the plan says: the 済 stamp and its ghost, the stamp book's kanji (スタンプ帳, 記念スタンプ帳, 今日, 発行), the kanji ornaments; also the ticket foot's issue line `… MI発行 00003-01` (treated as an ornament) and data fields that may hold Japanese (line_jp, from_jp/to_jp, sign_jp, name_jp, address_jp: the Sheet decides). Japanese web fonts still load. `format.js dayHead()` still computes the Japanese date, unprinted.
+
+### 8. README and photo credits
+- README rewritten for this trip: what it is, the fixed facts and the Trip-tab check, "not connected yet", running and testing (with `MAT_PORT`), the one-time backend set-up from survey section 5 with the owner-only steps marked **owner**, later deploys, the Claude connector (11 tools, no sync_payments), "No planner", money, the stamp book in Chicago time, the Sheet. No ids, addresses or links of the live apps.
+- `PHOTO-CREDITS.md`: the Japan photos removed; an empty table for this trip's.
 
 ## Tests deleted (and why)
 

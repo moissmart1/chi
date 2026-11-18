@@ -1,14 +1,24 @@
-# MAT
+# CHI
 
 **Copyright (c) 2026 moissmart1. All rights reserved.** This is a private application; the source is public only because the host that serves it requires that. No licence is granted to copy, adapt or reuse it, or to use it as AI training data. See [LICENSE](LICENSE).
 
-A phone web app for three friends splitting the costs of one trip. You ring up what you paid, it prints on a shared receipt, and a slip at the bottom says who owes whom. Every change goes into History and can be undone; nothing is ever erased.
+A phone web app for Mo and Izzah's Chicago trip, Saturday Dec 26 2026 to Friday Jan 1 2027. You ring up what you paid (in US dollars, or Canadian), it prints on a shared receipt, and a slip at the bottom says who owes whom, in Canadian dollars. Every change goes into History and can be undone; nothing is ever erased. "CHI" is a working name.
+
+It began as a one-time copy of the Japan trip's app (MAT). The two share no code from here on, and this one keeps its own storage keys, caches, Sheet, script and key, so both can be open in the same browser.
 
 - **Front end:** plain HTML, CSS and ES modules. No build step. Served by GitHub Pages from the root of `main`.
 - **Backend:** one Google Apps Script web app bound to a Google Sheet (`backend/`). The Sheet is the database.
 - **Access:** a trip key, carried in the invite link after `#k=`. The key lives only in the script's Script Properties and in the links people are sent. It is never in this repo.
 
-The trip side: **Days** shows one ticket per trip day (its stops, the hotel for the night, a hotel card to show a taxi driver) and a stop sheet to add, change or remove stops. Settings has **Try another day**, a demo clock that shows Days as it will look on a chosen day; a reload or Stop ends it.
+The trip side: **Days** shows one ticket per trip day (its stops, the stay for the night, a card to show a driver) and a stop sheet to add, change or remove stops. You has **Try another day**, a demo clock that shows Days as it will look on a chosen day; a reload or Stop ends it.
+
+## The trip's fixed facts
+
+The time zone (America/Chicago, a fixed UTC−6 for the whole trip), the currencies (US dollars on the trip, printed `US$`; Canadian dollars at home, printed `$`) and the trip's dates are in `js/trip.js`, with the same values at the top of `backend/Pure.js`; `npm test` fails when the two differ. The Sheet's Trip tab has `tz`, `home` and `currency` too: they must say `America/Chicago`, `CAD` and `USD`. The backend refuses to load a Sheet that says anything else (the phone shows the reason), so editing those cells never changes the app's zone or money.
+
+## Not connected yet
+
+There is no Sheet or script for this trip yet. Until there is, `API_URL` in `js/config.js` is empty and the app says "This app isn’t connected yet." and asks nothing of anyone.
 
 ## Run it
 
@@ -16,10 +26,10 @@ The trip side: **Days** shows one ticket per trip day (its stops, the hotel for 
 npm install
 npm run serve     # http://localhost:4173
 npm test          # unit tests
-npm run e2e       # click-through tests in a headless browser (about four minutes)
+npm run e2e       # click-through tests in a headless browser (a few minutes)
 ```
 
-The click-through tests use a fake backend and never call the real one. They use port 4173, so run one at a time.
+The click-through tests use a fake backend and never call the real one. They use port 4173; set `MAT_PORT` to use another (two checkouts testing at once need two ports): `MAT_PORT=4187 node tests/e2e/run.cjs`, or `node tests/e2e/run.cjs register` for the files whose names contain a word.
 
 ## Changing the front end
 
@@ -31,146 +41,92 @@ npm run stamp
 
 `npm test` fails if you forget. Phones pick up the new version the next time the app is opened.
 
-## Changing the backend
+`backend/Money.js` is generated from `js/money.js` by the same command. Do not edit it by hand; `npm test` fails if it has drifted.
 
-`backend/` is pushed with [clasp](https://github.com/google/clasp). `.clasp.json` (which names the script) is not in this repo.
+## Setting up the backend (once)
+
+Steps marked **owner** need Mo at the keyboard, signed in to his Google account: nobody else can create the Sheet or grant the script its permissions.
+
+1. **owner** Create a new Google Sheet for this trip. The script must be bound to it (every helper uses `getActiveSpreadsheet()`). Set the Sheet's File → Settings → Time zone to Chicago (Central), or hand-typed dates can shift a day.
+2. **owner** Turn on the Apps Script API (script.google.com/home/usersettings) and sign in with `clasp login`. Create the bound script from this folder: `clasp create --type sheets --title CHI --rootDir backend` makes a new Sheet and script together, or bind one to the Sheet from step 1 (Extensions → Apps Script) and write its id into a new `.clasp.json`. Never copy a `.clasp.json` from another app: it names that app's live script.
+3. Push the backend: `clasp push -f` (it sends `backend/*.js` and `backend/appsscript.json`; `appsscript.json` already says `America/Chicago`).
+4. **owner** Run `setup` once from the script editor. It makes every tab, writes the trip (name Chicago 2026, Dec 26 to Jan 1, CAD and USD, America/Chicago), Mo and Izzah, and seven Days rows in Chicago with no titles; makes the trip key and the Claude connector's token; deletes a blank Sheet1; and fetches today's US dollar rate (it stops with a plain error if the rate site refuses Google). The first run shows Google's consent screen for the two permissions (this Sheet only; outside requests) and the "Google hasn't verified this app" warning.
+5. **owner** Run `showInvite` and read the trip key from the Execution log.
+6. Fill in the plan: day titles, stops and stays, through the app, Claude, or the Sheet (see "Typing into the Sheet" below). Type `StampDefs` rows if the stamp book is wanted.
+7. Deploy as a web app: execute as me, access Anyone (`clasp create-deployment -d "first"` after step 4 granted the permissions; a deployment whose permissions were never granted fails for everybody). The deployment's `/exec` address is the backend's address.
+8. Put that address into `API_URL` in `js/config.js`, `npm run stamp`, commit, and publish (step 9).
+9. **owner** Create the GitHub repository for this app and turn on Pages from `main`. Its address must not be the Japan app's.
+10. Run `migrate` once to confirm the Sheet is current (it should answer `added: []` on a fresh Sheet), from a terminal, with the trip key in an environment variable (never typed into a file or a script):
+
+    ```bash
+    read -rs CHI_KEY && export CHI_KEY        # paste the trip key, then Enter
+    curl -sL -H 'Content-Type: text/plain;charset=utf-8' \
+      --data "{\"key\":\"$CHI_KEY\",\"action\":\"migrate\"}" \
+      "https://script.google.com/macros/s/<deployment id>/exec"
+    unset CHI_KEY
+    ```
+
+11. **owner** Send the invite link (`<site>#k=<key>`) to Izzah. The Sheet itself only needs sharing if she should open it; the app does not need that.
+12. Optional: the Claude connector (below).
+
+### Changing the backend later
 
 ```bash
 clasp push -f
 clasp create-deployment -i <deployment id> -d "what changed"
 ```
 
-Deploy to the same deployment id every time, or the address in `js/config.js` stops matching.
-
-First-time setup on a new Sheet: run `setup` once from the script editor (it creates the tabs, the people, the days and the trip key), then `showInvite` to read the key from the log.
-
-`backend/Money.js` is generated from `js/money.js` by `npm run stamp`. Do not edit it by hand; `npm test` fails if it has drifted.
-
-### migrate
-
-`migrate` brings an older Sheet up to date: it adds any column the code expects that a tab's header row lacks (at the end, bold, formatted as setup formats it) and creates the Claude connector's token if there is none. It never changes what is in a data row and does not move `rev`. It is safe to run twice: the second run adds nothing and answers `[]`.
-
-Run it once after pushing new backend code, from a terminal, with the trip key in an environment variable (never typed into a file or a script):
-
-```bash
-read -rs MAT_KEY && export MAT_KEY        # paste the trip key, then Enter
-curl -sL -H 'Content-Type: text/plain;charset=utf-8' \
-  --data "{\"key\":\"$MAT_KEY\",\"action\":\"migrate\"}" \
-  "https://script.google.com/macros/s/<deployment id>/exec"
-unset MAT_KEY
-```
-
-It answers `{"ok":true,...,"data":{"added":[...]}}` with the columns it added, for example `["Stays.deleted_at"]`.
+Deploy to the same deployment id every time, or the address in `js/config.js` stops matching. Run `migrate` (above) after pushing code that adds a column.
 
 ## The Claude connector
 
 The backend is also an MCP server, so someone's Claude can read the trip and make changes in it.
 
-- **It can:** read the trip (`get_trip`), explain who owes whom and why (`explain_debt`), add an expense, add, change or remove stops, save or remove a stay, change a day's ticket (`set_day`), read History and undo an entry, and bring in payments from the planner sheet (`sync_payments`, below). Every change goes through the same checks as the app, is logged in History marked "(through Claude)", and can be undone.
-- **It cannot:** stamp payments, see or change e-Transfer addresses or emails, see or set anyone's picture (`get_trip` only says `has_picture` for each person), see the trip key or its own token, copy invite links, or change who is on the trip. (Its undo works on any History entry, as Undo in the app does, except a change to someone else's picture.) Replies never contain the key, the token, an e-Transfer address or an email.
-- **The link:** Settings → Claude link → Copy. Anyone who has the invite link can copy it, and everyone's Claude link carries the same token: one token for the whole trip.
-- **The token sits in the connector's address** (`?t=…`). Treat the Claude link like the invite link: whoever has it can change the plan and add expenses.
-- **`as=`** in the link names who the changes are logged as (the person who copied it). A name that matches no one on the trip blocks every write until the link is copied again; with no `as=`, changes are logged as the first person.
-- **Changing the token:** in the script editor, Project Settings → Script Properties, either edit `CLAUDE_TOKEN` to a new long random value, or delete it and run `migrate` (above) to make a new one. Every Claude link copied before stops working; each person copies theirs again from Settings.
+- **It can:** read the trip (`get_trip`), explain who owes whom and why (`explain_debt`), add an expense, add, change or remove stops, save or remove a stay, change a day's ticket (`set_day`), and read History and undo an entry. Every change goes through the same checks as the app, is logged in History marked "(through Claude)", and can be undone.
+- **It cannot:** stamp payments or press stamps, see or change e-Transfer addresses or emails, see or set anyone's picture, see the trip key or its own token, copy invite links, or change who is on the trip. Replies never contain the key, the token, an e-Transfer address or an email.
+- **The link:** You → Claude link → Copy. Anyone who has the invite link can copy it, and everyone's Claude link carries the same token. Treat it like the invite link: whoever has it can change the plan and add expenses. `as=` in the link names who the changes are logged as.
+- **Changing the token:** in the script editor, Project Settings → Script Properties, delete `CLAUDE_TOKEN` and run `migrate` to make a new one. Every Claude link copied before stops working.
 
-## Payments from a planner sheet
+## No planner
 
-The app can bring in payments kept in a separate Google Sheet (the "planner"), on request: Settings → Planner payments → Fetch, or Claude's `sync_payments`. Nothing runs on a timer. The backend reads the planner; the only thing it ever writes there is a "Before we go" tick (below).
+The Japan app could pull payments and a "Before we go" list from a separate planner sheet. This trip has none, and the backend no longer has that code, so the script needs no permission beyond its own Sheet. `load` always says no planner is linked, and the phone's Before tab and Planner payments row never appear.
 
-**The tab.** The planner needs a tab named `Payments`, with column names in row 1 (any order): `payment_id, date_paid, payer, description, category, vendor, booking_ref, amount, currency, amount_cad, cad_is_exact, split_between, split_type, status, include_in_split, source, added_by, notes`. `split_between` is a comma list of names; `split_type` is `equal` or `personal`.
+## Money
 
-**The rule.** Only rows whose `include_in_split` is `yes` come in, and only equal splits between people on the trip. A new payment becomes an expense (in Canadian dollars when `amount_cad` is filled, otherwise in its own yen or dollars) whose note starts with the payment's id. The two are tied by the Expenses tab's `planner_id` column, which only a pull writes and the app never shows; editing the line's note does not untie it. A line rung up by hand whose note starts with a payment id that is in the planner (for example `X7 · North Rail · ref AB12`) is tied the first time a pull sees it. A payment id has at least one letter and one digit. The planner owns a payment's title, amount, currency, payer, split and note: a later pull brings those back in line with it. The app owns the day and kind. An expense deleted in the app is never brought back, a payment taken out of the split leaves its expense alone, and nothing is ever deleted by a pull. Every change is logged in History marked "(from the planner)" and can be undone. Undoing a change the planner made (not an add) only lasts until the next pull, which sets it back: to keep a different value, change it in the planner. Undoing an add removes the line, and the planner does not bring it back. A payment that can't be brought in (or is no longer in the planner, or is carried by two lines) is skipped and counted ("1 payment needs a look in the planner."). One pull adds or changes at most 10 expenses; when more remain it says so, and the next tap brings the next 10. Only the first 300 payment rows are read.
-
-**Setting it up,** in this order:
-
-1. Push this backend (`clasp push -f`).
-2. In the script editor, run `checkPlanner` once. Google asks for the Sheets permission (`spreadsheets`, below) for the account the web app runs as, which must be able to open the planner; the log then says no planner is linked yet.
-3. Update the deployment (`clasp create-deployment -i <deployment id> ...`, above).
-4. Run `migrate` (above): it adds the `planner_id` column to the Expenses tab. Until then a pull is refused with "The trip sheet needs updating first."
-5. Send `linkPlanner` from a terminal, with the trip key and the planner's spreadsheet id (the long part of its address between `/d/` and `/edit`) in environment variables, never typed into a file:
-
-   ```bash
-   read -rs MAT_KEY && export MAT_KEY          # paste the trip key, then Enter
-   read -rs PLANNER_ID && export PLANNER_ID    # paste the planner's spreadsheet id, then Enter
-   curl -sL -H 'Content-Type: text/plain;charset=utf-8' \
-     --data "{\"key\":\"$MAT_KEY\",\"action\":\"linkPlanner\",\"args\":{\"id\":\"$PLANNER_ID\"}}" \
-     "https://script.google.com/macros/s/<deployment id>/exec"
-   unset MAT_KEY PLANNER_ID
-   ```
-
-   It answers `{"ok":true,...,"data":{"linked":true}}`. The id is kept only in the Script Property `PLANNER_ID`: never in a reply, the Log or History. `linkPlanner` works only while no planner is linked; it answers "A planner is already linked." otherwise.
-6. Run `checkPlanner` again: the log says how many payment rows and Book Now items it found, or which column is missing, and whether the Change Log is there.
-
-**Changing or unlinking it.** In the script editor, Project Settings → Script Properties, delete `PLANNER_ID` (then `linkPlanner` again to link another sheet). With none linked, the Settings row goes away on the next load; expenses already brought in stay.
-
-## Before we go (bookings and prep from the planner)
-
-The app's "Before we go" list is the planner's `Book Now` tab: bookings and prep to finish before the trip. Items are added and edited only in the planner. In the app someone can say "I'll do it" and tick an item off; a tick also marks it `Booked` in the planner.
-
-**The planner's tabs.** `Book Now`: the header is the first row with cells named `#`, `Item`, `Book by` and `Status` (any case); `Notes` and `Booking link` are used when there. Rows above the header, rows with no `Item`, and rows whose `#` is not a whole number (a footnote line) are skipped; a `#` that appears twice keeps its first row. `Book by` is read as `2026-12-05`, `Dec 5`, `Dec 5, 2026`, `5 Dec` or a date cell (no year means the trip's year); anything else is no date. A link is kept only when it is a plain `https://` address. `Change Log`: the header is the first row with `#`, `Tab`, `Old value` and `New value`; a tick appends one row there and fills `#`, `Date / time` (Toronto time), `Agent / session`, `Tab`, `Cell(s)`, `Item`, `Old value`, `New value`, `Why`, `Proof / source` and `Verified?` where those columns exist.
-
-**The Todos tab** in this Sheet holds the list: `id` (the planner's `#`), `item`, `book_by`, `status` (the planner's word as last read), `note`, `link`, `claimed_by`, `ticked_by`, `ticked_at`, `planner_written` (below), `gone` (`yes` when the planner no longer lists it), plus `ticked_item` (the item's text when ticked: the tick is bound to it) and `planner_was` (the planner's status when the app wrote Booked, put back by an undo). All text. `planner_written` is one of four values: empty (nothing written: an untouched item, or a tick the planner has not taken yet, which a pull retries); `yes` (the planner took the tick: the app wrote `Booked` there); `formula` (the planner computes that Status, by a formula in the cell or one spilled into it from another cell, as a read of the cell showed; a cell that can't be read is planner trouble like any other, so the tick stays pending and is retried; the tick stays in the app only and the planner is never written for it); `undo` (the tick was undone in the app but putting the old status back in the planner has not gone through yet: the planner still holds the app's `Booked`, the row shows `planner_was` and is not done, and each pull tries the put-back again). An item is done when its status starts with "booked" or someone ticked it. Rows are never deleted. Do not edit it by hand: a pull rewrites the planner's columns.
-
-**The three actions.**
-
-- `syncTodos` (`{ force }`): pulls the Book Now tab, at most once in 10 minutes unless `force` is true; updates changed items, adds new ones and marks missing ones gone, at most 15 rows per pull (it answers `more: true` when rows remain, and the next pull carries on). It writes no History, except one line when it takes a tick or claim off (below). It then retries up to two ticks the planner has not taken yet or undone ticks whose old status it has not taken back yet (`planner_written` `undo`), taking turns. It answers the list, when it last pulled, and any problems (a `#` used twice, a tick or claim taken off); a planner it can't read is refused as for payments, with the stored list still in the reply.
-- `tickTodo` (`{ id }`): saves the tick in this Sheet first (one History entry, "Mo ticked off: …", undoable). Then, best effort, it re-reads the planner and, only if that row still has the same `#` and `Item` and is not already booked, writes `Booked` into its Status cell and appends one Change Log row (if the Change Log can't be found, nothing is written; if the log row fails, the old Status is put back). It answers `planner: "written"` or `"pending"`; a pending tick stands in the app and the next pull tries again. Once written it is never written again. Undoing a written tick puts the old status back in the planner (and logs it there) when the row still says exactly `Booked` (else `planner: "kept"`); if the planner can't be written then, the app's undo still happens, the put-back is owed (`planner_written` `undo`), History says once "The planner still says Booked for this one; the app will put it back at the next fetch.", and each pull tries it again (the item meanwhile shows its old status, not done). Ticking it again while that is owed takes back the planner's `Booked` as it is, with nothing written there.
-- `claimTodo` (`{ id, on }`): `on: true` puts the person on it (taking it from whoever had it); `on: false` hands it back, only if it is theirs. Each is a History entry ("Mo is on: …", "Mo took over: …, from Ajen", "Mo handed back: …") and can be undone. A done item can't be claimed.
-
-`load` returns the list (`todos`, without gone items) and `todosPulledAt`; it never reads the planner. Claude's `get_trip` lists the open items and counts the done ones.
-
-**On the phone** (the Before tab, js/views/todos.js). The list has its own tab, `Before` (出発前), a key in the bottom bar (a row of machine keys: with it, Days, Before, Ring up, Money, You, Ring up in the middle; without it, Days, Money, You, Ring up, four even keys; a lamp on the current key), with a small count of open items on it (its accessible name reads `Before we go, 18 open`). Its top bar says 出発前 Before we go and `18 open`. Under it: open items first, earliest book-by date first (undated last), each with the seal of whoever is on it, and a due line counted on the Toronto calendar (`by Sat Dec 5 · in 19 days`, `tomorrow`, `today`, or in red `was due … · 2 days late`). Tapping a row opens it: the note, `Open the booking ↗` (when there is a link), `I’ll do it` / `Take it over` / `Hand it back`, and `Tick it off`, which lands the settle slip's 済 stamp with its thud and moves the item to the folded `済 Done (n)` group, which is folded again the next time the tab is shown. The tab is in the bar always before the trip's first day, even with nothing open; from the first day on only while at least one item is open (if it goes while you are on it, you land on Days); with no planner linked, or no items, there is no tab. Days shows nothing of the list. The phone fetches the list by itself when it starts and when the Before tab is shown, if the last fetch is an hour old or more (quietly; it speaks up only when that fails twice in a row); `Fetch` at the foot of the list fetches it at once. A tick or claim is shown at once and rolled back with the usual notice when the backend refuses it or there is no signal; History lists each one with Undo.
-
-**The permission, and why.** A tick writes to the planner, which is a different spreadsheet from this one. Google has no permission for writing one other spreadsheet: the script needs the full Sheets permission (`https://www.googleapis.com/auth/spreadsheets`, in place of `spreadsheets.readonly`). That permission lets this script read and edit **any** spreadsheet the owner's account can open, not only the planner. Only the owner can grant it, by running `checkPlanner` in the script editor. The code itself only ever writes, to the planner and nowhere else, one Status cell and one Change Log row per tick or undone tick.
-
-**Keeping the planner safe.** A tick is bound to the item's text when it was ticked: it is written only to the row whose `#` is the item's and whose `Item` is still that text, found on a read made just before the write. If the planner puts another item under that `#`, the next pull takes the tick (and anyone's "I'll do it") off that row, never writes for it, and History says so once ("The planner changed “…”: the tick was taken off"; this line can't be undone). An undo puts back the status the planner had when the app wrote Booked, and only while the planner still says exactly `Booked`; anything else (for example `Booked - conf JR123`) is someone's later edit and is left alone (`planner: "kept"`). Nothing done through the Claude connector writes to the planner: it cannot tick an item ("Tick this one in the app.") or undo its way back to a tick ("Undo this one in the app."), though it can undo a tick: the tick comes off in the app and the put-back is left to the next pull (`planner: "pending"`). If the app cannot record a Booked it has just written, it takes it back out of the planner; if even that fails, History says the item was left marked Booked in the planner, for someone to check by hand. Planner reads and writes run under their own lock, never while the app's own lock is held; a pull retries at most two pending ticks or owed put-backs, put-backs then the oldest tick first, taking turns, and is complete whatever those retries do; a forced pull within 30 seconds of the last one answers the stored list without reading the planner (marked `stored: true`).
-
-**Deploying it,** in this order (a deployment that needs a permission nobody has granted stops working for everyone):
-
-1. Push this backend (`clasp push -f`).
-2. The owner runs `checkPlanner` in the script editor and approves the Sheets permission; running it again logs the Book Now count, how many Status cells are formulas (a formula in the cell, or a value spilled into it by an array formula in another cell; if a cell can't be checked it says so instead of a count), and whether the Change Log was found. Pre-flight, before going on: the Book Now count equals the real tab; `checkPlanner` reports 0 formula Status cells (or the owner accepts that those items stay untouched: the app never writes over a formula, it records the tick in the app only, answers `planner: "kept"` and History says "The planner computes this one’s Status, so it was left alone."); and the Change Log has no blank rows (the row is added with Sheets' own append, which never overwrites a row, but a blank row inside the Change Log can take the new row: keep the log free of blank rows).
-3. Update the deployment on the same deployment id (`clasp create-deployment -i <deployment id> ...`).
-4. Run `migrate` (above): it adds the `Todos` tab (or its `ticked_item` and `planner_was` columns). Until then `syncTodos`, `tickTodo` and `claimTodo` are refused with "The trip sheet needs updating first."
-5. Pull once: `syncTodos` with `{"force":true}` (the app's Fetch, or curl as for `migrate`, with an `actor`).
-6. Check a real write: add a test row to the planner's Book Now tab, fetch, tick it in the app, then undo the tick. Look at the planner: the row's Status should read `Booked` after the tick and its old value after the undo, and the Change Log should have exactly two new rows, directly under the last one. Then delete the test row from the planner by hand.
-7. Last: publish the front end (merge to `main` / push to Pages, `APP_VERSION` 6) only after the backend's new version is live, `migrate` has run and one forced `syncTodos` has answered.
+Money is kept in integer cents. A line is in US dollars (the trip's currency) or Canadian dollars (home), and every line carries the day's rate (US dollars per Canadian dollar, kept to four decimals, fetched from open.er-api.com at most once a Chicago day and accepted only between 0.5 and 1.0). When no rate has ever been fetched the app uses a stand-in 0.72 and says so above the slip. Debts are always in Canadian dollars. With two people there is at most one debt; the Simplify switch shows only with three or more people.
 
 ## The stamp book
 
-A book of twelve stamps that each person presses by hand: one per trip day, and an issue stamp for the book itself. It opens from the stamp button on the Days bar (a small ring and how many stamps you have) or from the line on today's ticket ("Today's stamp is open"), as a panel like History. Nothing here is money: a press is a History line ("Mo stamped Dec 12", or "Mo stamped the book") and can be undone from History, which lifts the stamp.
+A book of stamps that each person presses by hand: one per trip day, and an issue stamp for the book itself. It opens from the stamp button on the Days bar or from the line on today's ticket. A press is a History line ("Mo stamped Dec 28") and can be undone from History.
 
-**The definitions are data, not code.** The `StampDefs` tab (made by `migrate`) has one row per stamp: `id`, `date` (`YYYY-MM-DD`, or empty for the issue stamp), `name_ja`, `name_en`, `place`, `motif` (one of `lantern, books, onsen, temple, mountain, snow, lamp, tower, record, sake, plane, crest`; any other word draws the ring with no drawing), `ink` (`shu`, `matsu` or `ai`; any other is `shu`) and `shape` (`round` or `square`). Which day gets which name and drawing is typed there, never into this repo. The app draws only the stamps a person has pressed; every phone receives all twelve definitions, so the surprise is on the honour system.
+**The definitions are data, not code.** The `StampDefs` tab (made by `setup` or `migrate`) has one row per stamp: `id`, `date` (`YYYY-MM-DD`, or empty for the issue stamp), `name_ja`, `name_en`, `place`, `motif` (one of `lantern, books, onsen, temple, mountain, snow, lamp, tower, record, sake, plane, crest`; any other word draws the ring with no drawing), `ink` (`shu`, `matsu` or `ai`) and `shape` (`round` or `square`).
 
-**When a stamp is open** is decided in Japan time (fixed UTC+9), by the backend's `stampWindow` and the app's copy of it (`js/stampbook.js`): a day stamp from 00:00 on its date until 03:00 the next day (27 hours); the issue stamp from the start until the last day stamp closes. A press made offline is accepted when the phone's own time for it falls inside the window and it arrives within 48 hours; it is stored with the time it was pressed. The app drops a press still waiting on the phone after 48 hours. Lifting a stamp lets it be pressed again while its window is open; after that it cannot be. There is no location check.
+**When a stamp is open** is decided in Chicago time (fixed UTC−6), by the backend's `stampWindow` and the app's copy of it (`js/stampbook.js`): a day stamp from 00:00 on its date until 03:00 the next day (27 hours), so the Dec 31 stamp can still be pressed until 3 a.m. on New Year's Day; the issue stamp from the start until the last day stamp closes. A press made offline counts when the phone's own time for it falls inside the window and it arrives within 48 hours.
 
-**The `Stamps` tab** holds the presses: `id` (`<stamp id>|<name>`), `def`, `who`, `at`, `seed` (how the ink wore: the same on every phone), `gone` (`yes` when lifted). Rows are never deleted. `pressStamp` (`{ def, at, seed? }`) is not one of the Claude connector's tools and is refused through it ("Press this one in the app."). On a Sheet where `migrate` has not been run the book is simply absent: `load` answers empty lists, and the Days bar shows no stamp button.
+**The `Stamps` tab** holds the presses; do not type into it.
 
-## You 設定
+## You
 
-**Your picture.** In You, "Your picture" opens the phone's own picker. The phone crops the picture to a centred square, shrinks it to 128 × 128 and sends it as a small JPEG (at most 12,000 characters; one that will not fit is refused before anything is sent). It then shows inside your round seal, in place of your initials, on every seal on every phone; Change and Remove are on the same row. Each person sets only their own. Setting, changing or removing it is one History entry, which its owner can undo.
+**Your picture.** "Your picture" opens the phone's own picker. The phone crops it to a centred square, shrinks it to 128 × 128 and sends it as a small JPEG; it then shows inside your seal on every phone. Each person sets only their own.
 
 ## The Sheet
 
-- **Todos:** the "Before we go" list (above). A pull keeps it in step with the planner; do not type into it.
-- **StampDefs** and **Stamps:** the stamp book (above). Type the definitions into `StampDefs`; do not type into `Stamps`.
-- **People:** `name`, `initials`, `order`, `etransfer`, `simplify`, `email`, `photo`. `photo` is the person's picture as a JPEG data address, or empty for none (then the seal shows `initials`). Set it from the app, not by hand; `migrate` adds the column to an older Sheet.
-
-- Once the trip is live, do not delete rows by hand. Deleted expenses, stops and stays and removed payments stay as rows with a date in `deleted_at` / `removed_at`; clear that cell, or use History in the app, to bring one back. To take a row out by hand, put any date in its `deleted_at` instead of deleting it.
-- Text columns are stored as plain text, so a title like `=SUM(1)` or `1/2 price ramen` stays exactly as typed.
+- **People:** `name`, `initials`, `order`, `etransfer`, `simplify`, `email`, `photo`. Set pictures and e-Transfer addresses from the app, not by hand.
+- **Trip:** `name`, `start`, `end`, `home`, `currency`, `tz`. Do not change `tz`, `home` or `currency` (above).
+- Once the trip is live, do not delete rows by hand. Deleted expenses, stops and stays and removed payments stay as rows with a date in `deleted_at` / `removed_at`; clear that cell, or use History in the app, to bring one back.
+- Text columns are stored as plain text, so a title like `=SUM(1)` or `1/2 price` stays exactly as typed.
 - To change the trip key: delete `TRIP_KEY` in Script Properties, run `setup`, then `showInvite`. Old links stop working.
+- The `Todos` tab and the Expenses `planner_id` column are left from the Japan app's planner and are unused.
 
-### Typing into the Stops, Stays and Days tabs by hand
+### Typing into the Sheet
 
 The plan can be built in the app, through Claude, or by typing into the Sheet. The app reads what it can and leaves the rest out, so type carefully:
 
-- **Easiest:** add stops and stays through the app or Claude, and only edit them by hand.
-- **A new row needs an `id`** of 8 or more letters and digits, different from every other row's (for example `stopmo0001`, `stopmo0002`, …). A row with no id is not shown at all; one with a shorter id shows but cannot be changed from the app.
-- **Dates** are `YYYY-MM-DD` (`2026-12-12`), and must be one of the trip's days. A date typed any other way matches no ticket, so the stop is never shown.
-- **Times** are `HH:MM`, 24-hour (`09:30`, `18:05`). `9:30` is read as `09:30`; anything else (`9.30`, `6pm`) counts as no time and the stop sorts last.
+- **A new row needs an `id`** of 8 or more letters and digits, different from every other row's (for example `stopmo0001`). A row with no id is not shown at all.
+- **Dates** are `YYYY-MM-DD` (`2026-12-28`) and must be one of the trip's days.
+- **Times** are `HH:MM`, 24-hour (`09:30`, `18:05`).
 - **`travel_min`** is whole minutes, from 0 to 600.
-- **Stops:** the columns that matter are `id`, `date`, `time`, `title` (required), `detail`, `getting_there`, `travel_min`, `fixed` (TRUE or FALSE), `place` (a name or a Maps link), `sign_jp`, `link` (must start with `https://`), `note`.
-- **Stays:** `id`, `name` (required), `name_jp`, `address_jp`, `first_night`, `last_night` (dates), `note`, `place`, `link`.
+- **Stops:** `id`, `date`, `time`, `title` (required), `detail`, `getting_there`, `travel_min`, `fixed` (TRUE or FALSE), `place` (a name or a Maps link), `sign_jp`, `link` (must start with `https://`), `note`.
+- **Stays:** `id`, `name` (required), `name_jp`, `address_jp`, `first_night`, `last_night`, `note`, `place`, `link`.
 - **Days:** one row per trip day, keyed by `date`; `city`, `title`, `line_jp`, `line_en`, `line_colour` (`#RRGGBB`), `from_jp`, `from_en`, `to_jp`, `to_en`. Do not add or delete day rows.
-- **Do not change the Trip tab's `tz`** (`Asia/Tokyo`): every "today", "next" and "leave by" depends on it.
-- **A hand edit does not reach phones that are already open** until someone taps You → Last updated, or makes any change in the app. A phone opened afterwards sees it at once.
-- **Never delete rows:** put a date in `deleted_at` instead (see above).
+- **A hand edit does not reach phones that are already open** until someone taps You → Last updated, or makes any change in the app.
