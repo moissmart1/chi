@@ -100,7 +100,7 @@ module.exports = [
     },
   },
   {
-    name: "a line you are not in says so, and its figures are legible Zen Kaku Gothic",
+    name: "a line you are not in says so, and its figures are legible (the body face)",
     async run({ page }) {
       await ready(page);
       await openLine(page, "Taxi back");

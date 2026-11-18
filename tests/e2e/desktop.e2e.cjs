@@ -265,7 +265,8 @@ for (const size of [BIG, LAPTOP]) {
             const a = document.activeElement;
             if (!a || a === document.body) return null;
             const s = getComputedStyle(a);
-            const ink = ["rgb(244, 240, 234)", "rgb(21, 18, 15)"];
+            // Look C: one ink, on the paper as on the mint counter.
+            const ink = ["rgb(19, 38, 31)"];
             return { tag: a.tagName, id: a.id, ok: a.matches(":focus-visible") && s.outlineStyle !== "none" && parseFloat(s.outlineWidth) >= 2 && ink.includes(s.outlineColor), color: s.outlineColor };
           });
           if (f) seen.push(f);
@@ -273,11 +274,11 @@ for (const size of [BIG, LAPTOP]) {
         assert.ok(seen.length >= 20, "Tab reaches the controls: " + seen.length);
         const bad = seen.filter((f) => !f.ok);
         assert.deepEqual(bad, [], "every focused control shows a ring in the app's ink");
-        // On paper the ring is the print colour, on the dark ground the light ink.
+        // On the counter as on paper, the ring is the check's ink.
         await page.focus("#histBtn");
         await page.keyboard.press("Shift+Tab");
         await page.keyboard.press("Tab");
-        assert.equal(await page.evaluate(() => getComputedStyle(document.activeElement).outlineColor), "rgb(244, 240, 234)");
+        assert.equal(await page.evaluate(() => getComputedStyle(document.activeElement).outlineColor), "rgb(19, 38, 31)");
         // Hover: a key on the rail changes under the mouse.
         const bg = () => page.evaluate(() => getComputedStyle(document.getElementById("youBtn")).backgroundColor);
         const plain = await bg();

@@ -78,7 +78,8 @@ const waitSeal = (page, selector, want, message) =>
     const s = await sealOf(page, selector);
     return s && want(s) ? s : null;
   }, message);
-const SHU = "rgb(214, 60, 30)";
+// The check's red (look C).
+const SHU = "rgb(194, 54, 43)";
 const isColour = (s) => s.pic && s.filter === "none" && s.opacity === 1 && s.ring === SHU && s.ringW >= 2;
 const isGrey = (s) => s.pic && /grayscale\(1\)/.test(s.filter) && s.opacity < 0.6 && s.ring !== SHU;
 
@@ -96,7 +97,7 @@ async function checkRegister(page) {
   await page.click("#ring");
   await until(() => page.evaluate(() => document.getElementById("reg").classList.contains("is-open")), "the register opens");
   const on = await waitSeal(page, payer("Mo"), (s) => s.pic && s.on, "Mo's paid seal shows the picture, on");
-  assert.ok(isColour(on), "on: full colour in the vermilion ring " + JSON.stringify(on));
+  assert.ok(isColour(on), "on: full colour in the red ring " + JSON.stringify(on));
   assert.equal(on.alt, "");
   assert.equal(await page.getAttribute(payer("Mo"), "aria-label"), "Mo paid");
   const aj = await sealOf(page, payer("Izzah"));

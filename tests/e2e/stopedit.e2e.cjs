@@ -433,6 +433,8 @@ module.exports = [
   },
   {
     name: "the field being typed in is kept in view when the visible area scrolls",
+    // A shorter phone, so the sheet's last field starts below its fold (the form lost a field in phase 2).
+    viewport: { width: 390, height: 640 },
     async run({ page }) {
       await ready(page);
       await openAdd(page);

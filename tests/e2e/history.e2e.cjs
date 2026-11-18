@@ -370,15 +370,15 @@ module.exports = [
     },
   },
   {
-    name: "no text on the tape uses the dot-matrix face, and the sentences are the Zen Kaku Gothic New face",
+    name: "no text on the tape uses the dot-matrix face, and the sentences are the Libre Franklin face",
     async run({ page }) {
       await ready(page);
       await openTape(page, 10);
       const faces = await page.$$eval("#hist, #hist *", (els) => els.map((e) => getComputedStyle(e).fontFamily));
       assert.ok(faces.length > 30);
-      assert.deepEqual(faces.filter((f) => /DotGothic/i.test(f)), []);
+      assert.deepEqual(faces.filter((f) => /DotGothic|VT323|Zen /i.test(f)), []);
       const row = await page.evaluate(() => getComputedStyle(document.querySelector("#tape .tp-row")).fontFamily);
-      assert.match(row, /^"?Zen Kaku Gothic New"?/);
+      assert.match(row, /^"?Libre Franklin"?/);
     },
   },
   {

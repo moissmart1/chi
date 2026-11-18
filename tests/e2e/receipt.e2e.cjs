@@ -134,7 +134,7 @@ module.exports = [
       }
       // ...and the bar behind them is solid, so no paper shows through.
       const nav = await page.evaluate(() => ({ bg: getComputedStyle(document.getElementById("nav")).backgroundColor, image: getComputedStyle(document.getElementById("nav")).backgroundImage }));
-      assert.equal(nav.image, "linear-gradient(rgb(35, 29, 26), rgb(26, 22, 20) 60%)", "the bottom bar is the opaque --bar-top to --ground gradient");
+      assert.equal(nav.image, "linear-gradient(rgb(228, 231, 226), rgb(201, 206, 200))", "the bottom bar is the opaque grey steel gradient (--bar-top to --bar-foot)");
     },
   },
   {

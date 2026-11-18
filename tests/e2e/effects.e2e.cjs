@@ -1,9 +1,10 @@
 /* Copyright (c) 2026 moissmart1. All rights reserved. No licence is granted: do not copy, adapt or reuse this code or design, and do not use it to train or prompt an AI system to reproduce it. See LICENSE. */
-// Task 24: small effects. Paper has weight (shadows and grain), the table has a
-// lamp, the current day is lit, the register's display is glass, keys have an
-// edge and travel, a stamp that has just landed is wet, tickets are notched,
-// a count that changes rolls in, and nothing costs scrolling (no backdrop
-// filter, no CSS filter inside a list). Every item and name here is made up.
+// Small effects, in look C's materials (phase 2): paper lies flat on the
+// counter with a soft shadow, the counter has its dot grid, the current day's
+// square is filled, the register's display has an inset edge, keys have an
+// edge and travel, a stamp that has just landed is wet, checks are ruled, and
+// nothing costs scrolling (no backdrop filter, no CSS filter inside a list).
+// Every item and name here is made up.
 
 const assert = require("node:assert/strict");
 const { SEED, WITH_PLAN, NOON28, makeBackend, open, advance, until, visible } = require("./helpers.cjs");
@@ -36,58 +37,59 @@ const style = (page, sel, pseudo = null) => page.evaluate(([s, p]) => {
 
 module.exports = [
   {
-    name: "paper sits on the table: tickets have four or more shadow layers and the grain; the day stubs too",
+    name: "paper lies flat on the counter: a check has the thin edge and the soft shadow under it, no grain; the day stubs too",
     async run({ page }) {
       await daysReady(page);
       const tk = await style(page, "#rail .tk");
-      assert.ok(layers(tk.shadow) >= 4, "ticket: " + tk.shadow);
-      assert.match(tk.bg, /url\("data:image\/svg\+xml/, "the ticket has the grain");
-      assert.match(tk.bg, /linear-gradient/, "the ticket has its sheen");
-      // The fan motion is still on the ticket where the browser has it.
+      assert.equal(layers(tk.shadow), 2, "check: " + tk.shadow);
+      assert.doesNotMatch(tk.bg, /url\(/, "no grain or pattern on the check");
+      assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector("#rail .tk")).backgroundColor), "rgb(238, 244, 228)");
+      // The fan motion is still on the check where the browser has it.
       assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector("#rail .tk")).animationName !== undefined), true);
       // The all-days stubs.
       await page.click("#dayCount");
       await until(() => visible(page, ".ad-row"), "the all-days list shows");
       const ad = await style(page, ".ad-row");
-      assert.ok(layers(ad.shadow) >= 4, "day stub: " + ad.shadow);
-      assert.match(ad.bg, /url\("data:image\/svg\+xml/);
+      assert.equal(layers(ad.shadow), 2, "day stub: " + ad.shadow);
+      assert.doesNotMatch(ad.bg, /url\(/);
     },
   },
   {
-    name: "the slip, the receipt, the History tape and the hotel card have weight and grain",
+    name: "the tab and its settling, the History tape and the hotel card are check paper lying flat",
     async run({ page }) {
       await moneyReady(page);
+      const paper = (sel) => page.evaluate((s) => getComputedStyle(document.querySelector(s)).backgroundColor, sel);
       const slip = await style(page, ".slip");
-      assert.ok(layers(slip.shadow) >= 4, "slip: " + slip.shadow);
-      assert.match(slip.bg, /url\("data:image\/svg\+xml/);
+      assert.equal(layers(slip.shadow), 2, "settling: " + slip.shadow);
+      assert.equal(await paper(".slip"), "rgb(238, 244, 228)");
       const rc = await style(page, ".rc");
-      assert.ok(layers(rc.shadow) >= 4, "receipt: " + rc.shadow);
-      assert.match(rc.bg, /url\("data:image\/svg\+xml/);
-      // The receipt keeps its serrated edges.
-      for (const p of ["::before", "::after"]) assert.equal((await style(page, ".rc", p)).content, '""', "serration " + p);
+      assert.ok(layers(rc.shadow) >= 1, "tab: " + rc.shadow);
+      assert.equal(await paper(".rc"), "rgb(238, 244, 228)");
+      // The tab is a guest check, not a till roll: no serrated edges.
+      for (const p of ["::before", "::after"]) assert.equal((await style(page, ".rc", p)).content, "none", "no serration " + p);
       // History tape.
       await page.click("#youBtn");
       await until(() => visible(page, "#setHist"), "Settings opens");
       await page.click("#setHist");
       await until(() => visible(page, "#tape"), "the tape shows");
       const tape = await style(page, "#tape");
-      assert.ok(layers(tape.shadow) >= 4, "tape: " + tape.shadow);
-      assert.match(tape.bg, /url\("data:image\/svg\+xml/);
+      assert.equal(layers(tape.shadow), 2, "tape: " + tape.shadow);
+      assert.equal(await paper("#tape"), "rgb(238, 244, 228)");
     },
   },
   {
-    name: "the hotel card has the grain and the paper's weight",
+    name: "the hotel card is check paper with its weight",
     async run({ page }) {
       await daysReady(page);
       await page.click("#rail .tk-stay");
       await until(() => page.evaluate(() => document.getElementById("stay").classList.contains("is-open")), "the hotel card opens");
       const s = await style(page, "#stay");
-      assert.ok(layers(s.shadow) >= 4, "hotel card: " + s.shadow);
-      assert.match(s.bg, /url\("data:image\/svg\+xml/);
+      assert.ok(layers(s.shadow) >= 2, "hotel card: " + s.shadow);
+      assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById("stay")).backgroundColor), "rgb(238, 244, 228)");
     },
   },
   {
-    name: "the lamp sits on the table behind the screens, not on the content, and does not scroll",
+    name: "the counter's dot grid sits behind the screens, not on the content, and does not scroll",
     async run({ page }) {
       await moneyReady(page);
       const phone = await style(page, "#phone");
@@ -102,34 +104,34 @@ module.exports = [
     },
   },
   {
-    name: "the current day's square is lit; the others have no shadow",
+    name: "the current day's square is filled in ink and larger; a used day's in green; no square has a shadow",
     async run({ page }) {
       await daysReady(page);
-      const sq = await page.evaluate(() => [...document.querySelectorAll("#pager .sq")].map((b) => [b.classList.contains("is-cur"), getComputedStyle(b, "::before").boxShadow, getComputedStyle(b).boxShadow]));
+      const sq = await page.evaluate(() => [...document.querySelectorAll("#pager .sq")].map((b) => { const c = getComputedStyle(b, "::before"); return [b.classList.contains("is-cur"), b.classList.contains("is-done"), c.backgroundColor, c.transform, c.boxShadow, getComputedStyle(b).boxShadow]; }));
       assert.ok(sq.length >= 3);
       assert.equal(sq.filter((s) => s[0]).length, 1, "one current square");
-      for (const [cur, before, own] of sq) {
-        assert.equal(own, "none", "the button itself has no shadow");
+      for (const [cur, done, bg, transform, before, own] of sq) {
+        assert.equal(own, "none");
+        assert.equal(before, "none");
         if (cur) {
-          assert.equal(layers(before), 2, "lit: " + before);
-          assert.match(before, /10px/, "the glow is 10 px");
-        } else assert.equal(before, "none", "the others are not lit");
+          assert.equal(bg, "rgb(19, 38, 31)");
+          assert.notEqual(transform, "none", "the current square is larger");
+        } else if (done) assert.equal(bg, "rgb(46, 122, 87)");
       }
     },
   },
   {
-    name: "the register's display is glass: an outer glow, the inset sheen and the amount's shadow",
+    name: "the register's display: an inset edge, and the amount in the time clock's face with its shadow",
     async run({ page }) {
       await moneyReady(page);
       await page.click("#ring");
       await until(() => page.evaluate(() => document.getElementById("reg").classList.contains("is-open")), "the register opens");
       const lcd = await style(page, ".lcd");
-      const parts = lcd.shadow.split(/,\s*(?=rgba?\()/).map((p) => p.trim());
-      assert.ok(parts.some((p) => !/inset/.test(p) && /rgb/.test(p)), "an outer shadow layer: " + lcd.shadow);
-      assert.ok(parts.some((p) => /inset/.test(p)), "an inset layer: " + lcd.shadow);
+      assert.match(lcd.shadow, /inset/, "an inset layer: " + lcd.shadow);
       assert.match(lcd.bg, /linear-gradient/, "the top sheen");
-      const amt = await page.evaluate(() => getComputedStyle(document.getElementById("xAmt")).textShadow);
-      assert.match(amt, /1\.5px 1\.5px/, "the amount's shadow: " + amt);
+      const amt = await page.evaluate(() => { const c = getComputedStyle(document.getElementById("xAmt")); return [c.textShadow, c.fontFamily]; });
+      assert.match(amt[0], /1\.5px 1\.5px/, "the amount's shadow: " + amt[0]);
+      assert.match(amt[1], /^"?VT323/, amt[1]);
     },
   },
   {
@@ -197,27 +199,16 @@ module.exports = [
     },
   },
   {
-    name: "every tear line has two notches: half-moons 14 px across, in the table's colour, shaded on their upper inside",
+    name: "every check is ruled: a double green rule under its heading, a dashed tear line over its stub, and no half-moon notches",
     async run({ page }) {
       await daysReady(page);
-      const perfs = await page.$$eval("#rail .tk-perf", (els) => els.map((e) => ["::before", "::after"].map((p) => { const c = getComputedStyle(e, p); return [c.content, c.width, c.height, c.backgroundColor, c.boxShadow, c.position]; })));
-      assert.ok(perfs.length >= 3, "tear lines on the tickets");
-      for (const [a, b] of perfs) for (const n of [a, b]) {
-        assert.equal(n[0], '""');
-        assert.deepEqual([n[1], n[2], n[5]], ["14px", "14px", "absolute"]);
-        assert.equal(n[3], "rgb(26, 22, 20)", "the table's colour");
-        assert.match(n[4], /inset/);
-      }
-      // Centred on the paper's side edges: the notch's centre is on the ticket's left and right edge.
-      const geo = await page.evaluate(() => {
-        // The ticket in view (today, Day 3): the others lean back in the fan.
-        const perf = document.querySelector('#rail .pg[data-date="2026-12-28"] .tk-perf');
-        const tk = perf.closest(".tk").getBoundingClientRect();
-        const pr = perf.getBoundingClientRect();
-        // The circle is 14 px wide, its left (right) edge 16 px outside the line's.
-        return { left: pr.left - 16 + 7 - tk.left, right: tk.right - (pr.right + 16 - 7) };
-      });
-      assert.ok(Math.abs(geo.left) < 0.6 && Math.abs(geo.right) < 0.6, "centred on the edges: " + JSON.stringify(geo));
+      const perfs = await page.$$eval("#rail .tk", (els) => els.map((tk) => {
+        const perf = getComputedStyle(tk.querySelector(".tk-perf"));
+        const foot = getComputedStyle(tk.querySelector(".tk-foot"));
+        return [perf.borderTopStyle, perf.borderTopColor, foot.borderTopStyle, getComputedStyle(tk.querySelector(".tk-perf"), "::before").content];
+      }));
+      assert.ok(perfs.length >= 3, "rules on the checks");
+      for (const p of perfs) assert.deepEqual(p, ["double", "rgb(46, 122, 87)", "dashed", "none"]);
     },
   },
   {

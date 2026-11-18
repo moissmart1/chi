@@ -74,7 +74,7 @@ module.exports = [
       await expectText(page, "#slip .slip-f", "Stamp it the moment you send. What’s left is always what’s shown here.");
       await expectText(page, "#simp .simp-l", "Simplify: fewest payments");
       assert.equal(await page.getAttribute("#simp", "aria-checked"), "true");
-      // Legible: the slip's figures are Zen Kaku Gothic, never the dot face.
+      // Legible: the slip's figures are the body face, never the dot face.
       const font = await page.evaluate(() => getComputedStyle(document.querySelector("#slip .s-amt")).fontFamily);
       assert.ok(!font.includes("DotGothic16"), font);
       assert.equal(await page.evaluate(() => document.getElementById("slip").scrollWidth <= document.getElementById("slip").clientWidth), true, "no sideways scroll");
@@ -288,7 +288,7 @@ module.exports = [
       const back = saved(backend)[0];
       assert.equal(back.removed, false);
       assert.equal(back.seed, 777);
-      assert.equal(await page.evaluate(() => document.querySelector("#slip .stamp").innerHTML), await asDrawn(page, 777));
+      assert.equal(await page.evaluate(() => document.querySelector("#slip .stamp").innerHTML), await asDrawn(page, 777, back.stampedAt));
       assert.equal(await page.evaluate(() => document.querySelector("#slip .stamp").style.getPropertyValue("--rot")), "4deg");
     },
   },

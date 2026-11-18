@@ -64,7 +64,7 @@
 .s-row.is-paid.is-pending .s-l,.s-row.is-paid.is-pending .stamp{opacity:.55}
 .rc-row.is-failed small.rc-fail{color:var(--red);opacity:1;font-weight:700}
 .rc-row.is-new .rc-amt::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--red);margin-right:6px;vertical-align:.18em}
-.mini{width:30px;height:30px;border-radius:50%;border:1.6px solid var(--grn);color:var(--grn);display:grid;place-items:center;
+.mini{width:30px;height:30px;border-radius:50%;border:1.6px solid var(--red);color:var(--red);display:grid;place-items:center;
   font-weight:900;font-size:11px;letter-spacing:0}
 .rc-sub{display:flex;justify-content:flex-end;align-items:baseline;gap:12px;padding:6px 8px 7px;font-size:13px;font-weight:600;border-bottom:1px solid var(--rule)}
 .rc-sub b{font-weight:900;font-size:15px;font-variant-numeric:tabular-nums}
