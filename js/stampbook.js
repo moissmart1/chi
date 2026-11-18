@@ -1,11 +1,12 @@
 /* Copyright (c) 2026 moissmart1. All rights reserved. No licence is granted: do not copy, adapt or reuse this code or design, and do not use it to train or prompt an AI system to reproduce it. See LICENSE. */
-// The stamp book, without a screen: the drawings, the three inks, how a
-// stamp is drawn from its seed, and when each one is open. Pure: no DOM, safe
-// to import in Node.
+// The placemat (the keepsake, look C), without a screen: where each day's
+// spot sits on the souvenir map, the three inks, how a stamp is drawn from
+// its seed, and when each one is open. Pure: no DOM, safe to import in Node.
 //
-// Which day gets which name, drawing, ink and shape is data in the Sheet
-// (the StampDefs tab, arriving on load as stampDefs); this file only holds
-// the library of generic drawings and the inks.
+// Which day gets which name, place, ink and shape is data in the Sheet (the
+// StampDefs tab, arriving on load as stampDefs); this file holds the map's
+// known places and the inks. The motif column is still read but no longer
+// drawn: on the placemat the date is the picture, as in the mock-up.
 //
 // A definition: { id, date, name_ja, name_en, place, motif, ink, shape }.
 // date is YYYY-MM-DD, or "" for the issue stamp (open from the start until
@@ -21,7 +22,9 @@ import { rng, wear } from "./stamp.js";
 import { TRIP_UTC_OFFSET_MS } from "./trip.js";
 import { tripDate, tripClock } from "./time.js";
 
-export const INKS = { shu: "#D63C1E", matsu: "#2B6A4C", ai: "#28408F" };
+// The keys stay the Sheet's words; the inks are the check's red, the
+// placemat's blue and the check's green.
+export const INKS = { shu: "#C2362B", matsu: "#2E7A57", ai: "#2F5FA8" };
 
 const OPEN_MS = 27 * 3600000;
 const DAY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -34,39 +37,96 @@ const ESC = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;
 export const esc = (v) => String(v === undefined || v === null ? "" : v).replace(/[&<>"']/g, (c) => ESC[c]);
 
 // ---- the drawings ----
-// Each is the inside of one drawing, in a 120-unit square, kept to x 38-82,
-// y 36-78, strokes and fills in currentColor (the stamp sets the ink). They
-// are drawn with a 2.6 round stroke and no fill (see DRAW below).
-const F = 'fill="currentColor" stroke="none"';
 const round2 = (n) => Math.round(n * 100) / 100;
+const SLAB = 'font-family="Zilla Slab,Rockwell,Georgia,serif" font-weight="700"';
+const FRANKLIN = 'font-family="Libre Franklin,Helvetica Neue,Arial,sans-serif" font-weight="800"';
 
-// The issue crest: the letters MAT inside a ring of twelve short ticks.
-function crest() {
+// The book's own stamp, the crest: a ring of twelve short ticks around the
+// app's name and the year. Exported as the one drawing left in the library.
+function crestTicks() {
   let ticks = "";
   for (let i = 0; i < 12; i++) {
     const a = (i * Math.PI) / 6;
     const c = Math.cos(a);
     const s = Math.sin(a);
-    ticks += "M" + round2(60 + c * 17) + " " + round2(57 + s * 17) + "L" + round2(60 + c * 21) + " " + round2(57 + s * 21);
+    ticks += "M" + round2(60 + c * 34) + " " + round2(60 + s * 34) + "L" + round2(60 + c * 40) + " " + round2(60 + s * 40);
   }
-  return '<path stroke-width="2.2" d="' + ticks + '"/>' +
-    '<text x="60" y="61.6" text-anchor="middle" font-family="Zen Kaku Gothic New,Hiragino Sans,sans-serif" font-weight="900" font-size="12.5" letter-spacing=".5" ' + F + ">MAT</text>";
+  return '<path fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" d="' + ticks + '"/>';
+}
+export const MOTIFS = { crest: crestTicks() };
+
+// A twelve-pointed burst for New Year's Eve (the fireworks).
+function burst(cx, cy, R, r) {
+  let p = "";
+  for (let k = 0; k < 24; k++) {
+    const a = -Math.PI / 2 + (k * Math.PI) / 12;
+    const rr = k % 2 ? r : R;
+    p += (k ? "L" : "M") + round2(cx + rr * Math.cos(a)) + " " + round2(cy + rr * Math.sin(a));
+  }
+  return p + "Z";
 }
 
-export const MOTIFS = {
-  lantern: '<path d="M60 31v6"/><rect x="52" y="37" width="16" height="4.5" ' + F + '/><circle cx="60" cy="57.5" r="15.5"/><path stroke-width="1.5" d="M46.4 51h27.2M44.6 57.5h30.8M46.4 64h27.2"/><rect x="53" y="73" width="14" height="4" ' + F + "/>",
-  books: '<rect x="42" y="66" width="36" height="9.5"/><rect x="46" y="55.5" width="31" height="9.5"/><rect x="41" y="45" width="33" height="9.5"/><path stroke-width="1.6" d="M48.5 66v9.5M52.5 55.5V65M47.5 45v9.5M67 49.7h3M70 60.2h3M71 70.7h3"/>',
-  onsen: '<path stroke-width="3.2" d="M43 59c0 19 34 19 34 0"/><path d="M51 62c-4.5-6 4.5-10 0-16-2-3 1-5.5.6-7.5M60 62c-4.5-7 4.5-11.5 0-18.5-2-3 1-6 .6-8.5M69 62c-4.5-6 4.5-10 0-16-2-3 1-5.5.6-7.5"/>',
-  temple: '<path d="M60 34v6"/><path ' + F + ' d="M35 61q14-3 25-21 11 18 25 21z"/><path d="M45 61v15M55 61v15M65 61v15M75 61v15M40 77h40"/>',
-  mountain: '<path d="M37 77l17-31q6-4 12 0l17 31z"/><path ' + F + ' d="M54 46q6-4 12 0l3.5 6.5-5-2.8-4.5 4-4.5-4-5 2.8z"/><circle cx="80" cy="41" r="4"/>',
-  snow: [0, 60, 120, 180, 240, 300].map((a) => '<path transform="rotate(' + a + ' 60 57)" d="M60 57V36M60 43.5l-5-4.5M60 43.5l5-4.5M60 50l-4-3.6M60 50l4-3.6"/>').join(""),
-  lamp: '<path d="M60 31v4"/><path ' + F + ' d="M49 45l11-9 11 9z"/><path d="M52.5 45h15l-2.5 15h-10z"/><circle cx="60" cy="52.5" r="2.7" ' + F + '/><path d="M60 60v18M53 78h14M56 66h8"/>',
-  tower: '<path d="M60 29v8M60 37L48.5 78M60 37l11.5 41M51.5 67h17"/><rect x="53" y="50" width="14" height="8" ' + F + '/><path stroke-width="1.5" d="M52.8 59l15 8M67.2 59l-15 8M49.5 74h21"/>',
-  record: '<circle cx="60" cy="57" r="20.5" stroke-width="3"/><circle cx="60" cy="57" r="14.5" stroke-width="1.2"/><circle cx="60" cy="57" r="10.5" stroke-width="1.2"/><path ' + F + ' fill-rule="evenodd" d="M53.5 57a6.5 6.5 0 1 0 13 0a6.5 6.5 0 1 0-13 0zM58.5 57a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0-3 0z"/>',
-  sake: '<path d="M49 77c-7 0-8-14-2.5-20.5 2.5-3 2.5-6 2.5-10h8c0 4 0 7 2.5 10C65 63 64 77 57 77z"/><path stroke-width="3.2" d="M48 46.5h10"/><path d="M67 66h14l-2.5 11h-9z"/>',
-  plane: '<path transform="rotate(45 60 56)" ' + F + ' d="M60 33c2.6 0 3.6 4 3.6 8v9L83 61.5v4.2L63.6 60v10.5l5.6 4.5v3.2L60 75.6l-9.2 2.6V75l5.6-4.5V60L37 65.7v-4.2L56.4 50v-9c0-4 1-8 3.6-8z"/>',
-  crest: crest(),
+// ---- where each spot sits on the placemat's map ----
+// The map is drawn in a 358 by 440 box (js/views/stampbook.js): the lake on
+// the right, the river across the middle and up its north branch. These
+// places have their own spot (a hand-drawn map, roughly where they are);
+// any other place takes the next free spot, so the Sheet can name anywhere.
+export const MAP_W = 358;
+export const MAP_H = 440;
+const PLACES = {
+  "o'hare": [64, 104, "nw"], "midway": [58, 372, "sw"], "uptown": [190, 104, "n"], "andersonville": [150, 112, "n"],
+  "wrigleyville": [232, 112], "lakeview": [232, 112], "lincoln park": [222, 150], "logan square": [62, 168], "wicker park": [96, 196],
+  "bucktown": [70, 214], "the river": [272, 160], "river": [272, 160], "gold coast": [270, 122], "old town": [214, 186],
+  "river north": [214, 186], "streeterville": [272, 232], "magnificent mile": [272, 232], "navy pier": [272, 232],
+  "west loop": [90, 252], "the loop": [212, 256], "loop": [212, 256], "millennium park": [250, 306], "grant park": [250, 306],
+  "south loop": [212, 330], "museum campus": [266, 360], "chinatown": [196, 384], "pilsen": [94, 316], "hyde park": [266, 396],
 };
+// Free spots, in the order they are handed out, clear of the river, the lake and the title.
+const FREE = [[150, 300], [120, 140], [250, 196], [96, 400], [180, 220], [40, 300], [270, 270], [150, 362], [212, 130], [40, 236],
+  [116, 360], [234, 362], [176, 150], [100, 286], [196, 288], [270, 100], [40, 136], [136, 250], [230, 400], [176, 96],
+  [60, 330], [204, 326], [120, 210], [264, 330], [88, 130], [150, 400], [236, 226], [40, 400], [176, 260], [116, 100],
+  [270, 400], [196, 360], [40, 196], [90, 220], [236, 160], [150, 196]];
+// The book's own stamp: the corner under the lake's shore.
+const ISSUE_AT = [230, 396];
+const MIN_GAP = 40;
+const placeKey = (v) => String(v === undefined || v === null ? "" : v).trim().toLowerCase().replace(/[\u2018\u2019]/g, "'").replace(/\s+/g, " ");
+
+// [{ id, x, y, dir, issue }] in book order (usableDefs): where each stamp's
+// spot is drawn. A place on the map gets its own spot unless another day
+// already has it; everything else the next free spot at least MIN_GAP away
+// from every spot taken. dir: the arrow of a place off the map's edge.
+export function placemat(defs) {
+  const taken = [];
+  const clear = (x, y) => taken.every((t) => Math.hypot(t[0] - x, t[1] - y) >= MIN_GAP);
+  const out = [];
+  const list = usableDefs(defs);
+  const issue = list.find((d) => dateOf(d) === "");
+  if (issue) taken.push(ISSUE_AT);
+  for (const d of list) {
+    if (d === issue) continue;
+    const k = placeKey(d.place);
+    let spot = PLACES[k] || PLACES[k.replace(/^the /, "")] || null;
+    if (spot && !clear(spot[0], spot[1])) spot = null;
+    if (!spot) spot = FREE.find((f) => clear(f[0], f[1])) || null;
+    if (!spot) {
+      // More days than the map has room for: the point of a fine grid farthest from every spot taken.
+      let best = -1;
+      for (let y = 100; y <= 400; y += 20) {
+        for (let x = 40; x <= 280; x += 20) {
+          const near = Math.min(...taken.map((t) => Math.hypot(t[0] - x, t[1] - y)));
+          if (near > best) {
+            best = near;
+            spot = [x, y];
+          }
+        }
+      }
+    }
+    taken.push(spot);
+    out.push({ id: d.id, x: spot[0], y: spot[1], dir: spot[2] || "", issue: false });
+  }
+  if (issue) out.push({ id: issue.id, x: ISSUE_AT[0], y: ISSUE_AT[1], dir: "", issue: true });
+  return out;
+}
 
 // ---- dates and the trip's time ----
 
@@ -86,7 +146,6 @@ export { tripDate, tripClock };
 export const monthDay = (s) => MON[Number(s.slice(5, 7)) - 1] + " " + Number(s.slice(8, 10));
 export const weekdayOf = (s) => WD[new Date(Date.UTC(Number(s.slice(0, 4)), Number(s.slice(5, 7)) - 1, Number(s.slice(8, 10)))).getUTCDay()];
 export const dayNumber = (s) => String(Number(s.slice(8, 10)));
-const dotted = (s) => Number(s.slice(5, 7)) + "." + Number(s.slice(8, 10));
 
 // ---- the definitions ----
 
@@ -180,13 +239,15 @@ function tag(id) {
 // How much a line of n letters has to shrink to fit `room` units of arc.
 const fit = (n, each, room) => Math.min(1, room / Math.max(1, n * each));
 
-// One stamp as an <svg> string: a ring (shape "round") or a rounded square
-// ("square"), the name in Japanese on the top arc, the name in English and
-// the date (M.D) on the bottom arc, one drawing in the middle, in the
-// definition's ink (an unknown ink is vermilion), worn by the seed so it
-// looks the same on every phone. The issue stamp (no date) shows the year of
-// the first day stamp in `defs` in place of a date. An unknown drawing draws
-// none. Every text is escaped, so the string may be set with innerHTML.
+// One stamp as an <svg> string, as the placemat's stamps are in the
+// mock-up: a double ring (shape "round"), or a rounded square ("square"),
+// or on New Year's Eve a fireworks burst; in the middle the date (DEC 28)
+// in the slab and the weekday under it; the place's English name on the top
+// arc. The book's own stamp (no date) is the crest: twelve ticks round the
+// app's name and the year of the first day stamp in `defs`. The ink is the
+// definition's (an unknown ink is red), worn by the seed so it looks the
+// same on every phone. Every text is escaped, so the string may be set with
+// innerHTML. The Japanese name and the motif are not drawn.
 export function bookStampSVG(seed, def, defs) {
   const d = def && typeof def === "object" ? def : {};
   const n = Number.parseInt(seed, 10);
@@ -194,38 +255,38 @@ export function bookStampSVG(seed, def, defs) {
   const id = "b" + sid + tag(d.id);
   const r = rng(sid);
   const ink = has(INKS, d.ink) ? INKS[d.ink] : INKS.shu;
-  const motif = has(MOTIFS, d.motif) ? MOTIFS[d.motif] : "";
   const mask = wear(id, r, 120);
-
-  const frame = d.shape === "square"
-    ? '<rect x="5" y="5" width="110" height="110" rx="13" fill="none" stroke="currentColor" stroke-width="3.2"/><rect x="10.5" y="10.5" width="99" height="99" rx="9" fill="none" stroke="currentColor" stroke-width="1"/>'
-    : '<circle cx="60" cy="60" r="55" fill="none" stroke="currentColor" stroke-width="3.2"/><circle cx="60" cy="60" r="50" fill="none" stroke="currentColor" stroke-width="1"/>';
-
-  const ja = String(d.name_ja === undefined || d.name_ja === null ? "" : d.name_ja).trim();
-  const jaN = [...ja].length;
-  const jaK = fit(jaN, 17, 96);
   const date = dateOf(d);
-  let when = "";
-  if (date !== "" && validDay(date)) when = dotted(date);
-  else if (date === "") {
-    const first = usableDefs(defs).find((x) => dateOf(x) !== "");
-    when = first ? dateOf(first).slice(0, 4) : "";
-  }
-  const en = (String(d.name_en === undefined || d.name_en === null ? "" : d.name_en).trim().toUpperCase() + (when ? " · " + when : "")).trim();
-  const enK = fit([...en].length, 6.4, 128);
+  const day = date !== "" && validDay(date);
+  const nye = day && date.slice(5) === "12-31";
 
-  const top = ja
-    ? '<text font-family="Zen Antique,Hiragino Mincho ProN,serif" font-size="' + round2(13.5 * jaK) + '" letter-spacing="' + round2(3.5 * jaK) + '" fill="currentColor"><textPath href="#ta' + id + '" startOffset="50%" text-anchor="middle">' + esc(ja) + "</textPath></text>"
-    : "";
-  const bottom = en
-    ? '<text font-family="Zen Kaku Gothic New,Hiragino Sans,sans-serif" font-weight="900" font-size="' + round2(6.8 * enK) + '" letter-spacing="' + round2(1.3 * enK) + '" fill="currentColor"><textPath href="#tb' + id + '" startOffset="50%" text-anchor="middle">' + esc(en) + "</textPath></text>"
-    : "";
-  const art = motif
-    ? '<g transform="translate(0 3)" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">' + motif + "</g>"
-    : "";
+  let frame;
+  if (nye) frame = '<path class="burst" d="' + burst(60, 60, 57, 44) + '" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><circle cx="60" cy="60" r="38" fill="none" stroke="currentColor" stroke-width="1"/>';
+  else if (d.shape === "square") frame = '<rect x="5" y="5" width="110" height="110" rx="13" fill="none" stroke="currentColor" stroke-width="3.2"/><rect x="10.5" y="10.5" width="99" height="99" rx="9" fill="none" stroke="currentColor" stroke-width="1"/>';
+  else frame = '<circle cx="60" cy="60" r="55" fill="none" stroke="currentColor" stroke-width="3.2"/><circle cx="60" cy="60" r="47" fill="none" stroke="currentColor" stroke-width="1.2"/>';
+
+  let middle;
+  let arc = "";
+  if (date === "") {
+    const first = usableDefs(defs).find((x) => dateOf(x) !== "");
+    const year = first ? dateOf(first).slice(0, 4) : "";
+    middle = MOTIFS.crest +
+      '<text x="60" y="' + (year ? 58 : 65) + '" text-anchor="middle" ' + SLAB + ' font-size="17" fill="currentColor">WENDY’S</text>' +
+      (year ? '<text x="60" y="76" text-anchor="middle" ' + FRANKLIN + ' font-size="11" letter-spacing="1.5" fill="currentColor">' + esc(year) + "</text>" : "");
+  } else {
+    const md = day ? MON[Number(date.slice(5, 7)) - 1].toUpperCase() + " " + Number(date.slice(8, 10)) : "";
+    const wd = day ? weekdayOf(date).toUpperCase() : "";
+    middle = (md ? '<text x="60" y="64" text-anchor="middle" ' + SLAB + ' font-size="21" fill="currentColor">' + esc(md) + "</text>" : "") +
+      (wd ? '<text x="60" y="81" text-anchor="middle" ' + FRANKLIN + ' font-size="12" letter-spacing="1" fill="currentColor">' + esc(wd) + "</text>" : "");
+    const name = String(d.name_en === undefined || d.name_en === null ? "" : d.name_en).trim().toUpperCase() || String(d.place === undefined || d.place === null ? "" : d.place).trim().toUpperCase();
+    if (name) {
+      const k = fit([...name].length, 7, 100);
+      arc = '<text ' + FRANKLIN + ' font-size="' + round2(9.5 * k) + '" letter-spacing="' + round2(1.2 * k) + '" fill="currentColor"><textPath href="#ta' + id + '" startOffset="50%" text-anchor="middle">' + esc(name) + "</textPath></text>";
+    }
+  }
   return '<svg class="bk-st" viewBox="0 0 120 120" width="100%" height="100%" color="' + ink + '" aria-hidden="true" focusable="false" overflow="visible"><defs>' + mask +
-    '<path id="ta' + id + '" d="M27 60A33 33 0 0 1 93 60" fill="none"/><path id="tb' + id + '" d="M13.5 60A46.5 46.5 0 0 0 106.5 60" fill="none"/></defs>' +
-    '<g mask="url(#pm' + id + ')">' + frame + top + bottom + art + "</g></svg>";
+    '<path id="ta' + id + '" d="M24 60A36 36 0 0 1 96 60" fill="none"/></defs>' +
+    '<g mask="url(#pm' + id + ')">' + frame + arc + middle + "</g></svg>";
 }
 
 // What the Days screen shows of the book, from the store's state and the real

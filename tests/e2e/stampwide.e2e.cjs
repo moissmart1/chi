@@ -51,8 +51,8 @@ module.exports = [
       assert.ok(book.x >= days.x - 1 && book.r <= days.r + 1 && book.b <= phone.b + 1 && book.y >= phone.y - 1, "the book stays inside the Days pane: " + JSON.stringify({ book, days }));
       const money = await box(page, "#vMoney");
       assert.ok(book.r <= money.x + 1, "Money stays in view beside the open book");
-      const ring = await page.evaluate(() => Math.max(...[...document.querySelectorAll("#book svg")].map((e) => e.getBoundingClientRect().width)));
-      assert.ok(ring <= 180, "a ring is no bigger than on a phone held sideways: " + ring);
+      const ring = await page.evaluate(() => Math.max(...[...document.querySelectorAll("#book .bk-cell")].map((e) => e.getBoundingClientRect().width)));
+      assert.ok(ring <= 180, "a spot is no bigger than on a phone held sideways: " + ring);
       const rings = await page.evaluate(() => [...document.querySelectorAll("#book .sb-ring, #book [data-def]")].filter((e) => e.getBoundingClientRect().width > 0).length);
       assert.ok(rings >= 8, "eight rings are drawn: " + rings);
       const done = await page.evaluate(() => { const d = [...document.querySelectorAll("#book button")].find((b) => b.textContent.trim() === "Done"); if (!d) return null; const r = d.getBoundingClientRect(); const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return { seen: r.width > 0 && r.y >= 0 && r.bottom <= innerHeight, onTop: top === d || d.contains(top) }; });

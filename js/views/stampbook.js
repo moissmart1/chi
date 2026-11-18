@@ -1,32 +1,40 @@
 /* Copyright (c) 2026 moissmart1. All rights reserved. No licence is granted: do not copy, adapt or reuse this code or design, and do not use it to train or prompt an AI system to reproduce it. See LICENSE. */
-// The stamp book: a page of twelve rings that each person presses by hand.
-// A panel over the app like History: opened from the Days screen (the stamp
-// button on its top bar, or the line on today's ticket), closed by Done, the
-// scrim or Escape.
+// The placemat (the keepsake, look C): a souvenir placemat with a hand-drawn
+// map of Chicago and a spot for each day that each person stamps by hand,
+// and under it the legend, one line a day. It replaces the stamp book's
+// page; the rules for when a stamp can be pressed and the data are the
+// same. A panel over the app like History: opened from the Days screen (the
+// Placemat pill on its top line, or the line on today's check), closed by
+// Done, the scrim or Escape.
 //
 // mountStampBook(root, store, { now }) -> { open(), close(restoreFocus), isOpen() }
 // - root is the phone. now() is the real time (the phone's clock; a press is
 //   judged by it, so the demo clock is never used here).
 // - A stamp is open, not yet open, closed or held: js/stampbook.js stateOf, in
-//   Chicago time whatever zone the phone is in. Tapping an open ring presses it
-//   (store.pressStamp: shown at once, kept on the phone until the backend has
-//   it); a held stamp is held up large; a ring that is not open says so in one
-//   line under the page and shakes a little. Nothing is sent for those.
+//   Chicago time whatever zone the phone is in. Tapping an open spot (or its
+//   line in the legend) presses it (store.pressStamp: shown at once, kept on
+//   the phone until the backend has it); a held stamp is held up large; a
+//   spot that is not open says so in one line under the map and shakes a
+//   little. Nothing is sent for those.
+// - Where each spot sits: js/stampbook.js placemat (known places on their
+//   own spot, the rest on free ones).
 // - The landing is the app's own: the stamp's `hit`, the thud once the store
-//   has taken the press, a small bump of the page and wet ink for half a
+//   has taken the press, a small bump of the placemat and wet ink for half a
 //   second. Under prefers-reduced-motion the stamp just appears.
 // - Every name, place and person's name goes in with textContent; the
-//   drawings come from bookStampSVG, which escapes its text.
-// - Redrawn only where something changed: a ring is replaced when its own
+//   drawings come from bookStampSVG and the map from numbers and escaped
+//   names only.
+// - Redrawn only where something changed: a spot is replaced when its own
 //   state or stamp did, so a press landing keeps its landing and a person
 //   holding a stamp up is left alone.
 
-import { bookStampSVG, countText, dayNumber, lockedLine, monthDay, spanText, stateOf, tiltOf, tripClock, tripDate, usableDefs, weekdayOf } from "../stampbook.js";
+import { bookStampSVG, countText, lockedLine, monthDay, placemat, stateOf, tiltOf, tripClock, tripDate, usableDefs, weekdayOf, esc, MAP_W, MAP_H } from "../stampbook.js";
+import { tripSpan } from "../format.js";
 import { calm, wetInk } from "../fx.js";
 import { thud, primeSound } from "../sound.js";
 import { fillSeal } from "../picture.js";
 
-const RULE = "One stamp a day, pressed on the day, in the place.";
+const RULE = "One stamp a day, pressed on the day, where you are. New Year’s Eve gets the fireworks.";
 const STAMPED = "Stamped.";
 const LOOK_BACK = "Tap to put it back";
 // How often an open book asks again which stamps are open (the clock moves on).
@@ -37,12 +45,13 @@ const BUMP_MS = 220;
 const SETTLE_MS = 700;
 
 const MARKUP = `
-<div class="bk-top"><span class="bk-title"><i>スタンプ帳</i> Stamp book</span><span class="bk-n" id="bookN"></span><button type="button" id="bookDone">Done</button></div>
+<div class="bk-top"><span class="bk-title">Placemat</span><span class="bk-n" id="bookN"></span><button type="button" id="bookDone">Done</button></div>
 <div class="bk-scroll" id="bookScroll" tabindex="-1">
   <div class="bk-page" id="bookPage">
-    <div class="bk-h"><b>MAT 記念スタンプ帳</b><span id="bookSpan"></span></div>
+    <div class="bk-map" id="bookMap"></div>
     <div class="bk-grid" id="bookGrid"></div>
   </div>
+  <div class="bk-leg" id="bookLeg"></div>
   <p class="bk-say" id="bookSay" role="status" aria-live="polite"></p>
   <p class="bk-rule">${RULE}</p>
   <div class="bk-today" id="bookToday">
@@ -50,6 +59,44 @@ const MARKUP = `
     <div class="bk-who" id="bookWho"></div>
   </div>
 </div>`;
+
+// The placemat itself, behind the spots: the scalloped paper, the red
+// border, the title, the street grid, the lake, the river and their names.
+// Built from numbers and escaped names only.
+function matSVG(sub) {
+  const W = MAP_W;
+  const H = MAP_H;
+  let sc = "";
+  const nx = Math.round((W - 14) / 14);
+  const sx = (W - 14) / nx;
+  const ny = Math.round((H - 14) / 14);
+  const sy = (H - 14) / ny;
+  for (let k = 0; k <= nx; k++) {
+    const x = (7 + k * sx).toFixed(1);
+    sc += '<circle cx="' + x + '" cy="7" r="7"/><circle cx="' + x + '" cy="' + (H - 7) + '" r="7"/>';
+  }
+  for (let k = 1; k < ny; k++) {
+    const y = (7 + k * sy).toFixed(1);
+    sc += '<circle cx="7" cy="' + y + '" r="7"/><circle cx="' + (W - 7) + '" cy="' + y + '" r="7"/>';
+  }
+  let grid = "";
+  for (let x = 30; x < 300; x += 22) grid += '<line x1="' + x + '" y1="70" x2="' + x + '" y2="' + (H - 22) + '"/>';
+  for (let y = 70; y < H - 20; y += 22) grid += '<line x1="22" y1="' + y + '" x2="300" y2="' + y + '"/>';
+  return '<svg viewBox="0 0 ' + W + " " + H + '" width="100%" height="100%" aria-hidden="true" focusable="false">' +
+    '<rect x="7" y="7" width="' + (W - 14) + '" height="' + (H - 14) + '" fill="#FFFDF5"/><g fill="#FFFDF5">' + sc + "</g>" +
+    '<rect x="16" y="16" width="' + (W - 32) + '" height="' + (H - 32) + '" fill="none" stroke="#C2362B" stroke-width="1.5"/>' +
+    '<text x="' + W / 2 + '" y="46" text-anchor="middle" font-family="Zilla Slab,Rockwell,Georgia,serif" font-weight="700" font-size="24" fill="#C2362B">Souvenir of Chicago</text>' +
+    '<text x="' + W / 2 + '" y="62" text-anchor="middle" font-family="Libre Franklin,Helvetica Neue,Arial,sans-serif" font-weight="700" font-size="11" fill="#13261F">' + esc(sub) + "</text>" +
+    '<g stroke="rgba(46,122,87,.18)" stroke-width="1">' + grid + "</g>" +
+    '<path d="M300 70 C 292 130, 306 170, 290 210 S 300 300, 284 ' + (H - 22) + " L " + (W - 17) + " " + (H - 22) + " L " + (W - 17) + ' 70 Z" fill="#CDE4EE"/>' +
+    '<text transform="translate(322 300) rotate(-90)" text-anchor="middle" font-family="Zilla Slab,Rockwell,Georgia,serif" font-weight="600" font-size="14" fill="#2F5FA8">Lake Michigan</text>' +
+    '<path d="M292 206 L 150 206 L 132 196 L 118 72 M150 206 L 140 222 L 150 ' + (H - 22) + '" fill="none" stroke="#7FB4D3" stroke-width="7" stroke-linejoin="round"/>' +
+    '<text transform="translate(160 330) rotate(90)" text-anchor="middle" font-family="Libre Franklin,Helvetica Neue,Arial,sans-serif" font-weight="700" font-size="9.5" fill="#2F5FA8">Chicago River</text>' +
+    "</svg>";
+}
+
+const ARROW = { sw: "↙ ", nw: "↖ ", n: "↑ " };
+const isNye = (d) => typeof d.date === "string" && d.date.slice(5) === "12-31";
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
@@ -69,7 +116,7 @@ export function mountStampBook(root, store, { now = () => Date.now() } = {}) {
   panel.id = "book";
   panel.setAttribute("role", "dialog");
   panel.setAttribute("aria-modal", "true");
-  panel.setAttribute("aria-label", "Stamp book");
+  panel.setAttribute("aria-label", "Placemat");
   panel.inert = true;
   panel.innerHTML = MARKUP;
   root.append(scrim, panel);
@@ -87,7 +134,8 @@ export function mountStampBook(root, store, { now = () => Date.now() } = {}) {
   let held = null; // the def id of the stamp held up
   let look = null; // the held-up overlay
   let timer = null;
-  const sigs = new Map(); // def id -> what its ring was drawn from
+  const sigs = new Map(); // def id -> what its spot was drawn from
+  let mapSub = null; // the map's second line, as last drawn
 
   // ---- what the book shows ----
 
@@ -101,26 +149,28 @@ export function mountStampBook(root, store, { now = () => Date.now() } = {}) {
 
   function label(d, st) {
     const date = d.date ? monthDay(d.date) : "";
-    if (!d.date) return st === "have" ? "The book, stamped. Hold it up." : st === "open" ? "Press the book's stamp" : "The book, closed";
+    if (!d.date) return st === "have" ? "The placemat’s own stamp, stamped. Hold it up." : st === "open" ? "Press the placemat’s own stamp" : "The placemat’s own stamp, closed";
     if (st === "have") return date + ", " + (d.name_en || d.place || "stamp") + ", stamped. Hold it up.";
     if (st === "open") return "Press the stamp for " + date;
     return st === "soon" ? date + ", not open yet" : date + ", closed";
   }
 
-  function ghost(d, st) {
-    const g = el("span", "bk-ghost");
-    const big = d.date ? dayNumber(d.date) : [...String(d.name_ja || "")].slice(0, 2).join("") || "MAT";
-    const small = st === "open" ? "PRESS" : d.date ? weekdayOf(d.date) : "";
+  // A spot not yet stamped: a dashed ring with the day's number (a burst on
+  // New Year's Eve); open today, a solid red ring that says today.
+  function ghost(d, st, n) {
+    const g = el("span", "bk-ghost" + (isNye(d) ? " is-nye" : ""));
+    const big = st === "open" ? "today" : d.date ? String(n) : "★";
     g.append(el("b", "", big));
-    if (small) g.append(el("small", "", small));
     return g;
   }
 
-  function cellEl(d, st, stamp, defs, hit) {
+  function cellEl(d, st, stamp, defs, hit, spot, n) {
     const b = el("button", "bk-cell is-" + st);
     b.type = "button";
     b.dataset.def = d.id;
     b.setAttribute("aria-label", label(d, st));
+    b.style.left = ((spot.x / MAP_W) * 100).toFixed(2) + "%";
+    b.style.top = ((spot.y / MAP_H) * 100).toFixed(2) + "%";
     const well = el("span", "bk-well");
     if (st === "have" && stamp) {
       const seed = stamp.seed;
@@ -132,23 +182,26 @@ export function mountStampBook(root, store, { now = () => Date.now() } = {}) {
         wetInk(svg); // just landed: still wet (js/fx.js)
       }
     } else {
-      well.append(ghost(d, st));
+      well.append(ghost(d, st, n));
     }
     const cap = el("span", "bk-cap");
-    cap.append(d.date ? monthDay(d.date) : "The book");
-    if (d.place) cap.append(el("i", "", d.place));
+    if (d.date) cap.append((ARROW[spot.dir] || "") + (d.place || monthDay(d.date)));
     b.append(well, cap);
     return b;
   }
 
   function drawGrid(m) {
     const want = [];
+    const spots = new Map(placemat(m.defs).map((p) => [p.id, p]));
+    const days = m.defs.filter((d) => d.date);
     for (const d of m.defs) {
+      const spot = spots.get(d.id);
+      const n = days.indexOf(d) + 1;
       const st = m.state(d);
       const stamp = m.mine.get(d.id) || null;
       // Everything the ring prints: its state, its stamp and the definition. Not whether
       // the press is still on its way: the drawing is the same.
-      const sig = JSON.stringify([st, stamp ? [stamp.seed, stamp.at] : null, d.date, d.name_ja, d.name_en, d.place, d.motif, d.ink, d.shape]);
+      const sig = JSON.stringify([st, stamp ? [stamp.seed, stamp.at] : null, d.date, d.name_en, d.place, d.ink, d.shape, spot.x, spot.y, n]);
       let node = grid.querySelector('.bk-cell[data-def="' + CSS.escape(d.id) + '"]');
       if (node && sigs.get(d.id) === sig) {
         want.push(node);
@@ -156,7 +209,7 @@ export function mountStampBook(root, store, { now = () => Date.now() } = {}) {
       }
       const hit = d.id === hitId;
       if (hit) hitId = null;
-      const fresh = cellEl(d, st, stamp, m.defs, hit);
+      const fresh = cellEl(d, st, stamp, m.defs, hit, spot, n);
       const hadFocus = node && node === document.activeElement;
       sigs.set(d.id, sig);
       if (node) node.replaceWith(fresh);
@@ -171,6 +224,28 @@ export function mountStampBook(root, store, { now = () => Date.now() } = {}) {
     for (const id of [...sigs.keys()]) if (!m.defs.some((d) => d.id === id)) sigs.delete(id);
   }
 
+  // The legend: one line a day, its number, place and date, and what it says now.
+  function drawLegend(m) {
+    const rows = m.defs.filter((d) => d.date).map((d, i) => {
+      const st = m.state(d);
+      const mine = m.mine.get(d.id);
+      const b = el("button", "bk-row" + (st === "open" ? " is-now" : ""));
+      b.type = "button";
+      b.dataset.def = d.id;
+      b.setAttribute("aria-label", label(d, st));
+      const k = el("span", "bk-k" + (st === "have" ? " is-got" : ""), String(i + 1));
+      const name = el("b", "", d.place || d.name_en || monthDay(d.date));
+      name.append(el("small", "", weekdayOf(d.date) + " " + monthDay(d.date)));
+      const at = mine ? isoMs(mine.at) : NaN;
+      const word = st === "have" ? (isFinite(at) ? "Stamped " + tripClock(at) : "Stamped") : st === "open" ? "Stamp it today" : isNye(d) ? "Fireworks" : st === "missed" ? "Closed" : "";
+      b.append(k, name, el("em", "", word));
+      return b;
+    });
+    const leg = $("bookLeg");
+    leg.replaceChildren(...rows);
+    leg.hidden = !rows.length;
+  }
+
   function drawToday(m) {
     const issue = m.defs.find((d) => !d.date) || null;
     const today = tripDate(m.t);
@@ -180,7 +255,7 @@ export function mountStampBook(root, store, { now = () => Date.now() } = {}) {
     row.hidden = !d;
     if (!d) return;
     const head = $("bookTH");
-    head.replaceChildren(el("i", "", day ? "今日" : "発行"), " " + (day ? "Today" : "The book"));
+    head.replaceChildren(day ? "Today" : "The placemat’s own stamp");
     const people = list(m.s.people);
     const who = $("bookWho");
     const nodes = people.map((p) => {
@@ -199,8 +274,13 @@ export function mountStampBook(root, store, { now = () => Date.now() } = {}) {
   function render(s) {
     if (!opened) return;
     const m = model(s);
+    const sub = [list(s.people).map((p) => p.name).join(" & "), s.trip && s.trip.start ? tripSpan(s.trip) : ""].filter(Boolean).join(" · ");
+    if (mapSub !== sub) {
+      mapSub = sub;
+      $("bookMap").innerHTML = matSVG(sub); // numbers and escaped names only
+    }
     drawGrid(m);
-    $("bookSpan").textContent = spanText(m.defs);
+    drawLegend(m);
     $("bookN").textContent = countText(m.mine.size, m.defs.length);
     drawToday(m);
     // A held stamp that is no longer mine (lifted from History on another phone) is put back.
@@ -249,7 +329,7 @@ export function mountStampBook(root, store, { now = () => Date.now() } = {}) {
     const card = el("span", "bk-card");
     card.innerHTML = bookStampSVG(stamp.seed, d, usableDefs(store.state.stampDefs)); // escaped by bookStampSVG
     const t = el("span", "bk-lt");
-    t.append([d.name_ja, d.name_en].filter(Boolean).join(" ") || "Stamp");
+    t.append(d.name_en || d.place || (d.date ? "Stamp" : "Wendy’s"));
     if (d.place) t.append(el("i", "", d.place));
     const at = isoMs(stamp.at);
     const day = d.date || (isFinite(at) ? tripDate(at) : "");
@@ -281,8 +361,11 @@ export function mountStampBook(root, store, { now = () => Date.now() } = {}) {
     return true;
   }
 
-  grid.addEventListener("click", (ev) => {
-    const cell = ev.target.closest(".bk-cell");
+  function tap(ev) {
+    const hitEl = ev.target.closest(".bk-cell, .bk-row");
+    if (!hitEl) return;
+    // A line of the legend acts as its spot on the map.
+    const cell = grid.querySelector('.bk-cell[data-def="' + CSS.escape(hitEl.dataset.def) + '"]');
     if (!cell) return;
     const m = model(store.state);
     const d = m.defs.find((x) => x.id === cell.dataset.def);
@@ -294,7 +377,9 @@ export function mountStampBook(root, store, { now = () => Date.now() } = {}) {
       if (stamp) openLook(d, stamp);
     } else if (st === "open") press(d);
     else refuse(cell, d, st);
-  });
+  }
+  grid.addEventListener("click", tap);
+  $("bookLeg").addEventListener("click", tap);
 
   // ---- opening and closing ----
 

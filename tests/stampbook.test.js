@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { INKS, MOTIFS, bookStampSVG, windowOf, stateOf, countText, tiltOf, usableDefs, spanText, lockedLine, tripClock, tripDate, esc, summary } from "../js/stampbook.js";
+import { INKS, MOTIFS, bookStampSVG, placemat, windowOf, stateOf, countText, tiltOf, usableDefs, spanText, lockedLine, tripClock, tripDate, esc, summary } from "../js/stampbook.js";
 
 const D1 = { id: "d1", date: "2030-01-05", name_ja: "試験", name_en: "Testville", place: "Test Hall", motif: "lantern", ink: "shu", shape: "round" };
 const D2 = { id: "d2", date: "2030-01-06", name_ja: "二", name_en: "Second", place: "Second Place", motif: "tower", ink: "ai", shape: "square" };
@@ -74,25 +74,33 @@ test("bookStampSVG: markup in a name is text, never markup", () => {
   for (const field of ["name_en", "name_ja", "place"]) {
     const svg = bookStampSVG(7, { ...D1, [field]: "<img src=x onerror=alert(1)>" }, DEFS);
     assert.equal(/<img/i.test(svg), false, field);
-    if (field !== "place") assert.match(svg, /&lt;IMG|&lt;img/i, field);
+    if (field === "name_en") assert.match(svg, /&lt;IMG|&lt;img/i, field);
   }
   assert.equal(esc('<a href="x">&\'</a>'), "&lt;a href=&quot;x&quot;&gt;&amp;&#39;&lt;/a&gt;");
   // an id with markup cannot break out of an attribute either
   assert.equal(/"[^"]*<script/.test(bookStampSVG(7, { ...D1, id: '"><script>x</script>' }, DEFS)), false);
 });
 
-test("bookStampSVG: an unknown drawing still draws the ring and the names; an unknown ink is vermilion", () => {
+test("bookStampSVG: the placemat's stamp: a double ring, the date and weekday in the middle, the name on the arc; an unknown ink is red", () => {
   const svg = bookStampSVG(9, { ...D1, motif: "no-such-drawing", ink: "no-such-ink" }, DEFS);
   assert.match(svg, /^<svg /);
   assert.match(svg, /<circle cx="60" cy="60" r="55"/);
+  assert.match(svg, />JAN 5</);
+  assert.match(svg, />SAT</);
   assert.match(svg, /TESTVILLE/);
   assert.match(svg, new RegExp('color="' + INKS.shu + '"'));
-  assert.equal(svg.includes(MOTIFS.lantern), false);
-  // names that are keys of Object.prototype are not drawings or inks
+  // names that are keys of Object.prototype are not inks
   const odd = bookStampSVG(9, { ...D1, motif: "constructor", ink: "__proto__" }, DEFS);
   assert.match(odd, new RegExp('color="' + INKS.shu + '"'));
   assert.match(bookStampSVG(9, {}, DEFS), /^<svg /);
   assert.match(bookStampSVG(9, null, DEFS), /^<svg /);
+});
+
+test("bookStampSVG: no Japanese face and no Japanese name; the date is the picture (no drawing from a library)", () => {
+  const svg = bookStampSVG(9, { ...D1, motif: "lantern" }, DEFS);
+  assert.equal(/Zen|Hiragino|Mincho|試験/.test(svg), false, svg);
+  assert.match(svg, /Zilla Slab/);
+  assert.deepEqual(Object.keys(MOTIFS), ["crest"]);
 });
 
 test("bookStampSVG: a square has a rounded-square frame and no outer circle frame; the ink follows the definition", () => {
@@ -105,26 +113,53 @@ test("bookStampSVG: a square has a rounded-square frame and no outer circle fram
   assert.equal(/<rect x="5" y="5" width="110"/.test(round), false);
 });
 
-test("bookStampSVG: the date reads M.D on the bottom arc; the issue stamp shows the year of the first day stamp", () => {
-  assert.match(bookStampSVG(3, D1, DEFS), /TESTVILLE · 1\.5</);
-  assert.match(bookStampSVG(3, ISS, DEFS), /ISSUED · 2030</);
-  assert.match(bookStampSVG(3, ISS, [ISS]), /ISSUED</);
-});
-
-test("bookStampSVG: a long name is made to fit its arc; every drawing in the library draws", () => {
-  const long = bookStampSVG(5, { ...D1, name_en: "A very long station name indeed", name_ja: "とても長い駅の名前です" }, DEFS);
-  assert.match(long, /font-size="[0-5]\.\d+"/);
-  for (const key of ["lantern", "books", "onsen", "temple", "mountain", "snow", "lamp", "tower", "record", "sake", "plane", "crest"]) {
-    assert.ok(MOTIFS[key] && MOTIFS[key].length > 20, key);
-    assert.ok(bookStampSVG(1, { ...D1, motif: key }, DEFS).includes(MOTIFS[key]), key);
-  }
-  assert.equal(Object.keys(MOTIFS).length, 12);
-  assert.match(MOTIFS.crest, />MAT</);
+test("bookStampSVG: New Year's Eve is a fireworks burst; the issue stamp is the crest with the app's name and the year", () => {
+  const nye = bookStampSVG(3, { ...D1, date: "2030-12-31" }, DEFS);
+  assert.match(nye, /class="burst"/);
+  assert.match(nye, />DEC 31</);
+  assert.equal(/<circle cx="60" cy="60" r="55"/.test(nye), false);
+  const iss = bookStampSVG(3, ISS, DEFS);
+  assert.match(iss, />WENDY’S</);
+  assert.match(iss, />2030</);
   assert.equal((MOTIFS.crest.match(/M[\d.]+ [\d.]+L/g) || []).length, 12, "twelve ticks");
+  assert.equal(/MAT/.test(iss), false);
+  assert.match(bookStampSVG(3, ISS, [ISS]), />WENDY’S</);
 });
 
-test("the inks are exactly three", () => {
-  assert.deepEqual(INKS, { shu: "#D63C1E", matsu: "#2B6A4C", ai: "#28408F" });
+test("bookStampSVG: a long name is made to fit its arc", () => {
+  const long = bookStampSVG(5, { ...D1, name_en: "A very long station name indeed and then some more" }, DEFS);
+  assert.match(long, /font-size="[0-5]\.\d+"/);
+});
+
+test("the inks are exactly three: the check's red, the placemat's blue and the rules' green", () => {
+  assert.deepEqual(INKS, { shu: "#C2362B", matsu: "#2E7A57", ai: "#2F5FA8" });
+});
+
+test("placemat: a known Chicago place sits on its own spot of the map; others get free spots; the book's own stamp its corner", () => {
+  const day = (i, place) => ({ id: "p" + i, date: "2030-01-0" + i, place, name_en: place });
+  const defs = [day(1, "Midway"), day(2, "Millennium Park"), day(3, "West Loop"), day(4, "the loop"), day(5, "Somewhere New"), day(6, "Another Unknown"), day(7, "O'Hare"), ISS];
+  const at = placemat(defs);
+  assert.deepEqual(at.map((p) => p.id), ["p1", "p2", "p3", "p4", "p5", "p6", "p7", "iss"]);
+  const of = (id) => at.find((p) => p.id === id);
+  assert.deepEqual([of("p1").x, of("p1").y], [58, 372]);
+  assert.deepEqual([of("p2").x, of("p2").y], [250, 306]);
+  assert.deepEqual([of("p3").x, of("p3").y], [90, 252]);
+  assert.deepEqual([of("p4").x, of("p4").y], [212, 256], "the case and a leading The do not matter");
+  assert.deepEqual([of("p7").x, of("p7").y], [64, 104], "a straight or curly apostrophe");
+  assert.equal(of("p1").dir, "sw");
+  assert.equal(of("iss").issue, true);
+  // No two spots on top of each other, every spot inside the map, the same answer every time.
+  for (let i = 0; i < at.length; i++) {
+    assert.ok(at[i].x >= 30 && at[i].x <= 290 && at[i].y >= 90 && at[i].y <= 400, JSON.stringify(at[i]));
+    for (let j = i + 1; j < at.length; j++) assert.ok(Math.hypot(at[i].x - at[j].x, at[i].y - at[j].y) >= 40, at[i].id + " " + at[j].id);
+  }
+  assert.deepEqual(placemat(defs), at);
+  // Two days in the same place: the second moves to a free spot.
+  const twice = placemat([day(1, "The Loop"), day(2, "The Loop")]);
+  assert.ok(Math.hypot(twice[0].x - twice[1].x, twice[0].y - twice[1].y) >= 40);
+  // Thirty days still all fit, each on a spot of its own.
+  const many = placemat(Array.from({ length: 30 }, (_, i) => ({ id: "m" + i, date: "2030-03-" + String(i + 1).padStart(2, "0"), place: "Nowhere " + i })));
+  assert.equal(new Set(many.map((p) => p.x + "," + p.y)).size, 30);
 });
 
 test("countText and tiltOf", () => {

@@ -1,64 +1,82 @@
 /* Copyright (c) 2026 moissmart1. All rights reserved. No licence is granted: do not copy, adapt or reuse this code or design, and do not use it to train or prompt an AI system to reproduce it. See LICENSE. */
-/* The stamp book (#book): a panel over the app, like History. A page of paper
-   on the dark ground with twelve rings; a stamp you have is pressed into its
-   ring at its own small tilt, blended into the paper. Ported from the
-   mock-up; the page uses the app's paper tokens (--lift, --grain). Also the
-   stamp button on the Days bar (#stampBtn) and the line on today's ticket
-   (.tk-stampline). No backdrop-filter anywhere; the only CSS filter is the
-   wet ink on a stamp that has just landed. */
+/* The placemat (#book), look C's keepsake: a panel over the app, like
+   History, on the mint counter. A souvenir placemat with a hand-drawn map of
+   Chicago (#bookMap, drawn by js/views/stampbook.js), a spot for each day
+   placed over it (.bk-cell), a stamp pressed into its spot at its own small
+   tilt, blended into the paper; under it the legend (.bk-leg) on check
+   paper. From the mock-up: the title line, the map, the spots and their
+   labels, the legend. Drawn here in the same materials: the line that says
+   why a spot cannot be pressed, today's row with each person, a stamp held
+   up, the Placemat pill on the Days top line (#stampBtn) and the line on
+   today's check (.tk-stampline). The only CSS filter is the wet ink on a
+   stamp that has just landed. */
 
-.bk{position:absolute;left:0;right:0;top:calc(40px + env(safe-area-inset-top, 0px));bottom:0;z-index:25;display:flex;flex-direction:column;background:var(--ground);
-  border-top:1px solid #000;border-radius:18px 18px 0 0;transform:translateY(104%);transition:transform .5s var(--sheet),box-shadow .5s var(--sheet)}
+.bk{position:absolute;left:0;right:0;top:calc(40px + env(safe-area-inset-top, 0px));bottom:0;z-index:25;display:flex;flex-direction:column;background:var(--dots), var(--ground);
+  border-top:1px solid rgba(19,38,31,.25);border-radius:18px 18px 0 0;transform:translateY(104%);transition:transform .5s var(--sheet),box-shadow .5s var(--sheet)}
 /* The shadow belongs to an open panel only: parked below the screen it leaked a dark fade over the bottom bar. */
-.bk.is-open{transform:none;box-shadow:0 -24px 40px -10px #000}
-.bk-top{display:flex;align-items:center;gap:8px;padding:12px var(--gr) 2px var(--gl);font-weight:900;font-size:16px}
-@media (max-width:380px){ .bk-top{font-size:14.5px;gap:6px} }
-.bk-title{min-width:0;white-space:nowrap}
-.bk-title i{font-family:var(--seal);font-weight:400;margin-right:8px}
-.bk-n{margin-left:auto;padding-left:4px;font-family:var(--dot);font-weight:400;font-size:13px;color:var(--dim);white-space:nowrap;font-variant-numeric:tabular-nums}
-.bk-top button{flex:none;border:0;background:none;color:var(--dim);font-weight:900;font-size:15px;height:44px;min-width:44px;padding:0 4px}
-.bk-scroll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:4px var(--gr) calc(28px + env(safe-area-inset-bottom, 0px)) var(--gl);scrollbar-width:none;outline:none}
+.bk.is-open{transform:none;box-shadow:0 -24px 40px -10px rgba(19,38,31,.5)}
+.bk-top{display:flex;align-items:baseline;gap:8px;padding:14px var(--gr) 2px var(--gl);font-weight:900}
+.bk-title{min-width:0;white-space:nowrap;font-size:20px}
+.bk-n{padding-left:2px;font-weight:700;font-size:14px;opacity:.75;white-space:nowrap;font-variant-numeric:tabular-nums}
+.bk-top button{flex:none;margin-left:auto;align-self:center;border:0;color:var(--stock);font-weight:800;font-size:13.5px;height:44px;min-width:44px;padding:0 13px;border-radius:17px;
+  background:linear-gradient(var(--print),var(--print)) center/100% 34px no-repeat}
+.bk-scroll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:8px calc(var(--gr) - 4px) calc(28px + env(safe-area-inset-bottom, 0px)) calc(var(--gl) - 4px);scrollbar-width:none;outline:none}
 .bk-scroll::-webkit-scrollbar{display:none}
 
-.bk-page{padding:13px 12px 14px;border-radius:5px;color:var(--print);background:var(--grain), var(--paper);box-shadow:var(--lift)}
+/* The placemat: the map's box keeps the drawing's own shape; the spots stand over it. */
+.bk-page{position:relative;width:100%;max-width:440px;margin:0 auto;aspect-ratio:358 / 440;container-type:inline-size}
 .bk-page.thump{animation:bk-thump .2s ease-out}
 @keyframes bk-thump{0%{transform:translateY(3px)}60%{transform:translateY(-1px)}}
-.bk-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding-bottom:8px;border-bottom:1.5px solid var(--print);font-weight:900;font-size:13px}
-.bk-h b{font-family:var(--seal);font-weight:400;font-size:15px}
-.bk-h span{font-family:var(--dot);font-weight:400;font-size:12.5px;white-space:nowrap}
-.bk-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 8px;margin-top:12px}
+.bk-map,.bk-map svg{position:absolute;inset:0;display:block;width:100%;height:100%}
+.bk-map svg{filter:drop-shadow(0 10px 12px rgba(19,38,31,.25))}
+.bk-grid{position:absolute;inset:0}
 
-.bk-cell{min-width:0;min-height:44px;border:0;background:none;padding:0;color:var(--print);text-align:center}
-.bk-well{position:relative;display:grid;place-items:center;aspect-ratio:1}
-.bk-ghost{width:86%;aspect-ratio:1;border-radius:50%;border:1.5px dashed rgba(21,18,15,.28);display:grid;place-items:center;align-content:center;
-  font-family:var(--dot);color:rgba(21,18,15,.38);line-height:1.1;transition:transform .15s ease-out,border-color .2s}
-.bk-ghost b{font-family:var(--seal);font-weight:400;font-size:26px}
-.bk-ghost small{font-size:11px}
-/* Open and not yet pressed: a solid vermilion ring that says PRESS. */
-.bk-cell.is-open .bk-ghost{border:2px solid var(--shu);color:var(--shu)}
-.bk-cell.is-open .bk-ghost small{font-family:var(--f);font-weight:900;font-size:10.5px;letter-spacing:.08em}
-.bk-cell.is-missed .bk-ghost{opacity:.6}
+/* A spot: a ring the size of the mock-up's (34 of the map's 358 units), its place under it. */
+/* As wide as its ring (spots stand at least 40 map units apart, so two rings never overlap), and never under 44 px to the finger; the label under it does not take taps. */
+.bk-cell{position:absolute;width:max(44px, 10.5cqw);min-height:44px;transform:translate(-50%,-50%);display:grid;justify-items:center;align-content:start;
+  border:0;background:none;padding:0;color:var(--print);text-align:center}
+.bk-well{position:relative;display:grid;place-items:center;width:10.5cqw;aspect-ratio:1}
+.bk-ghost{width:100%;aspect-ratio:1;border-radius:50%;border:1.5px dashed var(--grn);background:rgba(255,255,255,.6);display:grid;place-items:center;
+  color:var(--grn);line-height:1;transition:transform .15s ease-out,border-color .2s}
+.bk-ghost b{font-weight:900;font-size:12px}
+/* New Year's Eve: a dashed burst where the ring would be (the fireworks). */
+.bk-ghost.is-nye{border:0;border-radius:0;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath d='M24 1L27.6 13.8 37.8 5.2 33 17.6 46.2 17.8 35.4 25.4 44.4 35.2 31.4 32.8 31.2 46 24 35 16.8 46 16.6 32.8 3.6 35.2 12.6 25.4 1.8 17.8 15 17.6 10.2 5.2 20.4 13.8Z' fill='none' stroke='%23C2362B' stroke-width='1.6' stroke-dasharray='4 3'/%3E%3C/svg%3E") center/contain no-repeat;color:var(--red)}
+/* Open and not yet pressed: a solid red ring on cream that says today. */
+.bk-cell.is-open .bk-ghost{border:2.4px solid var(--red);border-style:solid;background:#FFF6E0;color:var(--red)}
+.bk-cell.is-open .bk-ghost.is-nye{border:0;background-color:transparent}
+.bk-cell.is-missed .bk-ghost{opacity:.55}
 .bk-cell:active .bk-ghost{transform:scale(.97)}
 .bk-cell.nope .bk-ghost{animation:bk-nope .2s ease-out}
 @keyframes bk-nope{30%{transform:translateX(-3px)}70%{transform:translateX(2px)}}
-.bk-cap{display:block;margin-top:3px;font-size:11px;font-weight:700;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.bk-cap i{display:block;font-weight:500;color:rgba(21,18,15,.62);overflow:hidden;text-overflow:ellipsis}
+.bk-cap{display:block;margin-top:2px;pointer-events:none;font-size:10.5px;font-weight:800;line-height:1.15;white-space:nowrap;color:var(--print)}
+@media (max-width:360px){ .bk-cap{font-size:9px} .bk-ghost b{font-size:10.5px} }
 
 /* A stamp: its own tilt (--rot, set on the well), blended into the paper. */
-.bk-st{position:absolute;inset:3%;width:94%;height:94%;transform:rotate(var(--rot,0deg));mix-blend-mode:multiply;overflow:visible;transition:filter 1.8s ease-out}
+.bk-st{position:absolute;inset:-8%;width:116%;height:116%;transform:rotate(var(--rot,0deg));mix-blend-mode:multiply;overflow:visible;transition:filter 1.8s ease-out}
 .bk-st.hit{animation:bk-hit .24s backwards}
 @keyframes bk-hit{
-  0%{transform:rotate(var(--rot)) scale(2.4);opacity:0;animation-timing-function:cubic-bezier(.7,0,1,.7)}
+  0%{transform:rotate(var(--rot)) scale(2.2);opacity:0;animation-timing-function:cubic-bezier(.7,0,1,.7)}
   62%{transform:rotate(var(--rot)) scale(.93);opacity:1}
   100%{transform:rotate(var(--rot)) scale(1);opacity:1}}
 /* Wet ink: js/fx.js adds .wet to a stamp that has just landed and takes it off after half a second, and the ink dries back over the 1.8 s above. Never on a stamp drawn on load. */
 .bk-st.wet{filter:saturate(1.35) brightness(1.1) drop-shadow(0 0 2.5px currentColor);transition:none}
 
-.bk-say{min-height:20px;margin:8px 2px 0;font-size:13px;color:var(--dim)}
-.bk-rule{margin:0 2px;font-size:12.5px;color:var(--dim)}
-.bk-today{margin:12px 0 4px;padding:12px 14px;border-radius:10px;background:var(--key);box-shadow:var(--key-edge)}
+/* The legend, on check paper: number, place and date, what it says now. */
+.bk-leg{margin:12px 4px 0;padding:2px 10px;border-radius:2px;background:var(--stock);color:var(--print);box-shadow:var(--lift)}
+.bk-row{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:8px;align-items:center;width:100%;min-height:44px;padding:8px 0;border:0;border-bottom:1px solid rgba(46,122,87,.4);
+  background:none;color:var(--print);text-align:left}
+.bk-row:last-child{border-bottom:0}
+.bk-k{width:22px;height:22px;border-radius:50%;border:1.6px solid var(--grn);display:grid;place-items:center;font-size:11px;font-weight:900;color:var(--grn)}
+.bk-k.is-got{background:var(--grn);color:#fff}
+.bk-row b{min-width:0;font-size:14.5px;font-weight:900;overflow-wrap:anywhere}
+.bk-row b small{font-weight:500;font-size:12.5px;margin-left:6px;white-space:nowrap}
+.bk-row em{font-style:normal;font-size:12px;font-weight:700;white-space:nowrap}
+.bk-row.is-now em{color:var(--red)}
+
+.bk-say{min-height:20px;margin:10px 4px 0;font-size:13.5px;font-weight:700}
+.bk-rule{margin:0 4px;font-size:13px}
+.bk-today{margin:12px 4px 4px;padding:12px 14px;border-radius:2px;background:var(--stock);box-shadow:var(--lift)}
 .bk-th{font-weight:900;font-size:14px}
-.bk-th i{font-family:var(--seal);font-weight:400;margin-right:8px}
 /* A third of the row each, two centred (as the who-are-you keys). */
 .bk-who{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:10px}
 .bk-who>.bk-p{flex:0 0 calc((100% - 16px) / 3)}
@@ -67,54 +85,50 @@
 .bk-p b{display:block;font-weight:900;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bk-p span i{display:block;color:var(--dim);font-variant-numeric:tabular-nums}
 .bk-seal{flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-family:var(--f);font-weight:900;font-size:12px;overflow:hidden;
-  border:1.5px dashed var(--dim);color:var(--dim);transition:background .2s,color .2s,border-color .2s}
+  border:1.5px dashed var(--grn);color:var(--grn);transition:background .2s,color .2s,border-color .2s}
 .bk-seal img{display:block;width:100%;height:100%;object-fit:cover;opacity:.4;pointer-events:none}
-.bk-p.is-in .bk-seal{border:2px solid var(--shu);background:var(--paper);color:var(--shu)}
+.bk-p.is-in .bk-seal{border:2px solid var(--red);background:var(--mat);color:var(--red)}
 .bk-p.is-in .bk-seal img{opacity:1}
 
-/* A stamp held up to look at. */
+/* A stamp held up to look at: on a piece of the placemat's paper. */
 .bk-look{position:absolute;inset:0;z-index:5;display:grid;place-items:center;align-content:center;gap:14px;width:100%;padding:20px;border:0;border-radius:18px 18px 0 0;
-  background:rgba(13,11,10,.9);color:var(--text)}
-.bk-card{display:block;width:min(100%,270px);padding:22px 22px 16px;border-radius:5px;color:var(--print);background:var(--grain), var(--paper);
+  background:rgba(19,38,31,.82);color:var(--stock)}
+.bk-card{display:block;width:min(100%,270px);padding:22px 22px 16px;border-radius:3px;color:var(--print);background:var(--mat);border:1.5px solid var(--red);outline:5px solid var(--mat);
   box-shadow:0 30px 50px -20px #000;transform:rotate(-1.2deg);text-align:left}
 .bk-card .bk-st{position:static;display:block;width:100%;height:auto;aspect-ratio:1}
-.bk-lt{display:block;margin-top:10px;padding-top:9px;border-top:1.5px solid var(--print);font-weight:900;font-size:14px;overflow-wrap:anywhere}
-.bk-lt i{display:block;font-family:var(--dot);font-weight:400;font-size:12.5px;margin-top:2px}
-.bk-lx{color:var(--dim);font-size:13px;font-weight:700}
+.bk-lt{display:block;margin-top:10px;padding-top:9px;border-top:1.5px solid var(--red);font-weight:900;font-size:15px;overflow-wrap:anywhere}
+.bk-lt i{display:block;font-weight:600;font-size:12.5px;margin-top:2px}
+.bk-lx{font-size:13.5px;font-weight:700}
 
-/* While the book is open the undo bar sits at the top, clear of its buttons. */
+/* While the placemat is open the undo bar sits at the top, clear of its buttons. */
 .phone.book-open .ubar{top:calc(12px + env(safe-area-inset-top, 0px));bottom:auto}
 
-/* ---------- the way in: the Days bar and today's ticket ---------- */
-/* The stamp button: a small ring and the count, beside the day counter. */
-.bar-l{display:flex;align-items:center;gap:12px;min-width:0}
-/* With the stamp button the bar has three things to say: the button sits at the right of the counter's line and the squares drop to a line of their own (a phone is too narrow for all three; a wider column keeps one line). */
-.bar.has-stamp{flex-wrap:wrap;row-gap:0}
-.bar.has-stamp .bar-l{flex:1 1 auto;justify-content:space-between}
-.bar.has-stamp .pager{margin-left:-2px}
-.bar-stamp{display:flex;align-items:center;gap:6px;flex:none;min-height:44px;min-width:44px;padding:0 4px;border:0;background:none;color:var(--text);
-  font-family:var(--dot);font-weight:400;font-size:14px;white-space:nowrap;font-variant-numeric:tabular-nums}
-.bar-stamp svg{flex:none;width:20px;height:20px;fill:none;stroke:var(--shu);stroke-width:2.2}
-.bar-stamp svg .d{stroke-width:1.6;stroke-dasharray:2.4 2.6}
-.bar-stamp:active svg{transform:scale(.94)}
-/* On today's ticket: a ruled line under the date, in the ticket's print. */
-.tk-stampline{display:flex;align-items:center;gap:9px;width:100%;min-height:44px;margin:9px 0 -4px;padding:6px 0;border:0;border-top:1px solid rgba(21,18,15,.17);
+/* ---------- the way in: the Days top line and today's check ---------- */
+/* Placemat: the dark pill at the right of the top line (the mock-up's). */
+/* A 44 px tap target; the pill drawn in its middle is 32 px tall. */
+.bar-stamp{position:relative;flex:none;align-self:center;min-height:44px;padding:0 12px;border:0;border-radius:16px;color:var(--stock);font-weight:800;font-size:13.5px;white-space:nowrap;
+  background:linear-gradient(var(--print),var(--print)) center/100% 32px no-repeat}
+.bar-stamp:active{transform:scale(.97)}
+/* On today's check: a line under the heading, as a line of the check. */
+.tk-stampline{display:flex;align-items:center;gap:9px;width:calc(100% + 16px);min-height:44px;margin:6px -8px -4px;padding:6px 8px;border:0;border-top:1px solid var(--rule);
   background:none;color:var(--print);text-align:left;font-size:14px;font-weight:900}
-.tk-stampline svg{flex:none;width:22px;height:22px;fill:none;stroke:var(--shu);stroke-width:2.2}
+.tk-stampline svg{flex:none;width:22px;height:22px;fill:none;stroke:var(--red);stroke-width:2.2}
 .tk-stampline svg .d{stroke-width:1.6;stroke-dasharray:2.6 2.8}
 .tk-stampline span{flex:1;min-width:0}
 .tk-stampline i{flex:none;font-size:18px;font-weight:700;opacity:.6}
-.tk-stampline:active{background:rgba(21,18,15,.06)}
+.tk-stampline:active{background:rgba(46,122,87,.08)}
 
 @media (prefers-reduced-motion: reduce){
   .bk-st.hit,.bk-page.thump,.bk-cell.nope .bk-ghost{animation:none}
   .bk-st{transition:none}
 }
 
-/* Held sideways: the book has the screen's height to itself and lays its twelve rings in two rows of six. */
+/* Held sideways: the placemat has the screen's height to itself; the map and the legend stand side by side. */
 @media (orientation:landscape) and (max-height:520px){
   .bk{top:calc(10px + env(safe-area-inset-top, 0px))}
   .bk:not(.is-open){box-shadow:none}
-  .bk-grid{grid-template-columns:repeat(6,minmax(0,1fr))}
+  .bk-scroll{display:grid;grid-template-columns:minmax(0,300px) minmax(0,1fr);column-gap:14px;align-content:start}
+  .bk-page{grid-row:1 / span 5}
+  .bk-leg{margin-top:0}
   .bk-card{width:min(100%,210px);padding:16px 18px 12px}
 }

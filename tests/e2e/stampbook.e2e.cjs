@@ -96,27 +96,33 @@ module.exports = [
     },
   },
   {
-    name: "the Days bar button reads the count and opens the book: eight cells, today's ring open, the rest not",
+    name: "the Placemat pill on the Days top line opens the placemat: eight spots, today's open, the rest not, and the legend",
     async run({ page }) {
       await ready(page);
       await until(() => visible(page, "#stampBtn"), "the stamp button shows");
-      assert.equal(await page.getAttribute("#stampBtn", "aria-label"), "Stamp book, 0 of 8");
-      assert.equal(await text(page, "#stampBtn"), "0/8");
+      assert.equal(await page.getAttribute("#stampBtn", "aria-label"), "Placemat, 0 of 8");
+      assert.equal(await text(page, "#stampBtn"), "Placemat");
       assert.equal((await page.locator("#stampBtn").boundingBox()).height >= 44, true, "a 44 px tap target");
       await openBook(page);
       assert.equal(await page.locator("#bookGrid .bk-cell").count(), 8);
       assert.equal(await text(page, "#bookN"), "0 of 8");
-      assert.equal(await text(page, "#bookSpan"), "2026.12.26 → 01.01");
-      assert.equal(await text(page, ".bk-rule"), "One stamp a day, pressed on the day, in the place.");
-      assert.equal(await text(page, ".bk-title"), "スタンプ帳 Stamp book");
-      assert.equal(await text(page, ".bk-h b"), "MAT 記念スタンプ帳");
+      assert.equal(await text(page, ".bk-rule"), "One stamp a day, pressed on the day, where you are. New Year’s Eve gets the fireworks.");
+      assert.equal(await text(page, ".bk-title"), "Placemat");
+      const map = await page.locator("#bookMap").innerHTML();
+      assert.ok(map.includes("Souvenir of Chicago") && map.includes("Mo &amp; Izzah · Dec 26 to Jan 1") && map.includes("Lake Michigan"), map.slice(0, 300));
+      assert.equal(/[\u3040-\u30ff\u4e00-\u9fff]/.test(await text(page, "#book")), false, "no Japanese on the placemat");
+      // The legend: one line a day, today's says so, New Year's Eve gets the fireworks.
+      assert.equal(await page.locator("#bookLeg .bk-row").count(), 7);
+      assert.equal(await text(page, '#bookLeg .bk-row[data-def="' + TODAY + '"]'), "3Place CharlieMon Dec 28Stamp it today");
+      assert.equal(await text(page, '#bookLeg .bk-row[data-def="s06"] em'), "Fireworks");
       assert.match(await cellClass(page, TODAY), /is-open/);
       assert.match(await cellClass(page, "s02"), /is-missed/);
       assert.match(await cellClass(page, "s04"), /is-soon/);
       assert.match(await cellClass(page, "iss"), /is-open/, "the issue stamp is open from the start");
-      // an open ring: the day number over PRESS; a ring not open: the day number over the weekday
-      assert.equal(await text(page, cell(TODAY) + " .bk-ghost"), "28PRESS");
-      assert.equal(await text(page, cell("s04") + " .bk-ghost"), "29Tue");
+      // an open spot says today; a spot not open shows the day's number; New Year's Eve is a burst
+      assert.equal(await text(page, cell(TODAY) + " .bk-ghost"), "today");
+      assert.equal(await text(page, cell("s04") + " .bk-ghost"), "4");
+      assert.match(await page.locator(cell("s06") + " .bk-ghost").getAttribute("class"), /is-nye/);
       assert.equal(await stampsDrawn(page), 0, "nothing is drawn until it is pressed");
       assert.equal(await page.locator("#bookGrid .bk-cell").evaluateAll((els) => els.every((e) => e.getBoundingClientRect().height >= 44)), true);
     },
@@ -134,12 +140,12 @@ module.exports = [
       assert.equal(press(be).length, 1, "one pressStamp for two taps");
       assert.equal(await text(page, "#bookSay"), "Stamped.");
       assert.equal(await text(page, "#bookN"), "1 of 8");
-      assert.equal(await page.getAttribute("#stampBtn", "aria-label"), "Stamp book, 1 of 8");
+      assert.equal(await page.getAttribute("#stampBtn", "aria-label"), "Placemat, 1 of 8");
       assert.equal(await isOpen(page), true);
       assert.equal(await page.locator("#book .bk-look").count(), 0, "the second tap did not hold the stamp up");
       assert.match(await cellClass(page, TODAY), /is-have/);
       // the Today row: me at 13:20 Chicago time, the others not yet
-      assert.equal(await text(page, "#bookTH"), "今日 Today");
+      assert.equal(await text(page, "#bookTH"), "Today");
       assert.equal(await who(page, 1), "You|13:20");
       assert.equal(await who(page, 2), "Izzah|not yet");
       assert.equal(await page.locator("#bookWho .bk-p.is-in").count(), 1);
@@ -150,7 +156,7 @@ module.exports = [
       // it stays across a reload
       await page.reload();
       await until(() => visible(page, "#stampBtn"), "the button again");
-      assert.equal(await text(page, "#stampBtn"), "1/8");
+      assert.equal(await page.getAttribute("#stampBtn", "aria-label"), "Placemat, 1 of 8");
     },
   },
   {
@@ -176,7 +182,7 @@ module.exports = [
       const nowMs = Date.parse("2026-12-17T12:00:00-06:00");
       const be = await ready(page, { nowMs });
       await openBook(page);
-      assert.equal(await text(page, "#bookTH"), "発行 The book");
+      assert.equal(await text(page, "#bookTH"), "The placemat’s own stamp");
       assert.match(await cellClass(page, "s01"), /is-soon/);
       assert.match(await cellClass(page, "iss"), /is-open/);
       await page.click(cell("iss"));
@@ -198,7 +204,7 @@ module.exports = [
       await page.click(cell(TODAY));
       await until(() => page.locator("#book .bk-look").count().then((n) => n === 1), "the stamp is held up");
       const t = await text(page, ".bk-lt");
-      assert.match(t, /試3 Testville Charlie/);
+      assert.match(t, /^Testville Charlie/);
       assert.match(t, /Place Charlie/);
       assert.match(t, /Mon Dec 28 · stamped 12:20/);
       assert.equal(await text(page, ".bk-lx"), "Tap to put it back");
@@ -268,7 +274,7 @@ module.exports = [
       await page.click("#bookDone");
       await until(async () => !(await isOpen(page)), "the book closes");
       await until(() => page.locator(".tk-stampline").count().then((n) => n === 0), "the line goes");
-      assert.equal(await text(page, "#stampBtn"), "1/8");
+      assert.equal(await page.getAttribute("#stampBtn", "aria-label"), "Placemat, 1 of 8");
     },
   },
   {
@@ -326,7 +332,7 @@ module.exports = [
       await waitBook(page);
       assert.equal(await stampsDrawn(page), 0);
       assert.match(await cellClass(page, TODAY), /is-missed/, "an empty ring, no PRESS");
-      assert.equal(await text(page, cell(TODAY) + " .bk-ghost"), "28Mon");
+      assert.equal(await text(page, cell(TODAY) + " .bk-ghost"), "3");
       const before = press(be).length;
       await page.click(cell(TODAY));
       assert.equal(await text(page, "#bookSay"), "Dec 28 has closed.");
@@ -385,7 +391,7 @@ module.exports = [
       await advance(page, be, 1000);
       await page.click(cell(TODAY));
       await until(() => page.locator("#book .bk-look").count().then((n) => n === 1), "held up");
-      assert.match(await text(page, ".bk-lt"), /<b>x<\/b> <img src=x onerror=window.__pwn=1>/);
+      assert.match(await text(page, ".bk-lt"), /<img src=x onerror=window.__pwn=1>/);
       assert.equal(await page.locator(".bk-look img, .bk-look b").count(), 0);
       assert.equal(await page.evaluate(() => window.__pwn), undefined);
       assert.match(await page.locator(".bk-look .bk-st").innerHTML(), /&lt;IMG/);
@@ -401,7 +407,7 @@ module.exports = [
       await openBook(page);
       assert.match(await cellClass(page, TODAY), /is-open/, "Dec 28 is open in Chicago");
       assert.match(await cellClass(page, "s04"), /is-soon/, "Dec 29 has not begun in Chicago");
-      assert.equal(await text(page, "#bookTH"), "今日 Today");
+      assert.equal(await text(page, "#bookTH"), "Today");
       await page.click(cell("s04"));
       assert.equal(await text(page, "#bookSay"), "Dec 29 opens on the day.");
       await page.click(cell(TODAY));
@@ -472,7 +478,7 @@ module.exports = [
     { name: "844 x 390 held sideways", viewport: { width: 844, height: 390 } },
     { name: "1280 x 800", viewport: { width: 1280, height: 800 } },
   ].map(({ name, viewport }) => ({
-    name: "no sideways scroll, and Done and every ring reachable, at " + name,
+    name: "no sideways scroll, and Done and every spot reachable, at " + name,
     viewport,
     async run({ page }) {
       const be = await backendWith();
@@ -490,11 +496,11 @@ module.exports = [
           page: page.left >= phone.left - 0.5 && page.right <= phone.right + 0.5,
           done: done.top >= 0 && done.bottom <= innerHeight && done.right <= innerWidth && done.width >= 43.5 && done.height >= 43.5,
           doneBox: [done.left, done.top, done.right, done.bottom].map(Math.round),
-          cols: getComputedStyle(document.getElementById("bookGrid")).gridTemplateColumns.split(" ").length,
+          onMap: [...document.querySelectorAll("#bookGrid .bk-cell .bk-well")].every((w) => { const r = w.getBoundingClientRect(); return r.left >= page.left - 1 && r.right <= page.right + 1 && r.top >= page.top - 1 && r.bottom <= page.bottom + 1; }),
         };
       });
       assert.deepEqual([fit.doc, fit.scroll, fit.page, fit.done], [true, true, true, true], JSON.stringify(fit));
-      assert.equal(fit.cols, viewport.height < 520 && viewport.width > viewport.height ? 6 : 3);
+      assert.equal(fit.onMap, true, "every spot is on the placemat's map");
       // the last ring can be scrolled to and is tappable
       await page.locator(cell("iss")).scrollIntoViewIfNeeded();
       const box = await page.locator(cell("iss")).boundingBox();
