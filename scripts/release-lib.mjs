@@ -51,8 +51,38 @@ export function privateEnv() {
       if (m) out[m[1]] = m[2];
     }
   }
-  if (process.env.CHI_KEY) out.CHI_KEY = process.env.CHI_KEY;
+  for (const k of KEY_NAMES) if (process.env[k]) out[k] = process.env[k];
   return out;
+}
+
+// The env names that hold a key (never printed).
+export const KEY_NAMES = ["CHI_KEY", "CHI_CHECK_KEY", "CHI_OWNER_KEY"];
+
+// The key the release checks use (security, 2026-11-18): the read-only check
+// key, CHI_CHECK_KEY (it may load, rev, history and migrate, nothing else);
+// the old shared CHI_KEY only when there is no check key. "" when neither.
+export function checkKey(env) {
+  return (env && (env.CHI_CHECK_KEY || env.CHI_KEY)) || "";
+}
+
+// The key that reads the whole trip for the private list: the owner's own
+// key (CHI_OWNER_KEY), else the old shared CHI_KEY (the check key's load
+// leaves out the e-Transfer addresses, which the list must hold).
+export function ownerKey(env) {
+  return (env && (env.CHI_OWNER_KEY || env.CHI_KEY)) || "";
+}
+
+// text with every key in env blanked, for a message that could carry one.
+export function withoutKeys(text, env) {
+  let s = String(text);
+  for (const k of KEY_NAMES) {
+    const v = env && env[k];
+    if (typeof v === "string" && v.length >= 6) {
+      s = s.split(v).join("(key)");
+      s = s.split(encodeURIComponent(v)).join("(key)");
+    }
+  }
+  return s;
 }
 
 // --- the backend stamp: ten hex digits over every file clasp pushes ---------
@@ -118,7 +148,8 @@ export async function liveStamp(apiUrl) {
   }
 }
 
-// One action, posted the way the phone posts it.
+// One action, posted the way the phone posts it: the key in the body only,
+// never in the address.
 export async function call(apiUrl, key, action, args = {}) {
   const r = await fetch(apiUrl, {
     method: "POST",
@@ -127,6 +158,24 @@ export async function call(apiUrl, key, action, args = {}) {
     body: JSON.stringify({ key, actor: "Mo", via: "app", action, args }),
   });
   return r.json();
+}
+
+// Whether a live load answered with the trip (days and stops).
+export function tripLoaded(r) {
+  return !!r && r.ok === true && !!r.data && Array.isArray(r.data.days) && r.data.days.length > 0 && Array.isArray(r.data.stops);
+}
+
+// Asks ask() until ok(answer), at most `tries` times, waiting `waitMs`
+// between: right after a deploy a request can still land on the old version
+// (which refuses the check key). Resolves with the last answer.
+export async function askUntil(ask, ok, { tries = 7, waitMs = 5000, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}) {
+  let last = null;
+  for (let i = 0; i < tries; i++) {
+    last = await ask().catch(() => null);
+    if (ok(last)) return last;
+    if (i < tries - 1) await sleep(waitMs);
+  }
+  return last;
 }
 
 // --- rules that are pure, so tests can pin them -----------------------------

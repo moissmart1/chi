@@ -1,7 +1,7 @@
 // Settings (Task 12): the "You" sheet.
 
 const assert = require("node:assert/strict");
-const { ORIGIN, SEED, THREE, NOON28, open, advance, until, text, expectText, visible } = require("./helpers.cjs");
+const { ORIGIN, SEED, NOON28, open, advance, until, text, expectText, visible } = require("./helpers.cjs");
 
 // ---- small tools for this file ----
 
@@ -54,7 +54,7 @@ module.exports = [
       assert.equal(await text(page, "#you .sheet-top span"), "You");
       assert.equal(await page.evaluate(() => document.getElementById("you").contains(document.activeElement)), true, "focus moves into the sheet");
       const order = await page.evaluate(() => {
-        const ids = ["setWho", "setMail", "setSound", "setHist", "setFresh", "setDemo", "setHow", "setInstall", "setInvite", "setClaude", "setSheet", "setReport"];
+        const ids = ["setWho", "setMail", "setSound", "setHist", "setFresh", "setDemo", "setHow", "setInstall", "setInvite", "setClaude", "setSheet", "setReport", "setForget"];
         const all = [...document.querySelectorAll("#you *")];
         return ids.map((id) => all.indexOf(document.getElementById(id)));
       });
@@ -106,37 +106,67 @@ module.exports = [
     },
   },
   {
-    name: "switching person stores chi.me and #say follows; the field then shows that person's own address and a half-typed one is dropped",
+    name: "on the shared link: switching person stores chi.me and #say follows; each person's address shows read-only, with the line to open your own link (security)",
     async run({ page }) {
-      const backend = await ready(page);
+      const backend = await ready(page, { seed: { ...SEED, people: { Mo: { etransfer: "mo@example.test" }, Izzah: { etransfer: "izzah@example.test" } } } });
       await expectText(page, "#say", "Izzah owes you $694.72.");
       await openYou(page);
+      assert.equal(await text(page, "#setWhoH"), "Which one are you?");
       assert.equal(await page.locator("#setWho [data-me]").count(), 2);
       assert.equal(await page.getAttribute('#setWho [data-me="Mo"]', "aria-pressed"), "true");
-      await page.fill("#setMail", "mo@example.test");
-      await page.click("#setMailSave");
-      await until(() => addressOf(backend, "Mo") === "mo@example.test", "Mo's address saved");
+      await waitMail(page, "mo@example.test");
+      assert.equal(await page.isDisabled("#setMail"), true, "read-only on the shared link");
+      assert.equal(await page.isDisabled("#setMailSave"), true);
+      assert.equal(await text(page, "#setMailS"), "Open your own link to change this.");
 
-      await page.fill("#setMail", "half-typed");
       await pick(page, "Izzah");
       await expectText(page, "#say", "You owe Mo $694.72.");
       assert.equal(await page.getAttribute('#setWho [data-me="Izzah"]', "aria-pressed"), "true");
       assert.equal(await page.getAttribute('#setWho [data-me="Mo"]', "aria-pressed"), "false");
-      await waitMail(page, "");
+      await waitMail(page, "izzah@example.test");
+      assert.equal(await page.isDisabled("#setMail"), true);
+      // Even a request made by hand is refused by the backend.
+      const r = await backend.handle({ key: "test-key", actor: "Izzah", action: "setPerson", args: { name: "Izzah", patch: { etransfer: "x@example.test" } } });
+      assert.equal(r.ok, false);
+      assert.equal(addressOf(backend, "Izzah"), "izzah@example.test");
+      assert.equal(setPersonRequests(backend), 1, "the phone sent nothing itself");
+      assert.equal(await visible(page, "#setInvite"), true, "the shared link still has its invite row");
+      assert.equal(await visible(page, "#setClaude"), false, "the Claude link is only on the owner's own link");
+    },
+  },
+  {
+    name: "on your own link: You shows only you, with no choice; your own address is editable; the backend refuses anyone else's (security)",
+    async run({ page }) {
+      const backend = await ready(page, { own: "Izzah", seed: { ...SEED, people: { Mo: { etransfer: "mo@example.test" } } } });
+      await expectText(page, "#say", "You owe Mo $694.72.");
+      await openYou(page);
+      assert.equal(await text(page, "#setWhoH"), "This phone is");
+      assert.equal(await page.locator("#setWho [data-me]").count(), 1);
+      assert.equal(await page.getAttribute("#setWho [data-me]", "data-me"), "Izzah");
+      assert.equal(await page.isDisabled("#setWho [data-me]"), true, "no choice");
+      assert.equal(await visible(page, "#first"), false, "and no chooser on top");
+      assert.equal(await text(page, "#setMailS"), "The others see it when they owe you money");
+      assert.equal(await page.isDisabled("#setMail"), false);
       await page.fill("#setMail", "izzah@example.test");
       await page.click("#setMailSave");
       await until(() => addressOf(backend, "Izzah") === "izzah@example.test", "Izzah's address saved");
       assert.equal(addressOf(backend, "Mo"), "mo@example.test", "Mo's is untouched");
-      await pick(page, "Mo");
-      await waitMail(page, "mo@example.test");
-      await pick(page, "Izzah");
-      await waitMail(page, "izzah@example.test");
+      const sent = backend.requests.filter((r) => r.action === "setPerson");
+      assert.equal(sent.at(-1).actor, undefined, "no name is sent on your own link");
+      const other = await backend.handle({ key: backend.ownKeys.Izzah, action: "setPerson", args: { name: "Mo", patch: { etransfer: "x@example.test" } } });
+      assert.deepEqual([other.ok, other.message], [false, "You can only change your own settings."]);
+      assert.equal(await visible(page, "#setInvite"), false, "your own link is not for inviting the other");
+      assert.equal(await visible(page, "#setClaude"), false, "the Claude link is the owner's only");
+      // A reload keeps you, from the saved trip.
+      await page.reload();
+      await until(() => page.evaluate(() => globalThis.__matTest && globalThis.__matTest.store.state.personal === true), "still on the own link");
+      assert.equal(await page.evaluate(() => localStorage.getItem("chi.me")), "Izzah");
     },
   },
   {
     name: "e-Transfer: the field is built for an address, an unchanged save sends nothing, a save is kept after reopening, a failed one keeps what was typed",
     async run({ page }) {
-      const backend = await ready(page);
+      const backend = await ready(page, { own: "Mo" });
       await openYou(page);
       const attrs = await page.$eval("#setMail", (i) => ({
         maxlength: i.getAttribute("maxlength"),
@@ -263,7 +293,7 @@ module.exports = [
     },
   },
   {
-    name: "Add to Home Screen copies the link, carries the key in the address and the manifest, shows two steps; closing takes it all back",
+    name: "Add to Home Screen copies the link, carries the key in the address (a fragment) but never in a manifest, shows two steps; closing takes it back",
     async run({ page }) {
       await ready(page);
       await openYou(page);
@@ -271,54 +301,32 @@ module.exports = [
       assert.equal(await page.evaluate(() => document.querySelector("#setInstall > span").firstChild.textContent), "Add to Home Screen");
       assert.equal(await text(page, "#setInstall small"), "Opens like an app, full screen");
       assert.equal(await visible(page, "#setInstallHow"), false, "the steps wait for the tap");
-      const original = await page.evaluate(() => {
-        const l = document.querySelector('link[rel="manifest"]');
-        return { href: l.getAttribute("href"), count: document.querySelectorAll('link[rel="manifest"]').length };
-      });
-      assert.deepEqual(original, { href: "manifest.webmanifest", count: 1 });
-
-      // The page's Content-Security-Policy lets no script fetch a blob: URL, so
-      // the test reads the manifest from the Blob the app handed to createObjectURL.
+      const manifest = () => page.evaluate(() => [...document.querySelectorAll('link[rel="manifest"]')].map((l) => l.getAttribute("href")));
+      assert.deepEqual(await manifest(), ["manifest.webmanifest"]);
       await page.evaluate(() => {
+        globalThis.__blobs = 0;
         const make = URL.createObjectURL.bind(URL);
-        globalThis.__blobs = {};
-        URL.createObjectURL = (blob) => {
-          const url = make(blob);
-          globalThis.__blobs[url] = blob;
-          return url;
+        URL.createObjectURL = (b) => {
+          globalThis.__blobs++;
+          return make(b);
         };
       });
       await page.click("#setInstall");
       await expectText(page, "#ubarT", "Link copied.");
       assert.equal(await clipboard(page), ORIGIN + "/#k=test-key");
       assert.equal(await page.evaluate(() => location.hash), "#k=test-key");
+      assert.equal(await page.evaluate(() => location.search), "", "never in a query string");
       const steps = await page.$$eval("#setInstallHow > span", (els) => els.map((e) => e.textContent));
       assert.deepEqual(steps, ["1. Tap Share, then Add to Home Screen.", "2. If it asks for your trip link, paste: it’s already copied."]);
       assert.ok(await visible(page, "#setInstallHow"));
-      const m = await until(
-        () => page.evaluate(async () => {
-          const links = document.querySelectorAll('link[rel="manifest"]');
-          if (links.length !== 1 || !links[0].href.startsWith("blob:")) return null;
-          return JSON.parse(await globalThis.__blobs[links[0].href].text());
-        }),
-        "a keyed manifest stands in",
-      );
-      assert.ok(m.start_url.endsWith("#k=test-key"), m.start_url);
-      assert.equal(m.start_url, ORIGIN + "/#k=test-key");
-      assert.equal(m.scope, ORIGIN + "/");
-      assert.equal(m.id, ORIGIN + "/?app=chi");
-      assert.equal(m.name, "Wendy’s Chicago 2026");
-      assert.ok(m.icons.length > 0 && m.icons.every((i) => i.src.startsWith(ORIGIN + "/icons/")), "absolute icon URLs");
+      await page.evaluate(() => globalThis.__matTest.store.idle());
+      assert.deepEqual(await manifest(), ["manifest.webmanifest"], "the page's own manifest, unchanged");
+      assert.equal(await page.evaluate(() => globalThis.__blobs), 0, "no keyed manifest is made");
       assert.equal(await page.evaluate(() => document.body.innerText.includes("test-key")), false, "the key is not drawn");
 
       await page.click("#youDone");
       await waitYouClosed(page);
       assert.equal(await page.evaluate(() => location.hash), "", "the key leaves the address bar");
-      const after = await page.evaluate(() => {
-        const l = document.querySelectorAll('link[rel="manifest"]');
-        return { href: l[0].getAttribute("href"), count: l.length };
-      });
-      assert.deepEqual(after, original, "the page's own manifest is back");
       await openYou(page);
       assert.equal(await visible(page, "#setInstallHow"), false, "the steps are folded away again");
     },
@@ -426,9 +434,9 @@ module.exports = [
     },
   },
   {
-    name: "Claude link copies the connector address",
+    name: "Claude link copies the connector address (the owner, on his own link)",
     async run({ page }) {
-      const backend = await ready(page);
+      const backend = await ready(page, { own: "Mo" });
       await openYou(page);
       assert.equal(await page.evaluate(() => document.querySelector("#setClaude > span").firstChild.textContent), "Claude link");
       assert.equal(await text(page, "#setClaude small"), "Lets your Claude add stops and expenses. Keep it to yourself.");
@@ -469,27 +477,28 @@ module.exports = [
     },
   },
   {
-    name: "Claude link carries the viewer's own name, URL-encoded, and each tap asks again",
-    async run({ page }) {
-      // A name the URL has to encode, on a third person (the seed's lines
-      // that name Sam are then set aside).
-      const backend = await open(page, { seed: { ...THREE, people: { Sam: { name: "Tr én&t" } } }, me: "Tr én&t" });
-      await until(() => page.evaluate(() => globalThis.__matTest.store.state.me === "Tr én&t"), "the app knows who this is");
+    name: "Claude link: only the owner's own link has the row; each tap asks again; the other person's link and the shared link have none (security)",
+    async run({ page, newPhone }) {
+      const backend = await ready(page, { own: "Mo" });
       await openYou(page);
       await page.click("#setClaude");
       await expectText(page, "#ubarT", "Claude link copied.");
-      assert.match(await clipboard(page), /\?t=claude-token&as=Tr%20%C3%A9n%26t$/);
       await page.evaluate(() => globalThis.__matTest.store.clearNotice());
-      await pick(page, "Izzah");
       await page.click("#setClaude");
-      await until(async () => /\?t=claude-token&as=Izzah$/.test(await clipboard(page)), "the second copy names Izzah");
-      assert.equal(backend.requests.filter((r) => r.action === "claudeLink").length, 2, "the token is not kept between taps");
+      await until(async () => backend.requests.filter((r) => r.action === "claudeLink").length === 2, "the token is not kept between taps");
+      for (const opts of [{ own: "Izzah" }, { me: "Mo" }]) {
+        const other = await newPhone();
+        await ready(other, { backend, ...opts });
+        await openYou(other);
+        assert.equal(await other.evaluate(() => document.getElementById("setClaude").hidden), true, JSON.stringify(opts));
+      }
+      assert.equal(backend.requests.filter((r) => r.action === "claudeLink").length, 2, "nobody else asked");
     },
   },
   {
     name: "Claude link with no signal says so and copies nothing",
     async run({ page }) {
-      const backend = await ready(page);
+      const backend = await ready(page, { own: "Mo" });
       await openYou(page);
       await page.evaluate(() => navigator.clipboard.writeText("before"));
       backend.failWith = "network";
@@ -503,7 +512,7 @@ module.exports = [
   {
     name: "Claude link: a trip with no token yet gives the backend's sentence; closing Settings while it is on its way copies nothing",
     async run({ page }) {
-      const backend = await ready(page);
+      const backend = await ready(page, { own: "Mo" });
       await openYou(page);
       await page.evaluate(() => navigator.clipboard.writeText("before"));
       delete backend.fake.props.CLAUDE_TOKEN;

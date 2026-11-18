@@ -8,7 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { STORAGE_PREFIX, NEW_VERSION_MESSAGE } from "../js/config.js";
+import { STORAGE_PREFIX, NEW_VERSION_MESSAGE, CACHE_PREFIX } from "../js/config.js";
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -55,6 +55,7 @@ test("the worker's caches and message carry this app's own prefix", () => {
   assert.match(sw, /n\.startsWith\(PREFIX \+ "shell-"\)/, "the purge only ever deletes this app's shells");
   assert.equal(NEW_VERSION_MESSAGE, "chi-new-version");
   assert.match(sw, /const NEW_VERSION = PREFIX \+ "new-version";/);
+  assert.equal(CACHE_PREFIX, "chi-", "Forget this phone removes only the caches named like sw.js's");
 });
 
 test("the manifest is this app's own", () => {

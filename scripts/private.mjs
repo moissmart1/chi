@@ -9,7 +9,7 @@
 
 import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { PRIVATE_DIR, call, privateEnv, readConfig } from "./release-lib.mjs";
+import { KEY_NAMES, PRIVATE_DIR, call, ownerKey, privateEnv, readConfig } from "./release-lib.mjs";
 
 if (!readConfig().apiUrl) {
   console.error("private: this app is not connected to a backend yet (API_URL in js/config.js is empty), so there is no live trip to build the private list from.");
@@ -17,12 +17,15 @@ if (!readConfig().apiUrl) {
 }
 
 const env = privateEnv();
-if (!env.CHI_KEY) {
-  console.error("private: no CHI_KEY (set it, or put CHI_KEY=... in " + join(PRIVATE_DIR, "env") + ")");
+// The whole trip is read with the owner's own key (CHI_OWNER_KEY), else the
+// old shared CHI_KEY: the check key's load leaves out e-Transfer addresses.
+const key = ownerKey(env);
+if (!key) {
+  console.error("private: no CHI_OWNER_KEY or CHI_KEY (put one in " + join(PRIVATE_DIR, "env") + ")");
   process.exit(1);
 }
 
-const res = await call(readConfig().apiUrl, env.CHI_KEY, "load");
+const res = await call(readConfig().apiUrl, key, "load");
 if (!res || res.ok !== true) {
   console.error("private: the live trip did not answer (" + ((res && res.error) || "no answer") + ")");
   process.exit(1);
@@ -34,7 +37,7 @@ const add = (s, min = 6) => {
   if (typeof s === "string" && s.trim().length >= min) out.add(s.trim());
 };
 
-add(env.CHI_KEY);
+for (const k of KEY_NAMES) add(env[k]);
 for (const m of String(d.sheetUrl || "").matchAll(/[A-Za-z0-9_-]{25,}/g)) add(m[0]);
 for (const p of d.people || []) {
   add(p.etransfer);

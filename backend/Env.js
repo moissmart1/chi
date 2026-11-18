@@ -9,6 +9,10 @@ function setProp_(key, value) {
   PropertiesService.getScriptProperties().setProperty(key, String(value));
 }
 
+function delProp_(key) {
+  PropertiesService.getScriptProperties().deleteProperty(key);
+}
+
 // The trip key, from the script cache (six hours) so that a request does not
 // cost a Script Properties read; Script Properties on a miss. After changing
 // TRIP_KEY by hand, run showInvite() to drop the cached copy.
@@ -21,6 +25,23 @@ function tripKey_() {
   key = getProp_("TRIP_KEY");
   if (key) cache.put("TRIP_KEY", key, TRIP_KEY_CACHE_S_);
   return key;
+}
+
+// Forgets the cached shared key, so a change to TRIP_KEY (or its deletion by
+// retireSharedLink) takes effect at once.
+function forgetTripKey_() {
+  CacheService.getScriptCache().remove("TRIP_KEY");
+}
+
+// SHA-256 of a text (UTF-8), as 64 lower-case hex characters (personal keys:
+// Keys.js). No new permission: Utilities needs none.
+function sha256Hex_(text) {
+  return hexOfBytes(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(text), Utilities.Charset.UTF_8));
+}
+
+// A new personal key: two UUIDs without their dashes, 64 hex characters.
+function newPersonKey_() {
+  return Utilities.getUuid().replace(/-/g, "") + Utilities.getUuid().replace(/-/g, "");
 }
 
 // Runs fn under the script lock. If the lock is not free within 8 seconds,

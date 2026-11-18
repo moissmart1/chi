@@ -5,7 +5,7 @@
 // the invite link, the Claude link, the Google Sheet and "Report a problem".
 // One sheet, no sub-pages.
 //
-// mountYou(root, store, { onHistory(), onDemo(date), getKey(), screen() }) -> { open(), close(restoreFocus), isOpen() }
+// mountYou(root, store, { onHistory(), onDemo(date), getKey(), screen(), onForget() }) -> { open(), close(restoreFocus), isOpen() }
 // onDemo(date): a trip day was picked under "Try another day". demo: the trip's
 // clock (js/clock.js), so the row can say a demo is running.
 // screen(): the screen showing, "Days" or "Money", for Report a problem.
@@ -14,6 +14,14 @@
 // The same goes for the Claude connector's token (the Claude link row), which
 // is fetched on each tap and kept nowhere.
 // Text from people or the Sheet goes in with textContent / .value only.
+//
+// Security (2026-11-18): on a phone opened from its own person's link
+// (store.state.personal) the top shows only that person, with no choice;
+// the Invite link row is not there (it would hand over your own link); the
+// Claude link row is there only for the trip's first person. On the shared
+// link, the e-Transfer field is read-only with a line saying to open your
+// own link. The last row, Forget this phone (onForget), asks once more in
+// the row itself, then takes the trip, the key and the offline copy off.
 
 import { API_URL, APP_VERSION } from "../config.js";
 import { screenNumbers } from "../diag.js";
@@ -45,10 +53,10 @@ const FAILED_MS = 3000; // how long a row says it did not
 const MARKUP = `
 <div class="sheet-top"><span>You</span><button type="button" id="youDone">Done</button></div>
 <div class="set">
-  <div class="set-h">Which one are you?</div>
+  <div class="set-h" id="setWhoH">Which one are you?</div>
   <div class="set-who" id="setWho"></div>
   <div class="set-r set-col">
-    <label for="setMail">Your e-Transfer address<small>The others see it when they owe you money</small></label>
+    <label for="setMail">Your e-Transfer address<small id="setMailS">The others see it when they owe you money</small></label>
     <div class="set-mail">
       <input id="setMail" type="email" inputmode="email" maxlength="80" autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false" enterkeyhint="done" placeholder="name@example.com">
       <button type="button" id="setMailSave">Save</button>
@@ -75,6 +83,7 @@ const MARKUP = `
   <button type="button" class="set-r" id="setClaude"><span>Claude link<small>Lets your Claude add stops and expenses. Keep it to yourself.</small></span><b id="setClaudeV" aria-live="polite" data-w="Not copied">Copy</b></button>
   <a class="set-r" id="setSheet" target="_blank" rel="noopener" hidden><span>Google Sheet<small>Where all of this is kept</small></span><b>Open ↗</b></a>
   <button type="button" class="set-r" id="setReport"><span>Report a problem<small>Copies a short note to paste to Mo or Claude</small></span><b id="setReportV" aria-live="polite" data-w="Not copied">Copy</b></button>
+  <button type="button" class="set-r" id="setForget"><span>Forget this phone<small id="setForgetS">Takes the trip and your link off this phone</small></span><b id="setForgetV" aria-live="polite" data-w="Tap again">Forget</b></button>
 </div>`;
 
 function el(tag, cls, text) {
@@ -115,7 +124,16 @@ function whenText(ms) {
   return dayHead(localDay(ms), []).en + ", " + clock(ms);
 }
 
-export function mountYou(root, store, { onHistory = () => {}, onDemo = () => {}, demo = null, getKey = () => null, screen = () => "Money" } = {}) {
+// The e-Transfer line on the shared link (security, 2026-11-18).
+const MAIL_FOR = "The others see it when they owe you money";
+const MAIL_OWN_LINK = "Open your own link to change this.";
+const WHO_PICK = "Which one are you?";
+const WHO_IS = "This phone is";
+const FORGET_FOR = "Takes the trip and your link off this phone";
+const FORGET_SURE = "Tap again to take everything off this phone";
+const FORGET_MS = 5000; // how long the row waits for the second tap
+
+export function mountYou(root, store, { onHistory = () => {}, onDemo = () => {}, demo = null, getKey = () => null, screen = () => "Money", onForget = async () => {} } = {}) {
   const scrim = el("div", "scrim");
   scrim.id = "youScrim";
   scrim.hidden = true;
@@ -133,6 +151,10 @@ export function mountYou(root, store, { onHistory = () => {}, onDemo = () => {},
 
   const $ = (id) => sheet.querySelector("#" + id);
   const who = $("setWho");
+  const whoH = $("setWhoH");
+  const inviteRow = $("setInvite");
+  const claudeRow = $("setClaude");
+  const mailS = $("setMailS");
   const mail = $("setMail");
   const mailSave = $("setMailSave");
   const picRow = $("setPic");
@@ -191,14 +213,19 @@ export function mountYou(root, store, { onHistory = () => {}, onDemo = () => {},
   };
 
   function drawWho(s) {
-    const sig = JSON.stringify(s.people.map((p) => [p.name, p.initials, p.photo || ""]));
+    // On its own link the phone is that person: only their seal, no choice.
+    const own = s.personal === true && !!mePerson(s);
+    const shown = own ? [mePerson(s)] : s.people;
+    whoH.textContent = own ? WHO_IS : WHO_PICK;
+    const sig = JSON.stringify([own, shown.map((p) => [p.name, p.initials, p.photo || ""])]);
     if (sig !== shownWho) {
       shownWho = sig;
       who.replaceChildren(
-        ...s.people.map((p) => {
+        ...shown.map((p) => {
           const b = el("button");
           b.type = "button";
           b.dataset.me = p.name;
+          if (own) b.disabled = true;
           b.append(fillSeal(el("span", "seal"), p), document.createTextNode(p.name));
           return b;
         }),
@@ -225,8 +252,11 @@ export function mountYou(root, store, { onHistory = () => {}, onDemo = () => {},
     const holdsSent = sentMail !== null && mail.value === sentMail;
     if (mail.value === shownMail && !holdsSent) mail.value = addr;
     shownMail = addr;
-    mail.disabled = !s.me;
-    mailSave.disabled = !s.me || mail.value.trim() === shownMail;
+    // Only on your own link can an address be changed (the backend refuses it otherwise).
+    const mayEdit = !!s.me && s.personal === true;
+    mailS.textContent = s.me && !mayEdit ? MAIL_OWN_LINK : MAIL_FOR;
+    mail.disabled = !mayEdit;
+    mailSave.disabled = !mayEdit || mail.value.trim() === shownMail;
   }
 
   // Your picture: Add with none; with one, its seal and Change / Remove.
@@ -261,6 +291,10 @@ export function mountYou(root, store, { onHistory = () => {}, onDemo = () => {},
     drawDemoDays(s);
     setDemo(!demoDays.hidden);
     if (!fetching && !saying.has(fresh)) fresh.textContent = freshWord(s);
+    // Your own link is yours: no invite row. The Claude link: the owner only.
+    inviteRow.hidden = s.personal === true;
+    const owner = s.people.length ? s.people[0].name : null;
+    claudeRow.hidden = !(s.personal === true && s.me && s.me === owner);
     const url = typeof s.sheetUrl === "string" && /^https?:\/\//i.test(s.sheetUrl) ? s.sheetUrl : "";
     sheetLink.hidden = !url;
     if (url) sheetLink.href = url;
@@ -326,6 +360,7 @@ export function mountYou(root, store, { onHistory = () => {}, onDemo = () => {},
     scrim.hidden = true;
     root.classList.remove("you-open");
     endInstall();
+    if (forgetArmed !== null) disarmForget();
     if (sheet.contains(document.activeElement)) document.activeElement.blur();
     if (restoreFocus === true) {
       const btn = document.getElementById("youBtn");
@@ -348,7 +383,7 @@ export function mountYou(root, store, { onHistory = () => {}, onDemo = () => {},
 
   async function saveMail() {
     const me = store.state.me;
-    if (!me) return;
+    if (!me || store.state.personal !== true) return;
     const text = mail.value.trim();
     if (text === addressOf(store.state)) return; // unchanged: nothing is sent
     sentMail = text;
@@ -518,11 +553,10 @@ export function mountYou(root, store, { onHistory = () => {}, onDemo = () => {},
   // ---- Add to Home Screen ----
   // An app on the iPhone Home Screen keeps storage of its own, without the key
   // Safari kept. So while the steps show, the key is back in the address bar
-  // and the manifest's start_url carries it; closing Settings takes both away
-  // again (and so does the next load). The key is never drawn.
-  let shownManifest = null; // the page's own <link rel="manifest">, while a keyed one stands in
-  let keyedManifestUrl = null;
-
+  // (a fragment: never sent to a server) and the link is on the clipboard to
+  // paste if the app asks; closing Settings takes the key out of the address
+  // again (and so does the next load). Security (2026-11-18): the key is
+  // never written into a manifest or its start_url. The key is never drawn.
   function stripKeyFromAddress() {
     const parts = location.hash.replace(/^#/, "").split("&").filter(Boolean);
     const rest = parts.filter((p) => !p.startsWith("k="));
@@ -534,45 +568,6 @@ export function mountYou(root, store, { onHistory = () => {}, onDemo = () => {},
     installHow.hidden = true;
     install.setAttribute("aria-expanded", "false");
     stripKeyFromAddress();
-    const keyed = document.querySelector('link[rel="manifest"][data-keyed]');
-    if (shownManifest && keyed) keyed.replaceWith(shownManifest);
-    shownManifest = null;
-    if (keyedManifestUrl) URL.revokeObjectURL(keyedManifestUrl);
-    keyedManifestUrl = null;
-  }
-
-  // A blob: manifest built from the real one, with absolute URLs and a
-  // start_url that opens with the key.
-  async function useKeyedManifest(key) {
-    const own = shownManifest || document.querySelector('link[rel="manifest"]:not([data-keyed])');
-    if (!own) return;
-    const base = new URL(own.getAttribute("href"), location.href).href;
-    let m;
-    try {
-      const res = await fetch(base);
-      m = await res.json();
-    } catch {
-      return; // the address bar still carries the key
-    }
-    if (!opened || installHow.hidden) return; // closed meanwhile
-    const abs = (u) => new URL(u, base).href;
-    const keyed = {
-      ...m,
-      id: abs(m.id || m.start_url || "./"),
-      start_url: inviteLink(key),
-      scope: abs(m.scope || "./"),
-      icons: (m.icons || []).map((i) => ({ ...i, src: abs(i.src) })),
-    };
-    const url = URL.createObjectURL(new Blob([JSON.stringify(keyed)], { type: "application/manifest+json" }));
-    const link = document.createElement("link");
-    link.rel = "manifest";
-    link.href = url;
-    link.dataset.keyed = "1";
-    const current = document.querySelector('link[rel="manifest"][data-keyed]') || own;
-    if (!shownManifest) shownManifest = own;
-    current.replaceWith(link);
-    if (keyedManifestUrl) URL.revokeObjectURL(keyedManifestUrl);
-    keyedManifestUrl = url;
   }
 
   install.addEventListener("click", async () => {
@@ -582,7 +577,47 @@ export function mountYou(root, store, { onHistory = () => {}, onDemo = () => {},
     history.replaceState(history.state, "", location.pathname + location.search + "#k=" + encodeURIComponent(key));
     installHow.hidden = false;
     install.setAttribute("aria-expanded", "true");
-    await Promise.all([copying, useKeyedManifest(key)]);
+    await copying;
+  });
+
+  // ---- Forget this phone ----
+  // The first tap asks again in the row itself (no dialog); a second tap
+  // within FORGET_MS forgets; otherwise the row goes back to how it was.
+  const forget = $("setForget");
+  const forgetS = $("setForgetS");
+  const forgetV = $("setForgetV");
+  let forgetArmed = null; // the timer while the row waits for the second tap
+  let forgetting = false;
+  const disarmForget = () => {
+    clearTimeout(forgetArmed);
+    forgetArmed = null;
+    forget.classList.remove("is-sure");
+    forgetS.textContent = FORGET_FOR;
+    forgetV.textContent = "Forget";
+  };
+  forget.addEventListener("click", async () => {
+    if (forgetting) return;
+    if (forgetArmed === null) {
+      forget.classList.add("is-sure");
+      // Say what would be lost: lines not sent yet go with everything else.
+      const unsent = typeof store.unsentCount === "function" ? store.unsentCount() : 0;
+      forgetS.textContent = FORGET_SURE + (unsent === 1 ? ". 1 entry not sent yet will be lost." : unsent > 1 ? ". " + unsent + " entries not sent yet will be lost." : "");
+      forgetV.textContent = "Tap again";
+      forgetArmed = setTimeout(disarmForget, FORGET_MS);
+      return;
+    }
+    clearTimeout(forgetArmed);
+    forgetArmed = null;
+    forgetting = true;
+    forget.disabled = true;
+    forgetV.textContent = "Forgetting…";
+    try {
+      await onForget();
+    } finally {
+      forgetting = false;
+      forget.disabled = false;
+      disarmForget();
+    }
   });
 
   // The note needs the latest history, so it is built while the copy waits.

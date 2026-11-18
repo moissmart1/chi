@@ -6,6 +6,7 @@ import { API_URL, STORAGE_PREFIX, NEW_VERSION_MESSAGE } from "./config.js";
 import { TRIP_TZ } from "./trip.js";
 import { createApi } from "./api.js";
 import { createStore } from "./store.js";
+import { clearTrip, forgetPhone } from "./forget.js";
 import { createClock } from "./clock.js";
 import { dateIn, defaultRingDay, tripDay } from "./time.js";
 import { mountDays } from "./views/days.js";
@@ -40,36 +41,56 @@ function phoneStorage() {
     return s;
   } catch {
     const mem = new Map();
-    return { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, String(v)) };
+    return {
+      getItem: (k) => (mem.has(k) ? mem.get(k) : null),
+      setItem: (k, v) => mem.set(k, String(v)),
+      removeItem: (k) => mem.delete(k),
+      key: (i) => [...mem.keys()][i] ?? null,
+      get length() {
+        return mem.size;
+      },
+    };
   }
 }
 
-// The invite link carries the key as #k=<key>. Keep it on the phone and take
-// it out of the address bar, so it is not left in history or a shared URL.
-// Returns the key found (or null), so it still works for this visit when the
-// phone will not store it.
+// The invite link carries the key as #k=<key>. Take it out of the address
+// bar, so it is not left in history or a shared URL. Returns { key,
+// candidate }:
+// - no key stored yet (or the same one): it is kept on the phone and is
+//   `key` (so it still works for this visit when the phone will not store it);
+// - another key already stored (an old Home Screen icon or invite link
+//   carrying the old shared key, or any link someone sends): it is NOT
+//   stored. It is `candidate`, tried once by the store (boot), kept only if
+//   the trip takes it, and never a reason to clear the phone.
 function takeKey(storage) {
+  const none = { key: null, candidate: null };
   const hash = location.hash.replace(/^#/, "");
-  if (!hash) return null;
+  if (!hash) return none;
   const parts = hash.split("&");
   const found = parts.find((p) => p.startsWith("k="));
-  if (found === undefined) return null;
+  if (found === undefined) return none;
   let key = found.slice(2);
   try {
     key = decodeURIComponent(key);
   } catch {
     // keep it as typed
   }
-  if (key) {
-    try {
-      storage.setItem(STORAGE_PREFIX + "key", key);
-    } catch {
-      // nowhere to keep it: it works for this visit only
-    }
-  }
   const rest = parts.filter((p) => p !== found).join("&");
   history.replaceState(history.state, "", location.pathname + location.search + (rest ? "#" + rest : ""));
-  return key || null;
+  if (!key) return none;
+  let stored = null;
+  try {
+    stored = storage.getItem(STORAGE_PREFIX + "key");
+  } catch {
+    stored = null;
+  }
+  if (stored && stored !== key) return { key: null, candidate: key };
+  try {
+    storage.setItem(STORAGE_PREFIX + "key", key);
+  } catch {
+    // nowhere to keep it: it works for this visit only
+  }
+  return { key, candidate: null };
 }
 
 // The phone's storage, except that the stored key falls back to the key from this
@@ -86,6 +107,11 @@ function withKey(storage, keyHere) {
       return v === null && k === STORAGE_PREFIX + "key" ? keyHere() : v;
     },
     setItem: (k, v) => storage.setItem(k, v),
+    removeItem: (k) => storage.removeItem(k),
+    key: (i) => storage.key(i),
+    get length() {
+      return storage.length;
+    },
   };
 }
 
@@ -177,7 +203,8 @@ function mountTabs(store, storage) {
 
 function start() {
   const raw = phoneStorage();
-  let keyHere = takeKey(raw);
+  const taken = takeKey(raw);
+  let keyHere = taken.key;
   const storage = withKey(raw, () => keyHere);
 
   const connected = !!API_URL || typeof globalThis.MAT_FAKE_API === "function";
@@ -185,9 +212,19 @@ function start() {
   const api = createApi({
     url: API_URL,
     getKey: () => storage.getItem(STORAGE_PREFIX + "key"),
-    getActor: () => (store && store.state.me) || storage.getItem(STORAGE_PREFIX + "me"),
+    // On its own link the backend knows who this is: no name is sent.
+    getActor: () => (store && store.state.personal ? undefined : (store && store.state.me) || storage.getItem(STORAGE_PREFIX + "me")),
   });
-  store = createStore({ api, storage });
+  // A refused key takes the trip off the phone (js/store.js): the stored
+  // keys, and the key this visit came with.
+  store = createStore({
+    api,
+    storage,
+    clear: (queue) => {
+      keyHere = null;
+      clearTrip(raw, { queue });
+    },
+  });
 
   // The one clock the Days screen reads, in the trip's time zone.
   const clock = createClock({ getTz: () => TRIP_TZ });
@@ -278,6 +315,27 @@ function start() {
     onHistory: () => {
       you.close(false);
       history.open();
+    },
+    // Forget this phone: the trip, the key and every setting, the offline
+    // copy and the worker, then the no-key screen.
+    onForget: async () => {
+      keyHere = null;
+      let session = null;
+      try {
+        session = window.sessionStorage;
+      } catch {
+        session = null;
+      }
+      await forgetPhone({
+        storages: [raw, session].filter(Boolean),
+        indexedDB: globalThis.indexedDB || null,
+        caches: globalThis.caches || null,
+        serviceWorker: (navigator && navigator.serviceWorker) || null,
+        // Only this app's worker: the Japan app shares the origin.
+        scope: new URL("./", location.href).href,
+      });
+      store.forgot();
+      you.close(false);
     },
   });
   const line = mountLine(phone, store, {
@@ -419,7 +477,7 @@ function start() {
     store.flush().then(check);
   });
 
-  if (connected) store.boot().then(() => {
+  if (connected) store.boot({ candidate: taken.candidate }).then(() => {
     // History is fetched quietly, so it opens at once (it then keeps itself up to date).
     if (store.state.status === "ready") store.loadHistory();
   });

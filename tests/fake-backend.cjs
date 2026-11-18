@@ -39,8 +39,14 @@ const PURE = script("Pure.js");
 const ACTIONS = script("Actions.js");
 const MONEY = script("Money.js");
 const MCP = script("Mcp.js");
+const KEYS = script("Keys.js");
+const SETUP = script("Setup.js");
 
 const TRIP_KEY = "test-key";
+// The release check's key in tests (the real one lives outside the repo):
+// the fake's CHECK_KEY_HASH is this key's hash, not CheckKey.js's.
+const CHECK_KEY = "test-check-key";
+const sha256 = (t) => crypto.createHash("sha256").update(String(t), "utf8").digest("hex");
 const CLAUDE_TOKEN = "claude-token";
 const RATE = 0.72;
 const SHEET_URL = "https://example.test/sheet";
@@ -95,6 +101,9 @@ function createFakeBackend(seed, { clock, lockFails, keepsApostrophe = false } =
   const rate = { rate: RATE, source: "live" };
   const cache = {}; // the script cache, for the trip key
   let lockWaited = 0; // ms the in-memory lock has made callers wait
+  // The owner's run log (Logger.log) and the executions log (console.error).
+  const logged = [];
+  const consoleLines = [];
 
   const headers = (tab) => {
     const h = P.TABS[tab];
@@ -178,6 +187,16 @@ function createFakeBackend(seed, { clock, lockFails, keepsApostrophe = false } =
     setProp_(key, value) {
       props[key] = String(value);
     },
+    delProp_(key) {
+      delete props[key];
+    },
+    // Same as Env.js: SHA-256 in hex, a new 64-hex personal key, and the
+    // cached shared key forgotten.
+    sha256Hex_: (t) => sha256(t),
+    newPersonKey_: () => crypto.randomBytes(32).toString("hex"),
+    forgetTripKey_() {
+      delete cache.TRIP_KEY;
+    },
     // Test-only: lockFails() returning true plays a lock that never frees up
     // (same envelope as Env.js withLock_).
     // A lock that is not freed waits its 8 seconds first (lockWaited), as
@@ -210,6 +229,11 @@ function createFakeBackend(seed, { clock, lockFails, keepsApostrophe = false } =
     },
   };
   Object.assign(world, primitives);
+  world.CHECK_KEY_HASH = sha256(CHECK_KEY);
+  world.Logger = { log: (t) => logged.push(String(t)) };
+  world.console = { error: (t) => consoleLines.push(String(t)), log: (t) => consoleLines.push(String(t)), warn: (t) => consoleLines.push(String(t)) };
+  KEYS.runInContext(world);
+  SETUP.runInContext(world);
   ACTIONS.runInContext(world);
   MONEY.runInContext(world);
   MCP.runInContext(world);
@@ -227,18 +251,30 @@ function createFakeBackend(seed, { clock, lockFails, keepsApostrophe = false } =
       env = handle(body);
     } catch (e) {
       // Same as doPost's last-resort catch.
-      env = { ok: false, error: "server", message: "Something went wrong on our side. Try again. (" + e.message + ")" };
+      env = { ok: false, error: "server", message: "Something went wrong on our side. Try again." };
     }
     return Promise.resolve(copy(env));
   };
-  world.handle_ = (body) => {
-    requests.push(copy(body));
-    // Test-only: fake.beforeConnectorWrite(body) runs between whatever the
-    // connector did first and its request reaching handle_ (another phone's
-    // write landing in that gap).
-    if (typeof fake.beforeConnectorWrite === "function") fake.beforeConnectorWrite(copy(body));
-    return handle(body);
+  // The connector reaches the actions through handleAs_ with the holder
+  // { kind: "claude" } (never with a key): such a request is recorded like
+  // one from a phone, as { via: "claude", actor, action, args, holder }.
+  const handleAs = world.handleAs_;
+  world.handleAs_ = (holder, body) => {
+    if (holder && holder.kind === "claude") {
+      const seen = { holder: "claude", actor: holder.name, via: "claude", action: body.action, args: copy(body.args) };
+      requests.push(copy(seen));
+      // Test-only: fake.beforeConnectorWrite(body) runs between whatever the
+      // connector did first and its request reaching the actions (another
+      // phone's write landing in that gap).
+      if (typeof fake.beforeConnectorWrite === "function") fake.beforeConnectorWrite(copy(seen));
+    }
+    return handleAs(holder, body);
   };
+  // Test-only: a request through the connector's own path (handleAs_ as the
+  // holder { kind: "claude" }, as Mcp.js makes it after its token check),
+  // as `actor` (default the trip's first person). A phone's via: "claude" is
+  // ignored by the backend.
+  fake.claude = (action, args = {}, actor) => Promise.resolve(copy(world.handleAs_({ kind: "claude", name: actor || world.peopleNames_()[0] }, { action, args: copy(args) })));
   fake.mcp = (msg, params) => copy(world.mcp_(copy(msg), copy(params)));
   fake.tables = tables;
   fake.requests = requests;
@@ -275,6 +311,18 @@ function createFakeBackend(seed, { clock, lockFails, keepsApostrophe = false } =
     };
   };
   fake.props = props;
+  fake.logged = logged;
+  fake.consoleLines = consoleLines;
+  // Test-only: gives person `name` a personal key (as issueLinks would) and
+  // returns it; PERSON_KEYS holds only its hash.
+  fake.personKey = (name) => {
+    const key = crypto.randomBytes(32).toString("hex");
+    const keys = world.personKeys_();
+    keys[name] = { hash: sha256(key), at: now() };
+    world.setPersonKeys_(keys);
+    return key;
+  };
+  fake.CHECK_KEY = CHECK_KEY;
   fake.tableReads = tableReads;
   fake.sheetCalls = sheetCalls;
   fake.propReads = propReads;
@@ -357,4 +405,4 @@ function seedWorld(P, prim, tables, props, seed, now) {
   if (events.length) props.LOGSEQ = String(events.length);
 }
 
-module.exports = { createFakeBackend };
+module.exports = { createFakeBackend, CHECK_KEY, sha256 };
