@@ -84,7 +84,7 @@ const queueOf = (storage) => JSON.parse(storage.getItem("chi.queue") || "[]");
 const byId = (list, id) => list.find((x) => x.id === id);
 
 function draft(over = {}) {
-  return { day: "2026-12-11", title: "Dinner", amount: 14500, currency: "JPY", paidBy: "Mo", split: ALL.slice(), splitMode: "equal", splitVals: [], note: "", kind: "", ...over };
+  return { day: "2026-12-11", title: "Dinner", amount: 94.15, currency: "USD", paidBy: "Mo", split: ALL.slice(), splitMode: "equal", splitVals: [], note: "", kind: "", ...over };
 }
 
 // The id of the line a write token made.
@@ -177,7 +177,7 @@ test("api uses MAT_FAKE_API in place of fetch, and a rejection from it is a netw
 test("Boot paints from cache first", async () => {
   const p = phone({ seed: SEED });
   const empty = await backend(createFakeBackend());
-  const cached = { id: "cached0001", ...draft({ title: "Cached" }), rate: 111, addedBy: "Mo", addedAt: "2026-12-11T01:00:00.000Z", deleted: false };
+  const cached = { id: "cached0001", ...draft({ title: "Cached" }), rate: 0.72, addedBy: "Mo", addedAt: "2026-12-11T01:00:00.000Z", deleted: false };
   p.storage.setItem("chi.cache", JSON.stringify({ data: { ...empty, expenses: [cached] }, rev: 0, loadedAt: 1000 }));
   const release = p.net.hold("load");
   const seen = [];
@@ -296,7 +296,7 @@ test("Optimistic add", async () => {
   assert.equal(line.pending, true);
   assert.equal(line.title, "Dinner");
   assert.equal(line.rate, p.store.state.rateToday);
-  assert.equal(line.rate, 111);
+  assert.equal(line.rate, 0.72);
   assert.deepEqual(p.store.state.lastChange, { token: t, action: "add", kind: "expense", item: p.store.state.lastChange.item, canUndo: true });
   await p.store.idle();
   const server = byId((await backend(p.fake)).expenses, id);
@@ -465,7 +465,7 @@ test("a queued line looks the same after a reload: its time and rate are kept", 
   await one.store.idle();
   const shown = byId(one.store.state.expenses, id);
   assert.equal(shown.addedAt, new Date(NOW).toISOString());
-  assert.equal(shown.rate, 111);
+  assert.equal(shown.rate, 0.72);
   // the next day the cached rate has moved on
   const cache = JSON.parse(one.storage.getItem("chi.cache"));
   cache.data.rateToday = 120;
@@ -476,7 +476,7 @@ test("a queued line looks the same after a reload: its time and rate are kept", 
   assert.equal(two.store.state.rateToday, 120);
   const again = byId(two.store.state.expenses, id);
   assert.equal(again.addedAt, new Date(NOW).toISOString());
-  assert.equal(again.rate, 111);
+  assert.equal(again.rate, 0.72);
   assert.equal(again.addedBy, "Mo");
   assert.equal(again.pending, true);
 });
@@ -730,10 +730,10 @@ test("Undo of an edit and of a delete", async () => {
   await p.store.idle();
   assert.equal(byId(p.store.state.expenses, "seedexp004").amount, 4500);
   p.store.undo(t1);
-  assert.equal(byId(p.store.state.expenses, "seedexp004").amount, 4200);
+  assert.equal(byId(p.store.state.expenses, "seedexp004").amount, 27.3);
   await p.store.idle();
-  assert.equal(byId((await backend(p.fake)).expenses, "seedexp004").amount, 4200);
-  assert.equal(byId(p.store.state.expenses, "seedexp004").amount, 4200);
+  assert.equal(byId((await backend(p.fake)).expenses, "seedexp004").amount, 27.3);
+  assert.equal(byId(p.store.state.expenses, "seedexp004").amount, 27.3);
 
   const t2 = p.store.deleteExpense("seedexp006");
   await p.store.idle();
@@ -778,7 +778,7 @@ test("A failed undo puts things back", async () => {
   await p.store.idle();
   p.net.failing.add("undo");
   p.store.undo(t);
-  assert.equal(byId(p.store.state.expenses, "seedexp004").amount, 4200);
+  assert.equal(byId(p.store.state.expenses, "seedexp004").amount, 27.3);
   await p.store.idle();
   assert.equal(byId(p.store.state.expenses, "seedexp004").amount, 4500);
   // A failed fetch may have left the phone: no reply, so the fate is unknown.
@@ -799,8 +799,8 @@ test("an undo from the bar whose reply is lost says it is checking, and the next
   p.net.lose.clear();
   await p.store.checkRev();
   await p.store.idle();
-  assert.equal(byId((await backend(p.fake)).expenses, "seedexp004").amount, 4200, "the undo landed");
-  assert.equal(byId(p.store.state.expenses, "seedexp004").amount, 4200, "the screen shows what the backend holds");
+  assert.equal(byId((await backend(p.fake)).expenses, "seedexp004").amount, 27.3, "the undo landed");
+  assert.equal(byId(p.store.state.expenses, "seedexp004").amount, 27.3, "the screen shows what the backend holds");
 });
 
 test("Stale undo from history", async () => {
@@ -924,7 +924,7 @@ test("two overlapping first-page loads: the older request answering last never r
 
 test("an older-page append is ignored when a first-page load started after it", async () => {
   const expenses = [];
-  for (let i = 0; i < 205; i++) expenses.push({ id: "bulk" + String(i).padStart(6, "0"), day: "pre", title: "Line " + i, amount: 100, currency: "JPY", paidBy: "Mo", split: ALL.slice(), addedAt: new Date(Date.UTC(2026, 10, 1) + i * 1000).toISOString() });
+  for (let i = 0; i < 205; i++) expenses.push({ id: "bulk" + String(i).padStart(6, "0"), day: "pre", title: "Line " + i, amount: 100, currency: "USD", paidBy: "Mo", split: ALL.slice(), addedAt: new Date(Date.UTC(2026, 10, 1) + i * 1000).toISOString() });
   const p = phone({ seed: { expenses, payments: [] } });
   await p.store.boot();
   await p.store.loadHistory();
@@ -1187,7 +1187,7 @@ test("History", async () => {
 
 test("loadHistory({ older: true }) appends the next page", async () => {
   const expenses = [];
-  for (let i = 0; i < 205; i++) expenses.push({ id: "bulk" + String(i).padStart(6, "0"), day: "pre", title: "Line " + i, amount: 100, currency: "JPY", paidBy: "Mo", split: ALL.slice(), addedAt: new Date(Date.UTC(2026, 10, 1) + i * 1000).toISOString() });
+  for (let i = 0; i < 205; i++) expenses.push({ id: "bulk" + String(i).padStart(6, "0"), day: "pre", title: "Line " + i, amount: 100, currency: "USD", paidBy: "Mo", split: ALL.slice(), addedAt: new Date(Date.UTC(2026, 10, 1) + i * 1000).toISOString() });
   const p = phone({ seed: { expenses } });
   await p.store.boot();
   await p.store.loadHistory();
@@ -1365,7 +1365,7 @@ test("outbox counts lines not yet on the backend: sending or waiting, never refu
   const p = phone({ seed: SEED });
   await p.store.boot();
   assert.deepEqual(p.store.outbox(), { unsent: 0, waiting: 0 });
-  const draft = (title) => ({ day: "2026-12-11", title, amount: 500, currency: "JPY", paidBy: "Mo", split: ALL.slice() });
+  const draft = (title) => ({ day: "2026-12-11", title, amount: 500, currency: "USD", paidBy: "Mo", split: ALL.slice() });
 
   const release = p.net.hold("addExpense");
   p.store.addExpense(draft("Sending"));
@@ -1515,14 +1515,14 @@ test("an edit whose reply is lost: shown after contact, and Undo takes it back",
   const t = p.store.updateExpense("seedexp004", { amount: 4500 });
   await p.store.idle();
   assert.equal(p.store.state.notice, UNCONFIRMED);
-  assert.equal(byId(p.store.state.expenses, "seedexp004").amount, 4200);
+  assert.equal(byId(p.store.state.expenses, "seedexp004").amount, 27.3);
   p.net.lose.clear();
   p.store.clearNotice();
   // Undo before any contact: it waits for the backend's answer, then undoes.
   await p.store.undo(t);
   await p.store.idle();
-  assert.equal(byId((await backend(p.fake)).expenses, "seedexp004").amount, 4200);
-  assert.equal(byId(p.store.state.expenses, "seedexp004").amount, 4200);
+  assert.equal(byId((await backend(p.fake)).expenses, "seedexp004").amount, 27.3);
+  assert.equal(byId(p.store.state.expenses, "seedexp004").amount, 27.3);
   assert.equal(p.store.state.lastChange.action, "undo");
   assert.equal(p.store.state.notice, null);
 });
@@ -1745,9 +1745,9 @@ test("a mistyped payer is set aside, not counted as owing nobody (H3)", async ()
   assert.deepEqual(p.store.state.setAside.map((x) => [x.id, x.reason]), [["exp00001", "name"]]);
 });
 
-test("a yen line with a blank rate is set aside (H4); a bad payment is set aside too", async () => {
+test("a US dollar line with a blank rate is set aside (H4); a bad payment is set aside too", async () => {
   const fake = createFakeBackend({
-    expenses: [{ id: "exp00002", day: "pre", title: "Taxi", amount: 3000, currency: "JPY", paidBy: "Mo", split: ALL }, { id: "exp00003", day: "pre", title: "Fine", amount: 30, currency: "CAD", paidBy: "Mo", split: ALL }],
+    expenses: [{ id: "exp00002", day: "pre", title: "Taxi", amount: 3000, currency: "USD", paidBy: "Mo", split: ALL }, { id: "exp00003", day: "pre", title: "Fine", amount: 30, currency: "CAD", paidBy: "Mo", split: ALL }],
     payments: [{ id: "pay000001", from: "Ajen", to: "Mo", cad: 5, seed: 1, rot: 0 }, { id: "pay000002", from: "Ajen", to: "Mo", cad: 5, seed: 1, rot: 0 }],
   });
   fake.tables.Expenses[0].rate = "";
@@ -1774,9 +1774,9 @@ test("an edit undone while its request is out, whose reply is then lost, is sett
   p.net.lose.clear();
   await p.store.checkRev();
   await p.store.idle();
-  assert.equal(byId((await backend(p.fake)).expenses, "seedexp004").amount, 4200, "the backend ends undone");
+  assert.equal(byId((await backend(p.fake)).expenses, "seedexp004").amount, 27.3, "the backend ends undone");
   const line = byId(p.store.state.expenses, "seedexp004");
-  assert.equal(line.amount, 4200);
+  assert.equal(line.amount, 27.3);
   assert.equal("pending" in line, false, "nothing left pending on the phone");
 });
 
@@ -1892,7 +1892,7 @@ test("an undo from History whose reply is lost says it is checking and reloads o
   p.net.lose.clear();
   await p.store.checkRev();
   await p.store.idle();
-  assert.equal(byId(p.store.state.expenses, "seedexp004").amount, 4200, "the backend's undone line is shown");
+  assert.equal(byId(p.store.state.expenses, "seedexp004").amount, 27.3, "the backend's undone line is shown");
 });
 
 // ---------- stops (Plan 2, Task 7) ----------
@@ -2129,7 +2129,7 @@ test("a stop in a saved queue from before a reload is never sent; the expense be
   storage.setItem("chi.queue", JSON.stringify([
     { stop, sent: true },
     { undo: true, kind: "stop", args: { stop }, logId: 1, actor: "Mo" },
-    { expense, addedAt: "2026-12-11T03:00:00.000Z", rate: 111, addedBy: "Mo", failed: false, sent: false },
+    { expense, addedAt: "2026-12-11T03:00:00.000Z", rate: 0.72, addedBy: "Mo", failed: false, sent: false },
   ]));
   const p = phone({ seed: { stops: [SKY] }, storage });
   await p.store.boot();
@@ -2205,7 +2205,7 @@ test("an expense edit with no reply still waits for the next contact (unchanged 
   p.net.lose.add("updateExpense");
   p.store.updateExpense("seedexp004", { amount: 4500 });
   await p.store.idle();
-  assert.equal(byId(p.store.state.expenses, "seedexp004").amount, 4200);
+  assert.equal(byId(p.store.state.expenses, "seedexp004").amount, 27.3);
   assert.equal(sent(p.fake, "rev") + sent(p.fake, "load"), 1, "only the boot load");
 });
 
@@ -2370,7 +2370,7 @@ test("R36: a waited-on stop edit refused by the backend comes back with its reas
 const PLANNER_ID = "fakePlannerSheet_0123456789abcdefXYZ";
 const PHEAD = ["payment_id", "date_paid", "payer", "description", "category", "vendor", "booking_ref", "amount", "currency", "amount_cad", "cad_is_exact", "split_between", "split_type", "status", "include_in_split", "source", "added_by", "notes"];
 const prow = (o) => PHEAD.map((h) => (o[h] === undefined ? "" : o[h]));
-const PX7 = { payment_id: "X7", date_paid: "2026-12-11", payer: "Mo", description: "Rail pass", category: "transport", vendor: "North Rail", booking_ref: "AB12", amount: 24750, currency: "JPY", amount_cad: 221.52, cad_is_exact: "yes", split_between: "Mo, Ajen, Trenton", split_type: "equal", include_in_split: "yes" };
+const PX7 = { payment_id: "X7", date_paid: "2026-12-11", payer: "Mo", description: "Rail pass", category: "transport", vendor: "North Rail", booking_ref: "AB12", amount: 24750, currency: "USD", amount_cad: 221.52, cad_is_exact: "yes", split_between: "Mo, Ajen, Trenton", split_type: "equal", include_in_split: "yes" };
 const PQ3 = { ...PX7, payment_id: "Q3", description: "Noodle bar", amount_cad: "", amount: 3600, vendor: "Ramen Ya", booking_ref: "" };
 
 test("syncPayments pulls, reloads so the lines are there, says what came in, and resolves with the counts", async () => {

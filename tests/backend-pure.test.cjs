@@ -2,7 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const P = require("../backend/Pure.js");
 const NAMES = ["Mo", "Ajen", "Trenton"];
-const good = { id: "a1b2c3d4e5", day: "2026-12-11", title: "Ramen", amount: 4200, currency: "JPY", paidBy: "Mo", split: NAMES };
+const good = { id: "a1b2c3d4e5", day: "2026-12-11", title: "Ramen", amount: 42, currency: "USD", paidBy: "Mo", split: NAMES };
 
 test("cells that look like formulas are neutralised", () => {
   assert.equal(P.sanitizeCell("=1+1"), "'=1+1");
@@ -11,10 +11,11 @@ test("cells that look like formulas are neutralised", () => {
   assert.equal(P.sanitizeCell(42), 42);
 });
 
-test("a good expense passes, yen is whole, and the defaults are filled", () => {
-  const r = P.validateExpense({ ...good, amount: 4200.6 }, NAMES);
+test("a good expense passes, US dollars keep their cents, and the defaults are filled", () => {
+  const r = P.validateExpense({ ...good, amount: 42.006 }, NAMES);
   assert.equal(r.ok, true);
-  assert.equal(r.value.amount, 4201);
+  assert.equal(r.value.amount, 42.01);
+  assert.equal(r.value.currency, "USD");
   assert.equal(r.value.splitMode, "equal");
   assert.deepEqual(r.value.splitVals, []);
   assert.equal(r.value.note, "");
@@ -24,12 +25,12 @@ test("a good expense passes, yen is whole, and the defaults are filled", () => {
 test("bad expenses are refused with a message", () => {
   for (const bad of [
     { title: "" }, { title: "x".repeat(81) }, { amount: 0 }, { amount: -5 }, { amount: 10000001 },
-    { amount: NaN }, { currency: "USD" }, { paidBy: "Nobody" }, { split: [] }, { split: ["Mo", "Nobody"] },
+    { amount: NaN }, { currency: "JPY" }, { currency: "usd" }, { currency: "" }, { paidBy: "Nobody" }, { split: [] }, { split: ["Mo", "Nobody"] },
     { split: ["Mo", "Mo"] }, { day: "tomorrow" }, { id: "short" }, { id: "has spaces in it" }, { id: "-abc12345" }, { id: "_abc12345" },
     { note: "x".repeat(201) }, { kind: "misc" }, { splitMode: "percent" },
     { splitMode: "parts", splitVals: [2, 3] }, { splitMode: "parts", splitVals: [2, 0, 3] },
     { splitMode: "parts", splitVals: [2, 1.5, 3] }, { splitMode: "parts", splitVals: [2, 100, 3] },
-    { splitMode: "exact", splitVals: [2000, 1000, 1000] }, { splitMode: "exact", splitVals: [4200, 0, 0] },
+    { splitMode: "exact", splitVals: [20, 10, 10] }, { splitMode: "exact", splitVals: [42, 0, 0] },
   ]) {
     const r = P.validateExpense({ ...good, ...bad }, NAMES);
     assert.equal(r.ok, false, JSON.stringify(bad));
@@ -38,7 +39,8 @@ test("bad expenses are refused with a message", () => {
   assert.equal(P.validateExpense({ ...good, day: "pre" }, NAMES).ok, true);
   assert.equal(P.validateExpense({ ...good, currency: "CAD", amount: 12.345 }, NAMES).value.amount, 12.35);
   assert.equal(P.validateExpense({ ...good, splitMode: "parts", splitVals: [2, 3, 3] }, NAMES).ok, true);
-  assert.equal(P.validateExpense({ ...good, splitMode: "exact", splitVals: [2000, 1200, 1000] }, NAMES).ok, true);
+  assert.equal(P.validateExpense({ ...good, splitMode: "exact", splitVals: [20, 12, 10] }, NAMES).ok, true);
+  assert.equal(P.validateExpense({ ...good, currency: "JPY" }, NAMES).message, "Use US or Canadian dollars.");
   assert.equal(P.validateExpense({ ...good, currency: "CAD", amount: 100, splitMode: "exact", splitVals: [33.34, 33.33, 33.33] }, NAMES).ok, true);
   assert.equal(P.validateExpense({ ...good, kind: "food", note: "ref 8841" }, NAMES).value.kind, "food");
 });
@@ -50,11 +52,10 @@ test("exact splits are rounded, each at least one unit, and must sum exactly", (
   const r = P.validateExpense({ ...cad, amount: 100, splitVals: [33.334, 33.336, 33.33] }, NAMES);
   assert.equal(r.ok, true);
   assert.deepEqual(r.value.splitVals, [33.33, 33.34, 33.33]);
-  const y = P.validateExpense({ ...good, amount: 100, splitMode: "exact", splitVals: [50.4, 49.6, 0.4] }, NAMES);
-  assert.equal(y.ok, false);
-  const y2 = P.validateExpense({ ...good, amount: 100, splitMode: "exact", splitVals: [50.4, 49.6, 0.6] }, NAMES);
-  assert.equal(y2.ok, false);
-  const y3 = P.validateExpense({ ...good, amount: 100, splitMode: "exact", splitVals: [50.4, 48.6, 1.2] }, NAMES);
+  // US dollars the same way: cents, each at least one.
+  const u = { ...good, splitMode: "exact" };
+  assert.equal(P.validateExpense({ ...u, amount: 0.01, splitVals: [0.004, 0.004, 0.01] }, NAMES).message, "Every amount has to be at least one cent.");
+  const y3 = P.validateExpense({ ...u, amount: 100, splitVals: [50.004, 48.996, 1] }, NAMES);
   assert.equal(y3.ok, true);
   assert.deepEqual(y3.value.splitVals, [50, 49, 1]);
 });
@@ -119,7 +120,7 @@ test("rows round-trip between sheet and API shapes", () => {
   const h = P.TABS.Expenses;
   const row = P.objToRow(h, { id: "x", title: "=evil", split: "Mo,Ajen", deleted_at: "" });
   assert.equal(row[h.indexOf("title")], "'=evil");
-  const e = P.expenseFromRow({ id: "x", day: "pre", title: "T", amount: 80, currency: "CAD", rate: 111, paid_by: "Mo", split: "Mo,Ajen", split_mode: "parts", split_vals: "1,3", note: "n", kind: "food", added_by: "Mo", added_at: "t", deleted_at: "" });
+  const e = P.expenseFromRow({ id: "x", day: "pre", title: "T", amount: 80, currency: "CAD", rate: 0.72, paid_by: "Mo", split: "Mo,Ajen", split_mode: "parts", split_vals: "1,3", note: "n", kind: "food", added_by: "Mo", added_at: "t", deleted_at: "" });
   assert.deepEqual(e.split, ["Mo", "Ajen"]);
   assert.deepEqual(e.splitVals, [1, 3]);
   assert.equal(e.paidBy, "Mo");
@@ -179,10 +180,10 @@ test("the People row keeps the picture, after email, as text", () => {
 });
 
 test("rows coped with as Sheets really hands them back", () => {
-  const e = P.expenseFromRow({ id: "x", day: new Date(Date.UTC(2026, 11, 11, 12)), title: "T", amount: "80.5", currency: "CAD", rate: "111", paid_by: "Mo", split: "Mo", split_mode: "parts", split_vals: 3, note: "", kind: "", added_by: "Mo", added_at: new Date(Date.UTC(2026, 11, 11, 3, 4, 5)), deleted_at: new Date(Date.UTC(2026, 11, 12)) });
+  const e = P.expenseFromRow({ id: "x", day: new Date(Date.UTC(2026, 11, 11, 12)), title: "T", amount: "80.5", currency: "CAD", rate: "0.7234", paid_by: "Mo", split: "Mo", split_mode: "parts", split_vals: 3, note: "", kind: "", added_by: "Mo", added_at: new Date(Date.UTC(2026, 11, 11, 3, 4, 5)), deleted_at: new Date(Date.UTC(2026, 11, 12)) });
   assert.deepEqual(e.splitVals, [3]);
   assert.equal(e.amount, 80.5);
-  assert.equal(e.rate, 111);
+  assert.equal(e.rate, 0.7234);
   assert.equal(e.day, "2026-12-11");
   assert.equal(e.addedAt, "2026-12-11T03:04:05.000Z");
   assert.equal(e.deleted, true);
@@ -195,7 +196,7 @@ test("rows coped with as Sheets really hands them back", () => {
 });
 
 test("expense and payment rows round-trip from the API shape", () => {
-  const x = { id: "a1b2c3d4e5", day: "2026-12-11", title: "Taxi", amount: 3600, currency: "JPY", rate: 111, paidBy: "Ajen", split: ["Ajen", "Trenton"], splitMode: "parts", splitVals: [1, 2], note: "late", kind: "transport", addedBy: "Ajen", addedAt: "2026-12-11T01:00:00.000Z", deleted: true };
+  const x = { id: "a1b2c3d4e5", day: "2026-12-11", title: "Taxi", amount: 23.4, currency: "USD", rate: 0.72, paidBy: "Ajen", split: ["Ajen", "Trenton"], splitMode: "parts", splitVals: [1, 2], note: "late", kind: "transport", addedBy: "Ajen", addedAt: "2026-12-11T01:00:00.000Z", deleted: true };
   const row = P.expenseToRow(x);
   assert.equal(row.paid_by, "Ajen");
   assert.equal(row.split, "Ajen,Trenton");
@@ -205,7 +206,7 @@ test("expense and payment rows round-trip from the API shape", () => {
   for (const k of Object.keys(x)) if (k !== "addedAt" && k !== "deleted") assert.deepEqual(back[k], x[k], k);
   assert.equal(P.expenseToRow({ ...x, splitMode: "equal", splitVals: [] }).split_vals, "");
   assert.deepEqual(P.expenseFromRow(P.expenseToRow({ ...x, currency: "CAD", amount: 100, splitMode: "exact", splitVals: [33.34, 66.66] })).splitVals, [33.34, 66.66]);
-  const noExtras = P.expenseToRow({ id: "a1b2c3d4e5", day: "pre", title: "T", amount: 1, currency: "JPY", paidBy: "Mo", split: ["Mo"], splitMode: "equal", splitVals: [], note: "", kind: "" });
+  const noExtras = P.expenseToRow({ id: "a1b2c3d4e5", day: "pre", title: "T", amount: 1, currency: "USD", paidBy: "Mo", split: ["Mo"], splitMode: "equal", splitVals: [], note: "", kind: "" });
   assert.equal("rate" in noExtras, false);
   assert.equal("added_by" in noExtras, false);
 
@@ -243,7 +244,7 @@ test("every column is plain text except the numbers and the on/off flags", () =>
 });
 
 test("rows read back from text columns still give numbers where the API wants them", () => {
-  const e = P.expenseFromRow({ id: "x", day: "2026-12-11", title: "0012", amount: 4200, currency: "JPY", rate: 111, paid_by: "Mo", split: "Mo,Ajen", split_mode: "parts", split_vals: "1,3", note: "3-4", kind: "", added_by: "Mo", added_at: "t", deleted_at: "" });
+  const e = P.expenseFromRow({ id: "x", day: "2026-12-11", title: "0012", amount: 42, currency: "USD", rate: 0.72, paid_by: "Mo", split: "Mo,Ajen", split_mode: "parts", split_vals: "1,3", note: "3-4", kind: "", added_by: "Mo", added_at: "t", deleted_at: "" });
   assert.deepEqual(e.splitVals, [1, 3]);
   assert.equal(P.expenseFromRow({ id: "x", split: "Mo", split_mode: "parts", split_vals: "3" }).splitVals[0], 3);
   assert.equal(e.title, "0012");
@@ -469,8 +470,8 @@ test("day rows, labels and links", () => {
 const PLAN_HEAD = ["payment_id", "date_paid", "payer", "description", "category", "vendor", "booking_ref", "amount", "currency", "amount_cad", "cad_is_exact", "split_between", "split_type", "status", "include_in_split", "source", "added_by", "notes"];
 // One planner row from named fields; the rest blank.
 const planRow = (o, head = PLAN_HEAD) => head.map((h) => (o[h] === undefined ? "" : o[h]));
-const X7 = { payment_id: "X7", date_paid: "2026-12-11", payer: "Mo", description: "Rail pass", category: "transport", vendor: "North Rail", booking_ref: "AB12", amount: 24750, currency: "JPY", amount_cad: 221.52, cad_is_exact: "yes", split_between: "Mo, Ajen, Trenton", split_type: "equal", include_in_split: "yes" };
-const X9 = { payment_id: "X9", date_paid: "2026-11-02", payer: "Ajen", description: "Flight north", category: "flight", vendor: "Sky Air", booking_ref: "ZZ9", amount: 31500, currency: "JPY", amount_cad: 274.05, cad_is_exact: "no — est.", split_between: "Mo,Ajen,Trenton", split_type: "equal", include_in_split: "yes" };
+const X7 = { payment_id: "X7", date_paid: "2026-12-11", payer: "Mo", description: "Rail pass", category: "transport", vendor: "North Rail", booking_ref: "AB12", amount: 160.5, currency: "USD", amount_cad: 221.52, cad_is_exact: "yes", split_between: "Mo, Ajen, Trenton", split_type: "equal", include_in_split: "yes" };
+const X9 = { payment_id: "X9", date_paid: "2026-11-02", payer: "Ajen", description: "Flight north", category: "flight", vendor: "Sky Air", booking_ref: "ZZ9", amount: 204.25, currency: "USD", amount_cad: 274.05, cad_is_exact: "no — est.", split_between: "Mo,Ajen,Trenton", split_type: "equal", include_in_split: "yes" };
 const PLAN_DATES = ["2026-12-10", "2026-12-11", "2026-12-12", "2026-12-13"];
 const payOf = (o) => {
   const r = P.paymentsFromRows([PLAN_HEAD, planRow(o)]);
@@ -484,7 +485,7 @@ test("paymentsFromRows reads each payment by column name, trimmed, numbers as nu
   assert.deepEqual(r.problems, []);
   assert.deepEqual(r.payments, [{
     id: "X7", row: 2, datePaid: "2026-12-11", payer: "Mo", description: "Rail pass", category: "transport", vendor: "North Rail", bookingRef: "AB12",
-    amount: 24750, currency: "JPY", amountCad: 221.52, cadExact: "yes", splitBetween: ["Mo", "Ajen", "Trenton"], splitType: "equal", include: true,
+    amount: 160.5, currency: "USD", amountCad: 221.52, cadExact: "yes", splitBetween: ["Mo", "Ajen", "Trenton"], splitType: "equal", include: true,
   }]);
 });
 
@@ -534,8 +535,8 @@ test("paymentsFromRows: a missing column gives one problem and no payments", () 
 });
 
 test("paymentsFromRows reads numbers given as text, and NaN when it can't", () => {
-  const p = payOf({ ...X7, amount: "¥24,750", amount_cad: "CA$1,234.50" });
-  assert.deepEqual([p.amount, p.amountCad], [24750, 1234.5]);
+  const p = payOf({ ...X7, amount: "US$1,160.50", amount_cad: "CA$1,234.50" });
+  assert.deepEqual([p.amount, p.amountCad], [1160.5, 1234.5]);
   assert.equal(payOf({ ...X7, amount_cad: " $ 12.30 " }).amountCad, 12.3);
   assert.equal(payOf({ ...X7, amount_cad: "" }).amountCad, null, "blank is not unreadable");
   assert.equal(payOf({ ...X7, amount_cad: "TBD" }).amountCad, NaN);
@@ -590,9 +591,9 @@ test("paymentsFromRows skips blank rows, leaves out unusable and repeated ids, a
 
 test("expenseFromPayment: the two note examples, word for word", () => {
   const a = P.expenseFromPayment(payOf(X7), NAMES, PLAN_DATES);
-  assert.deepEqual(a, { ok: true, value: { title: "Rail pass", amount: 221.52, currency: "CAD", paidBy: "Mo", split: ["Mo", "Ajen", "Trenton"], day: "2026-12-11", kind: "transport", note: "X7 · North Rail · ref AB12 · ¥24,750 charged" } });
+  assert.deepEqual(a, { ok: true, value: { title: "Rail pass", amount: 221.52, currency: "CAD", paidBy: "Mo", split: ["Mo", "Ajen", "Trenton"], day: "2026-12-11", kind: "transport", note: "X7 · North Rail · ref AB12 · US$160.50 charged" } });
   const b = P.expenseFromPayment(payOf(X9), NAMES, PLAN_DATES);
-  assert.equal(b.value.note, "X9 · Sky Air · ref ZZ9 · ¥31,500 charged · CAD amount is an estimate");
+  assert.equal(b.value.note, "X9 · Sky Air · ref ZZ9 · US$204.25 charged · CAD amount is an estimate");
   assert.deepEqual([b.value.amount, b.value.currency, b.value.day, b.value.kind, b.value.paidBy], [274.05, "CAD", "pre", "transport", "Ajen"]);
 });
 
@@ -609,17 +610,17 @@ test("expenseFromPayment: only equal splits, only the trip's people, in their ow
   assert.deepEqual([v.paidBy, v.split], ["Ajen", ["Mo", "Trenton"]]);
 });
 
-test("expenseFromPayment: the amount is amount_cad when there is one, else yen or dollars as charged", () => {
+test("expenseFromPayment: the amount is amount_cad when there is one, else US or Canadian dollars as charged", () => {
   assert.deepEqual([convert({ amount_cad: 10.005 }).value.amount, convert({ amount_cad: 10.005 }).value.currency], [10.01, "CAD"]);
-  const yen = convert({ amount_cad: "", amount: 4200.6 }).value;
-  assert.deepEqual([yen.amount, yen.currency, yen.note], [4201, "JPY", "X7 · North Rail · ref AB12"]);
+  const usd = convert({ amount_cad: "", amount: 42.006 }).value;
+  assert.deepEqual([usd.amount, usd.currency, usd.note], [42.01, "USD", "X7 · North Rail · ref AB12"]);
   const cad = convert({ amount_cad: 0, amount: 12.345, currency: " cad " }).value;
   assert.deepEqual([cad.amount, cad.currency], [12.35, "CAD"]);
-  // Fix 8: a CAD amount that is there but can't be read is not passed over for the yen.
+  // Fix 8: a CAD amount that is there but can't be read is not passed over for the US dollars.
   assert.deepEqual(convert({ amount_cad: "TBD" }), { ok: false, message: "That payment’s CAD amount can’t be read." });
-  assert.equal(convert({ amount_cad: "", amount: 500 }).value.currency, "JPY");
+  assert.equal(convert({ amount_cad: "", amount: 500 }).value.currency, "USD");
   assert.equal(convert({ amount_cad: "", amount: "" }).ok, false);
-  for (const o of [{ amount_cad: "", currency: "USD", amount: 30 }, { amount_cad: -5, amount: 0 }, { amount_cad: "", amount: "" }]) {
+  for (const o of [{ amount_cad: "", currency: "EUR", amount: 30 }, { amount_cad: "", currency: "JPY", amount: 3000 }, { amount_cad: -5, amount: 0 }, { amount_cad: "", amount: "" }]) {
     assert.deepEqual(convert(o), { ok: false, message: "That payment has no usable amount." }, JSON.stringify(o));
   }
 });
@@ -641,18 +642,18 @@ test("expenseFromPayment: the day, the kind and the note's other parts", () => {
   assert.equal(convert({ date_paid: "2026-12-25" }).value.day, "2026-12-13");
   const kinds = { lodging: "stay", Transport: "transport", flight: "transport", food: "food", shopping: "shopping", tickets: "activity", "": "activity" };
   for (const [c, k] of Object.entries(kinds)) assert.equal(convert({ category: c }).value.kind, k, c);
-  assert.equal(convert({ vendor: "", booking_ref: "" }).value.note, "X7 · ¥24,750 charged");
-  assert.equal(convert({ currency: "USD", amount: 45.5 }).value.note, "X7 · North Rail · ref AB12 · 45.5 USD");
+  assert.equal(convert({ vendor: "", booking_ref: "" }).value.note, "X7 · US$160.50 charged");
+  assert.equal(convert({ currency: "EUR", amount: 45.5 }).value.note, "X7 · North Rail · ref AB12 · 45.5 EUR");
   assert.equal(convert({ currency: "CAD", amount: 221.52 }).value.note, "X7 · North Rail · ref AB12");
-  assert.equal(convert({ cad_is_exact: "" }).value.note, "X7 · North Rail · ref AB12 · ¥24,750 charged · CAD amount is an estimate");
-  assert.equal(convert({ cad_is_exact: "Yes, from the statement" }).value.note, "X7 · North Rail · ref AB12 · ¥24,750 charged");
+  assert.equal(convert({ cad_is_exact: "" }).value.note, "X7 · North Rail · ref AB12 · US$160.50 charged · CAD amount is an estimate");
+  assert.equal(convert({ cad_is_exact: "Yes, from the statement" }).value.note, "X7 · North Rail · ref AB12 · US$160.50 charged");
   const long = convert({ vendor: "Vendor ".repeat(40) }).value.note;
   assert.ok(long.length <= 200, long.length);
   assert.match(long, /^X7 · Vendor Vendor .*Vendor…$/);
 });
 
 test("paymentIdOf: the note's first part when it is an id", () => {
-  assert.equal(P.paymentIdOf("X7 · North Rail · ref AB12 · ¥24,750 charged"), "X7");
+  assert.equal(P.paymentIdOf("X7 · North Rail · ref AB12 · US$160.50 charged"), "X7");
   assert.equal(P.paymentIdOf("X7"), "X7");
   assert.equal(P.paymentIdOf("ref NK-4471"), null);
   assert.equal(P.paymentIdOf(""), null);

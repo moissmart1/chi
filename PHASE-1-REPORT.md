@@ -8,7 +8,7 @@ Survey: `triplit/docs/superpowers/specs/2026-11-17-second-trip-survey.md`.
 - [x] 0. Isolation commit (storage prefix, sw caches, manifest, titles, API_URL empty, changes.html gone, isolation test)
 - [x] 1. One place for the trip's constants (js/trip.js, backend/Pure.js top, tripMismatch in load and setup)
 - [x] 2. Time zone
-- [ ] 3. Currency
+- [x] 3. Currency
 - [ ] 4. Two people
 - [ ] 5. The trip's own seed
 - [ ] 6. No planner
@@ -41,6 +41,16 @@ Survey: `triplit/docs/superpowers/specs/2026-11-17-second-trip-survey.md`.
 - History: day headings and times on the trip's clock (plan). MY CALL: the line sheet's "Rung up by …, <day>" follows History (the two were pinned together by a test); the slip's "Paid <day>." stays the phone's own day (an explicit earlier rule, not named in the plan).
 - Wording: "Japan time" → "Chicago time" in comments and test names; the remind message says "for the Chicago trip."
 - Tests: unit instants moved from +09:00 to −06:00 (stamp windows shifted 15 h). e2e: phones default to America/Chicago; `NOON12` is 13:20 Chicago; `SEEDED_AT` is 09:00 Nov 20 Chicago; `zones` rewritten for a phone in Toronto and one in Tokyo; the Toronto cases that relied on a 14-hour gap now use a Tokyo phone (stamp "Paid", stamp book "today") or a late Chicago instant (History).
+
+### 3. Currency
+- Codes: trip `USD`, home `CAD`, both 2 decimals. `js/money.js`: `cadCents` (home is exact, anything else divides by the rate) and `tripCents` (was `jpyOf`, now cents). money.js can't import, so it keeps the literal "CAD" and a test pins it to `HOME_CURRENCY`. `backend/Money.js` regenerated.
+- Printing: `dollars(c)` → `$12.50` (home), new `tripMoney(c)` → `US$12.50` (trip); `yen()` gone; `typed()` by currency; `pt()` no longer styles ¥. History (`money_`) writes `US$…` for trip lines.
+- Register: starts in CAD; key `$ → US$` / `US$ → $`; the switch keeps the digits; "." works in both; `00` stays; limits 10,000,000 in both (in cents); "≈" conversion both ways in cents. Uneven panel: cents in both, placeholder `US$0.00` / `$0.00`, decimal keyboard.
+- Receipt: subtotals, total, "each, about" and "about US$2,850.00" in `US$`; ticket fare is the day's `US$` (`dayTotalTrip`); line sheet's "about" line.
+- Rate: `open.er-api.com/v6/latest/CAD`, reads `rates.USD`, accepts 0.5 < x < 1.0, stores `rateRounded` (4 decimals), stand-in 0.72, error text "US dollar rate". Note on screen: `US dollars are being converted at a stand-in rate of 0.72.` (the plan's sentence; the old one ended "Tell Mo.", dropped to match). Nothing assumed a rate > 1 or whole beyond these.
+- Backend: `validateExpense` takes USD/CAD ("Use US or Canadian dollars."), cents for both; connector enum `[USD, CAD]`; planner pull reads `US$`/`CA$` text and USD/CAD (this code goes in item 6).
+- Fixtures: seed lines are US$ at rate 0.72, total US$2,850.00 (the plan's example figure); test amounts and expectations moved to US$/cents. MY CALL: in backend-only tests (fake-backend.test) the old yen figures were kept as dollar figures (e.g. US$4,200.00 ramen) rather than re-deriving every number: they test mechanics, not prices.
+- Not changed (phase 2): the quick chip "Onsen".
 
 ## Tests deleted (and why)
 

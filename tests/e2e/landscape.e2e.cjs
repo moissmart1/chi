@@ -316,29 +316,29 @@ for (const size of [...SIZES, TAB]) {
         await money(page);
         await page.click("#ring");
         await waitOpen(page, "reg");
-        await page.click("#kCur"); // dollars to yen
-        await keys(page, "4 5 0");
+        await page.click("#kCur"); // Canadian dollars to US dollars
+        await keys(page, "4 . 5 0");
         const amount = () => page.evaluate(() => document.getElementById("xAmt").textContent);
-        assert.equal(await amount(), "¥450");
+        assert.equal(await amount(), "US$4.50");
         await page.setViewportSize(size);
         for (const sel of ["#kGo", "#regDone"]) await expectReach(page, sel);
         assert.equal(await isOpen(page, "reg"), true, "still open sideways");
-        assert.equal(await amount(), "¥450");
+        assert.equal(await amount(), "US$4.50");
         await page.setViewportSize(PORTRAIT);
         for (const sel of ["#kGo", "#regDone"]) await expectReach(page, sel);
-        assert.equal(await amount(), "¥450");
+        assert.equal(await amount(), "US$4.50");
         // The uneven panel, opened in portrait where it has the most room.
         await page.click("#xUneven");
         await until(() => visible(page, "#un"), "the panel opens");
         await page.setViewportSize(size);
         assert.equal(await isOpen(page, "reg"), true, "still open sideways");
-        assert.equal(await amount(), "¥450");
+        assert.equal(await amount(), "US$4.50");
         assert.equal(await visible(page, "#un"), true, "the panel is still open sideways");
         for (const sel of ["#unDone", "#kGo", "#regDone"]) await expectReach(page, sel);
         await page.setViewportSize(PORTRAIT);
         for (const sel of ["#unDone", "#kGo", "#regDone"]) await expectReach(page, sel);
         assert.equal(await isOpen(page, "reg"), true, "still open in portrait");
-        assert.equal(await amount(), "¥450");
+        assert.equal(await amount(), "US$4.50");
         assert.equal(await visible(page, "#un"), true, "the panel is still open");
       },
     },

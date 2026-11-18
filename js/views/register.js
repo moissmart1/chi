@@ -6,13 +6,15 @@
 // mountRegister(root, store, { now, storage, onClose }) -> { open(day?), edit(id), close(), isOpen() }
 // onClose(): called each time the register closes.
 // root is the phone; the register sits at its bottom over the Money view.
-// Every new entry starts in dollars (CAD), also the next one after ringing up; the ¥/$ key
-// switches the one in hand, and a half-typed entry keeps its currency when put away and reopened.
+// Every new entry starts in Canadian dollars, also the next one after ringing up; the
+// $ → US$ key switches the one in hand to US dollars (and US$ → $ back), and a half-typed
+// entry keeps its currency when put away and reopened.
 // storage is only used to clear the old stored cur memory once.
 
 import { STORAGE_PREFIX } from "../config.js";
 import { defaultRingDay, newId } from "../time.js";
-import { yen, dollars, pt, dayShort } from "../format.js";
+import { tripMoney, dollars, pt, dayShort } from "../format.js";
+import { HOME_CURRENCY, TRIP_CURRENCY, HOME_SIGN, TRIP_SIGN } from "../trip.js";
 import { mountUneven, splitOf, toUnits, fromUnits } from "./uneven.js";
 import { isWide } from "../shape.js";
 import { fillSeal } from "../picture.js";
@@ -29,8 +31,8 @@ export const CHIPS = [
 
 const MAX_DIGITS = 8;
 // The biggest amount the backend takes (validateExpense in backend/Pure.js):
-// 10,000,000 in either currency, in the register's units (yen, or cents).
-export const MAX_UNITS = { JPY: 10000000, CAD: 1000000000 };
+// 10,000,000 in either currency, in cents.
+export const MAX_UNITS = { [TRIP_CURRENCY]: 1000000000, [HOME_CURRENCY]: 1000000000 };
 const HOLD_MS = 500;
 const DAY_MS = 86400000;
 const FIELDS = ["title", "amount", "currency", "paidBy", "day", "kind"]; // split, splitMode, splitVals go together
@@ -52,7 +54,7 @@ const MARKUP = `
 </div>
 <div class="pad" id="pad">
   <button type="button" class="key" data-k="7">7</button><button type="button" class="key" data-k="8">8</button><button type="button" class="key" data-k="9">9</button><button type="button" class="key" data-k="del" aria-label="Delete">⌫</button>
-  <button type="button" class="key" data-k="4">4</button><button type="button" class="key" data-k="5">5</button><button type="button" class="key" data-k="6">6</button><button type="button" class="key" data-k="cur" id="kCur">$ → ¥</button>
+  <button type="button" class="key" data-k="4">4</button><button type="button" class="key" data-k="5">5</button><button type="button" class="key" data-k="6">6</button><button type="button" class="key" data-k="cur" id="kCur">$ → US$</button>
   <button type="button" class="key" data-k="1">1</button><button type="button" class="key" data-k="2">2</button><button type="button" class="key" data-k="3">3</button><button type="button" class="key go" data-k="go" id="kGo" disabled>Ring<br>it up</button>
   <button type="button" class="key" data-k="0">0</button><button type="button" class="key" data-k="00">00</button><button type="button" class="key" data-k=".">.</button>
 </div>`;
@@ -83,7 +85,6 @@ function dayOptions(trip) {
 
 // The amount as stored, back as the keys would have typed it.
 function typedAmount(e) {
-  if (e.currency === "JPY") return String(Math.round(e.amount));
   const cents = Math.round(e.amount * 100);
   return cents % 100 ? (cents / 100).toFixed(2) : String(cents / 100);
 }
@@ -141,7 +142,7 @@ export function mountRegister(root, store, { now = () => Date.now(), storage = d
 
   // tagged: the label whose kind the line carries while its title still reads so.
   const blank = () => ({ amt: "", tagged: null, split: names(), mode: null, parts: {}, exact: {} });
-  let draft = { ...blank(), editId: null, orig: null, cur: "CAD", payer: "", day: "pre", rate: null };
+  let draft = { ...blank(), editId: null, orig: null, cur: HOME_CURRENCY, payer: "", day: "pre", rate: null };
   let opened = false;
   let peopleShown = "";
 
@@ -155,7 +156,7 @@ export function mountRegister(root, store, { now = () => Date.now(), storage = d
 
   function startFresh(day) {
     resetLine();
-    Object.assign(draft, { editId: null, orig: null, cur: "CAD", payer: me(), day: day || today() });
+    Object.assign(draft, { editId: null, orig: null, cur: HOME_CURRENCY, payer: me(), day: day || today() });
   }
 
   const kindNow = () => (draft.tagged && what.value.trim() === draft.tagged.label ? draft.tagged.kind : "");
@@ -179,18 +180,18 @@ export function mountRegister(root, store, { now = () => Date.now(), storage = d
   }
 
   function canGo() {
-    const units = toUnits(draft.amt, draft.cur);
+    const units = toUnits(draft.amt);
     return units > 0 && units <= MAX_UNITS[draft.cur] && what.value.trim() !== "" && splitOf(draft).ok;
   }
 
   function render() {
     drawSeals();
     draft.rate = rate();
-    const units = toUnits(draft.amt, draft.cur);
-    const sym = draft.cur === "JPY" ? "¥" : "$";
+    const units = toUnits(draft.amt);
+    const sym = draft.cur === HOME_CURRENCY ? HOME_SIGN : TRIP_SIGN;
     const shown = draft.amt === "" ? "0" : draft.amt.replace(/^\d+/, (w) => String(Number(w)).replace(/\B(?=(\d{3})+(?!\d))/g, ","));
     amtOut.innerHTML = pt(sym + shown);
-    $("kCur").textContent = draft.cur === "JPY" ? "¥ → $" : "$ → ¥";
+    $("kCur").textContent = draft.cur === HOME_CURRENCY ? HOME_SIGN + " → " + TRIP_SIGN : TRIP_SIGN + " → " + HOME_SIGN;
     $("xDay").textContent = dayShort(draft.day);
     const opts = dayOptions(store.state.trip);
     const i = opts.indexOf(draft.day);
@@ -202,7 +203,7 @@ export function mountRegister(root, store, { now = () => Date.now(), storage = d
     if (units > 0 && split.mode !== "equal") conv = "uneven";
     else if (units > 0) {
       conv = "÷" + draft.split.length;
-      if (draft.rate > 0) conv += "  ≈ " + (draft.cur === "JPY" ? dollars(Math.round((units / draft.rate) * 100)) : yen(Math.round((units / 100) * draft.rate)));
+      if (draft.rate > 0) conv += "  ≈ " + (draft.cur === HOME_CURRENCY ? tripMoney(Math.round(units * draft.rate)) : dollars(Math.round(units / draft.rate)));
     }
     $("xConv").textContent = conv;
     unevenBtn.classList.toggle("is-on", split.mode !== "equal");
@@ -224,22 +225,19 @@ export function mountRegister(root, store, { now = () => Date.now(), storage = d
   function press(k) {
     if (k === "go") return ringUp();
     if (k === "cur") {
-      draft.cur = draft.cur === "JPY" ? "CAD" : "JPY";
-      if (draft.cur === "JPY") {
-        draft.amt = draft.amt.split(".")[0];
-        for (const n of Object.keys(draft.exact)) draft.exact[n] = draft.exact[n].split(".")[0];
-      }
+      // Both currencies have cents: the digits typed stay as they are.
+      draft.cur = draft.cur === HOME_CURRENCY ? TRIP_CURRENCY : HOME_CURRENCY;
     } else if (k === "del") {
       draft.amt = draft.amt.slice(0, -1);
     } else if (k === ".") {
-      if (draft.cur === "CAD" && !draft.amt.includes(".")) draft.amt = (draft.amt || "0") + ".";
+      if (!draft.amt.includes(".")) draft.amt = (draft.amt || "0") + ".";
     } else {
       // Append as much of the key as fits: two decimals, eight digits.
       const dec = draft.amt.split(".")[1];
       let add = dec === undefined ? k : k.slice(0, 2 - dec.length);
       add = add.slice(0, MAX_DIGITS - draft.amt.replace(".", "").length);
       // Nothing past the backend's limit: as much of the key as stays within it.
-      while (add && toUnits(draft.amt + add, draft.cur) > MAX_UNITS[draft.cur]) add = add.slice(0, -1);
+      while (add && toUnits(draft.amt + add) > MAX_UNITS[draft.cur]) add = add.slice(0, -1);
       if (!add) return;
       draft.amt += add;
       if (/^0+$/.test(draft.amt)) draft.amt = "";
@@ -250,15 +248,15 @@ export function mountRegister(root, store, { now = () => Date.now(), storage = d
 
   // Exact amounts that no longer add up: open the panel on what is left to assign.
   function showGap() {
-    if (draft.mode === "exact" && toUnits(draft.amt, draft.cur) > 0 && !splitOf(draft).ok) uneven.open();
+    if (draft.mode === "exact" && toUnits(draft.amt) > 0 && !splitOf(draft).ok) uneven.open();
   }
 
   // The line as the backend takes it.
   function fields() {
-    const units = toUnits(draft.amt, draft.cur);
+    const units = toUnits(draft.amt);
     const split = splitOf(draft);
     return {
-      day: draft.day, title: what.value.trim(), amount: fromUnits(units, draft.cur), currency: draft.cur,
+      day: draft.day, title: what.value.trim(), amount: fromUnits(units), currency: draft.cur,
       paidBy: draft.payer, split: draft.split.slice(), splitMode: split.mode, splitVals: split.vals, kind: kindNow(),
     };
   }
@@ -285,7 +283,7 @@ export function mountRegister(root, store, { now = () => Date.now(), storage = d
       store.addExpense({ id, ...line, note: "" }); // draws the line before it returns
     } finally {
       resetLine();
-      draft.cur = "CAD"; // the next entry is a new expense
+      draft.cur = HOME_CURRENCY; // the next entry is a new expense
       render();
     }
     printLine(id);
@@ -336,7 +334,7 @@ export function mountRegister(root, store, { now = () => Date.now(), storage = d
       draft.day = day || today();
       // A half-typed entry put away with Done keeps its own currency, so its
       // digits never change meaning; an empty one starts in dollars.
-      if (draft.amt === "") draft.cur = "CAD";
+      if (draft.amt === "") draft.cur = HOME_CURRENCY;
     }
     show();
   }
@@ -353,7 +351,7 @@ export function mountRegister(root, store, { now = () => Date.now(), storage = d
     e.split.forEach((n, i) => {
       const v = e.splitVals[i];
       if (mode === "parts") draft.parts[n] = v;
-      if (mode === "exact") draft.exact[n] = e.currency === "JPY" ? String(v) : typedAmount({ currency: "CAD", amount: v });
+      if (mode === "exact") draft.exact[n] = typedAmount({ amount: v });
     });
     what.value = e.title;
     show();

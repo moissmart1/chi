@@ -12,8 +12,8 @@ const PLANNER_ID = "fakePlannerSheet_0123456789abcdefXYZ";
 const JUST_PULLED = new Date(NOON12).toISOString();
 const PLANNER = [
   PHEAD,
-  prow({ payment_id: "X7", date_paid: "2026-12-11", payer: "Mo", description: "Rail pass", category: "transport", amount: 24750, currency: "JPY", amount_cad: 221.52, cad_is_exact: "yes", split_between: "Mo, Ajen, Trenton", split_type: "equal", include_in_split: "yes" }),
-  prow({ payment_id: "Q3", date_paid: "2026-12-12", payer: "Ajen", description: "Noodle bar", category: "food", amount: 3600, currency: "JPY", split_between: "Mo, Ajen", split_type: "equal", include_in_split: "yes" }),
+  prow({ payment_id: "X7", date_paid: "2026-12-11", payer: "Mo", description: "Rail pass", category: "transport", amount: 160.5, currency: "USD", amount_cad: 221.52, cad_is_exact: "yes", split_between: "Mo, Ajen, Trenton", split_type: "equal", include_in_split: "yes" }),
+  prow({ payment_id: "Q3", date_paid: "2026-12-12", payer: "Ajen", description: "Noodle bar", category: "food", amount: 36, currency: "USD", split_between: "Mo, Ajen", split_type: "equal", include_in_split: "yes" }),
 ];
 
 const clipboard = (page) => page.evaluate(() => navigator.clipboard.readText());

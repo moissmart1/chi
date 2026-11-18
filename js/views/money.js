@@ -5,14 +5,14 @@
 // root and redraws on every store change. Every figure comes from money.js and
 // format.js; text from people or the Sheet goes in with textContent only.
 
-import { standing, jpyOf, cadCents, shares } from "../money.js";
+import { standing, tripCents, cadCents, shares } from "../money.js";
 import { tripDay } from "../time.js";
 import { mountSlip, viewerOwed } from "./slip.js";
-import { yen, dollars, typed, dayHead, issuer, pt, freshText, sentence, tripSpan } from "../format.js";
+import { tripMoney, dollars, typed, dayHead, issuer, pt, freshText, sentence, tripSpan } from "../format.js";
 import { fillSeal } from "../picture.js";
 
 const UNREACHABLE = "Couldn’t reach the trip sheet.";
-const STAND_IN_RATE = "Yen is being converted at a stand-in rate of 111. Tell Mo.";
+const STAND_IN_RATE = "US dollars are being converted at a stand-in rate of 0.72.";
 
 // The one line about Sheet rows the app has left out (store.state.setAside).
 export function setAsideText(list) {
@@ -109,7 +109,7 @@ function drawDay(day, lines, ctx) {
   } else {
     for (const e of lines) group.append(drawLine(e, ctx));
     const sub = el("div", "rc-sub");
-    sub.append(el("span", "", "小計 subtotal"), fig("b", "rc-cad", dollars(sum(lines, cadCents))), fig("b", "", yen(sum(lines, jpyOf))));
+    sub.append(el("span", "", "小計 subtotal"), fig("b", "rc-cad", dollars(sum(lines, cadCents))), fig("b", "", tripMoney(sum(lines, tripCents))));
     group.append(sub);
   }
   group.append(el("div", "rule"));
@@ -132,13 +132,13 @@ function drawReceipt(rc, s, live, ctx) {
   const newestFirst = live.slice().sort((a, b) => ((a.addedAt || "") < (b.addedAt || "") ? -1 : (a.addedAt || "") > (b.addedAt || "") ? 1 : 0)).reverse();
   const days = receiptDays(s, live, ctx.nowMs).map((day) => drawDay(day, newestFirst.filter((e) => e.day === day), ctx));
 
-  const totalYen = sum(live, jpyOf);
+  const totalTrip = sum(live, tripCents);
   const tot = el("div", "rc-tot");
-  tot.append(el("span", "", "合計 Total"), fig("b", "", yen(totalYen)));
+  tot.append(el("span", "", "合計 Total"), fig("b", "", tripMoney(totalTrip)));
   const inDollars = el("div", "rc-sub");
   inDollars.append(el("span", "", "in dollars"), fig("b", "", dollars(sum(live, cadCents))));
   const each = el("div", "rc-sub");
-  each.append(el("span", "", "1人あたり each, about"), fig("b", "", yen(shares(totalYen, ctx.names)[ctx.names[0]])));
+  each.append(el("span", "", "1人あたり each, about"), fig("b", "", tripMoney(shares(totalTrip, ctx.names)[ctx.names[0]])));
   const foot = el("div", "rc-f");
   foot.append(el("i", "", "毎度ありがとうございます"), document.createTextNode("Thank you, come again."), el("div", "bars"));
 
@@ -210,7 +210,7 @@ export function mountMoney(root, store, { onRing = () => {}, onLine = () => {}, 
     const { live, list, bal } = viewerOwed(s);
     say.textContent = s.me ? sentence(standing(s.me, list, bal)) : "";
     // The words stay dim; the three figures are bold and bright.
-    sayP.replaceChildren("The trip so far is ", el("b", "", dollars(sum(live, cadCents))), ", about ", el("b", "", yen(sum(live, jpyOf))),
+    sayP.replaceChildren("The trip so far is ", el("b", "", dollars(sum(live, cadCents))), ", about ", el("b", "", tripMoney(sum(live, tripCents))),
       ", across ", el("b", "", String(live.length)), live.length === 1 ? " receipt." : " receipts.");
     rateNote.hidden = s.rateSource !== "fallback";
     rateNote.textContent = rateNote.hidden ? "" : STAND_IN_RATE;

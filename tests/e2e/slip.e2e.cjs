@@ -7,7 +7,7 @@ const P = require("../../backend/Pure.js");
 const { NOON12, open, until, text, expectText, visible } = require("./helpers.cjs");
 
 // Task 2's chain: Mo owes Ajen $10, Ajen owes Trenton $10.
-const line = (o) => ({ day: "2026-12-11", currency: "CAD", rate: 111, splitMode: "equal", splitVals: [], note: "", kind: "", deleted: false, ...o });
+const line = (o) => ({ day: "2026-12-11", currency: "CAD", rate: 0.72, splitMode: "equal", splitVals: [], note: "", kind: "", deleted: false, ...o });
 const CHAIN = [
   line({ id: "chainexp001", title: "Izakaya", amount: 20, paidBy: "Ajen", split: ["Mo", "Ajen"] }),
   line({ id: "chainexp002", title: "Karaoke", amount: 20, paidBy: "Trenton", split: ["Ajen", "Trenton"] }),

@@ -20,8 +20,8 @@ test("the receipt's line about rows left out: one, several, and why (F3)", () =>
 
 test("the register's limit is exactly the backend's, in both currencies (F13)", () => {
   const ok = (amount, currency) => P.validateExpense({ id: "exp0000001", day: "pre", title: "x", amount, currency, paidBy: "Mo", split: ["Mo"] }, ["Mo"]).ok;
-  assert.equal(ok(MAX_UNITS.JPY, "JPY"), true);
-  assert.equal(ok(MAX_UNITS.JPY + 1, "JPY"), false);
+  assert.equal(ok(MAX_UNITS.USD / 100, "USD"), true);
+  assert.equal(ok((MAX_UNITS.USD + 1) / 100, "USD"), false);
   assert.equal(ok(MAX_UNITS.CAD / 100, "CAD"), true);
   assert.equal(ok((MAX_UNITS.CAD + 1) / 100, "CAD"), false);
 });

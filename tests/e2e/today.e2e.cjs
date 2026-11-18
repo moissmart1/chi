@@ -309,11 +309,11 @@ module.exports = [
       assert.equal(await count(page, d11 + " .punch"), 1);
       const rows = await page.evaluate((sel) => [...document.querySelectorAll(sel + " .r[data-id]")].map((r) => r.classList.contains("is-done")), d11);
       assert.ok(rows.length > 0 && rows.every(Boolean), JSON.stringify(rows));
-      const { jpyOf } = await import(pathToFileURL(path.join(__dirname, "..", "..", "js", "money.js")).href);
-      const { yen } = await import(pathToFileURL(path.join(__dirname, "..", "..", "js", "format.js")).href);
-      const total = SEED.expenses.filter((e) => e.day === "2026-12-11" && !e.deleted).reduce((a, e) => a + jpyOf(e), 0);
-      assert.ok(total > 0);
-      await expectText(page, d11 + " .fare", yen(total));
+      const { tripCents } = await import(pathToFileURL(path.join(__dirname, "..", "..", "js", "money.js")).href);
+      const { tripMoney } = await import(pathToFileURL(path.join(__dirname, "..", "..", "js", "format.js")).href);
+      const total = SEED.expenses.filter((e) => e.day === "2026-12-11" && !e.deleted).reduce((a, e) => a + tripCents(e), 0);
+      assert.equal(tripMoney(total), "US$182.45");
+      await expectText(page, d11 + " .fare", tripMoney(total));
       await expectText(page, "#dayCount", /^Day 3 of 11 ?today$/);
       await page.click("#pager .sq:nth-child(2)");
       await expectText(page, "#dayCount", /^Day 2 of 11 ?used$/);

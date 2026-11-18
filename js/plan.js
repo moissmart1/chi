@@ -4,7 +4,7 @@
 // be missing or blank, because a person can type into the Sheet by hand.
 
 import { dateIn } from "./time.js";
-import { jpyOf } from "./money.js";
+import { tripCents } from "./money.js";
 
 const str = (v) => (typeof v === "string" ? v.trim() : "");
 
@@ -213,11 +213,12 @@ export function header(day) {
   };
 }
 
-export function dayTotalYen(expenses, date) {
+// The day's logged spending in the trip's currency, in cents.
+export function dayTotalTrip(expenses, date) {
   let sum = 0;
   for (const e of expenses) {
     if (e.day !== date || e.deleted) continue;
-    const v = jpyOf(e);
+    const v = tripCents(e);
     if (Number.isFinite(v)) sum += v;
   }
   return sum;

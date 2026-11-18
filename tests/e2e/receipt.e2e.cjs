@@ -20,7 +20,7 @@ function withExtras(extra = {}) {
 }
 
 const BOARD = {
-  id: "seedexp010", day: "pre", title: "Board rental", amount: 730, currency: "CAD", rate: 111,
+  id: "seedexp010", day: "pre", title: "Board rental", amount: 730, currency: "CAD", rate: 0.72,
   paidBy: "Ajen", split: ["Mo", "Ajen", "Trenton"], splitMode: "equal", splitVals: [], note: "", kind: "", addedBy: "Ajen", deleted: false,
 };
 
@@ -29,7 +29,7 @@ module.exports = [
     name: "within a day the newest line is at the top",
     async run({ page }) {
       const mk = (id, title, addedAt) => ({
-        id, day: "2026-12-11", title, amount: 1000, currency: "JPY", rate: 111, paidBy: "Mo", split: NAMES.slice(),
+        id, day: "2026-12-11", title, amount: 10, currency: "USD", rate: 0.72, paidBy: "Mo", split: NAMES.slice(),
         splitMode: "equal", splitVals: [], note: "", kind: "", addedBy: "Mo", addedAt, deleted: false,
       });
       const seed = withExtras({ expenses: [mk("ordexp001", "Earlier snack", "2026-12-11T09:00:00.000Z"), mk("ordexp002", "Later snack", "2026-12-11T15:00:00.000Z")] });
@@ -51,7 +51,7 @@ module.exports = [
   {
     name: "sentence, summary and receipt from the standard seed",
     async run({ page }) {
-      const { balances, owedList, standing, sentence, jpyOf, cadCents, yen, dollars } = await lib();
+      const { balances, owedList, standing, sentence, tripCents, cadCents, tripMoney, dollars } = await lib();
       await open(page, { seed: SEED, nowMs: NOON12 });
       await waitRows(page, 8);
 
@@ -59,11 +59,11 @@ module.exports = [
       const bal = balances(NAMES, exps, SEED.payments);
       await expectText(page, "#say", sentence(standing("Mo", owedList(NAMES, exps, SEED.payments, true), bal)));
       const cents = exps.reduce((a, e) => a + cadCents(e), 0);
-      await expectText(page, "#sayP", "The trip so far is " + dollars(cents) + ", about ¥438,340, across 8 receipts.");
-      assert.equal(dollars(cents), "$3,949.01");
+      await expectText(page, "#sayP", "The trip so far is " + dollars(cents) + ", about US$2,850.00, across 8 receipts.");
+      assert.equal(dollars(cents), "$3,958.33");
       // Figures in the summary are bold and bright; the words around them stay dim.
       const figs = await page.$$eval("#sayP b", (els) => els.map((b) => [b.textContent, getComputedStyle(b).fontWeight, getComputedStyle(b).color]));
-      assert.deepEqual(figs.map((f) => f[0]), ["$3,949.01", "¥438,340", "8"]);
+      assert.deepEqual(figs.map((f) => f[0]), ["$3,958.33", "US$2,850.00", "8"]);
       const textColour = await page.evaluate(() => getComputedStyle(document.body).color);
       for (const [, weight, colour] of figs) {
         assert.equal(weight, "700");
@@ -85,15 +85,15 @@ module.exports = [
       assert.equal(await page.locator('.rc-group[data-day="2026-12-12"] .rc-empty').count(), 1, "Dec 12 is empty");
       assert.equal(await page.locator('.rc-group[data-day="2026-12-12"] [data-addday="2026-12-12"]').count(), 1);
 
-      // Every day's subtotal: 小計, the day's yen and its dollars.
+      // Every day's subtotal: 小計, the day's US dollars and its Canadian dollars.
       for (const day of ["pre", "2026-12-10", "2026-12-11"]) {
         const list = exps.filter((e) => e.day === day);
         const sub = await text(page, '.rc-group[data-day="' + day + '"] .rc-sub');
         assert.ok(sub.includes("小計"), day + " subtotal says 小計");
-        assert.ok(sub.includes(yen(list.reduce((a, e) => a + jpyOf(e), 0))), day + " subtotal yen: " + sub);
+        assert.ok(sub.includes(tripMoney(list.reduce((a, e) => a + tripCents(e), 0))), day + " subtotal US dollars: " + sub);
         assert.ok(sub.includes(dollars(list.reduce((a, e) => a + cadCents(e), 0))), day + " subtotal dollars: " + sub);
       }
-      assert.ok((await text(page, '.rc-group[data-day="2026-12-11"] .rc-sub')).includes("¥27,400"));
+      assert.ok((await text(page, '.rc-group[data-day="2026-12-11"] .rc-sub')).includes("US$182.45"));
 
       assert.ok((await text(page, '.rc-row[data-id="seedexp008"]')).includes("Ajen + Trenton only"));
       const onlyNames = await page.$$eval('.rc-row[data-id="seedexp008"] small b', (els) => els.map((b) => [b.textContent, getComputedStyle(b).fontWeight]));
@@ -102,7 +102,7 @@ module.exports = [
       assert.equal(await page.locator("#rc .rc-note").count(), 1, "only the line with a note has .rc-note");
 
       const tot = await text(page, "#rc .rc-tot");
-      assert.ok(tot.includes("合計") && tot.includes("¥438,340"), "total: " + tot);
+      assert.ok(tot.includes("合計") && tot.includes("US$2,850.00"), "total: " + tot);
       assert.ok((await text(page, "#rc .rc-f")).includes("毎度ありがとうございます"));
 
       assert.ok(await visible(page, "#nav #youBtn"));
@@ -146,7 +146,7 @@ module.exports = [
       await expectText(page, '.rc-group[data-day="2026-12-11"] .rc-day .rc-city', "Tokyo");
       assert.equal(await page.locator('.rc-group[data-day="2026-12-10"] .rc-city').count(), 0, "no city, none shown");
       await expectText(page, '.rc-row[data-id="seedexp010"] .rc-amt', "$730.00");
-      assert.ok((await text(page, '.rc-group[data-day="pre"] .rc-sub')).includes("¥480,030"));
+      assert.ok((await text(page, '.rc-group[data-day="pre"] .rc-sub')).includes("US$3,115.60"));
     },
   },
   {
@@ -393,16 +393,16 @@ module.exports.push(
     },
   },
   {
-    name: "yen converted at the stand-in rate: one plain line under the trip summary",
+    name: "US dollars converted at the stand-in rate: one plain line under the trip summary",
     async run({ page }) {
       const backend = makeBackend(SEED, { now: NOON12 });
-      backend.fake.setRate(111, "fallback");
+      backend.fake.setRate(0.72, "fallback");
       await open(page, { backend, nowMs: NOON12 });
       await waitRows(page, 8);
-      await expectText(page, "#rateNote", "Yen is being converted at a stand-in rate of 111. Tell Mo.");
+      await expectText(page, "#rateNote", "US dollars are being converted at a stand-in rate of 0.72.");
       const under = await page.evaluate(() => document.getElementById("sayP").getBoundingClientRect().bottom <= document.getElementById("rateNote").getBoundingClientRect().top);
       assert.ok(under, "under the trip summary");
-      backend.fake.setRate(108.4, "last");
+      backend.fake.setRate(0.7189, "last");
       await page.evaluate(() => globalThis.__matTest.store.refresh());
       await until(async () => !(await visible(page, "#rateNote")), "nothing shown for an earlier day's rate");
     },

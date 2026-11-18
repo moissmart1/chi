@@ -38,7 +38,7 @@
 // ground under it), it goes back to the top. Never
 // on a minute tick, a sync or a redraw.
 
-import { openDayIndex, dayState, daysToGo, nowIn, stopsFor, nextStopId, header, dayTotalYen, stayShownFor } from "../plan.js";
+import { openDayIndex, dayState, daysToGo, nowIn, stopsFor, nextStopId, header, dayTotalTrip, stayShownFor } from "../plan.js";
 import { issuer, dayShort, dayHead } from "../format.js";
 import { TRIP_TZ } from "../trip.js";
 import { ticketEl } from "./ticket.js";
@@ -496,7 +496,7 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
         header: header(day),
         stops: dayStops,
         stays,
-        total: dayTotalYen(expenses, day.date),
+        total: dayTotalTrip(expenses, day.date),
         mark,
         // Before 04:00, today's ticket shows last night's stay (R37).
         stay: stayShownFor(stays, day.date, { today: now.date, minutes: now.minutes }),

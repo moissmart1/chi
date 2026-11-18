@@ -239,8 +239,8 @@ function mcpMoneyLines_(d, names) {
   var isName = function (n) { return typeof n === "string" && names.indexOf(n) !== -1; };
   var expenses = d.expenses.filter(function (x) {
     if (x.deleted || !isName(x.paidBy) || !Array.isArray(x.split) || !x.split.length || !x.split.every(isName)) return false;
-    if (!mcpPositive_(x.amount) || (x.currency !== "JPY" && x.currency !== "CAD")) return false;
-    if (x.currency === "JPY" && !mcpPositive_(x.rate)) return false;
+    if (!mcpPositive_(x.amount) || (x.currency !== TRIP_CURRENCY_ && x.currency !== HOME_CURRENCY_)) return false;
+    if (x.currency === TRIP_CURRENCY_ && !mcpPositive_(x.rate)) return false;
     if (x.splitMode === "parts" || x.splitMode === "exact") {
       if (!Array.isArray(x.splitVals) || x.splitVals.length !== x.split.length || !x.splitVals.every(mcpPositive_)) return false;
     }
@@ -506,7 +506,7 @@ function mcpTools_() {
       args: {
         title: arg("string", "What it was for, under 80 letters.", true),
         amount: arg("number", "The amount, in the currency given.", true),
-        currency: arg("string", "JPY for yen or CAD for Canadian dollars.", true, ["JPY", "CAD"]),
+        currency: arg("string", "USD for US dollars or CAD for Canadian dollars.", true, [TRIP_CURRENCY_, HOME_CURRENCY_]),
         paid_by: arg("string", "The name of the one who paid.", true),
         day: arg("string", "The day, YYYY-MM-DD, or pre for before the trip; by default today in Chicago."),
         split: arg("array", "The names of those who share it; by default everyone."),

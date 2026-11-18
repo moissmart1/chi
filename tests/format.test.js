@@ -1,11 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { yen, dollars, typed, dayHead, issuer, pt, clock, sentence, changeText, tripSpan, dayShort } from "../js/format.js";
+import { tripMoney, dollars, typed, dayHead, issuer, pt, clock, sentence, changeText, tripSpan, dayShort } from "../js/format.js";
 
-test("yen and dollars", () => {
-  assert.equal(yen(14500), "¥14,500");
-  assert.equal(yen(438340), "¥438,340");
-  assert.equal(yen(0), "¥0");
+test("US dollars (never a bare $) and Canadian dollars, from cents", () => {
+  assert.equal(tripMoney(14500), "US$145.00");
+  assert.equal(tripMoney(285000), "US$2,850.00");
+  assert.equal(tripMoney(0), "US$0.00");
+  assert.equal(tripMoney(-1250), "-US$12.50");
   assert.equal(dollars(13063), "$130.63");
   assert.equal(dollars(5), "$0.05");
   assert.equal(dollars(394901), "$3,949.01");
@@ -13,7 +14,8 @@ test("yen and dollars", () => {
 });
 
 test("typed shows the figure as entered", () => {
-  assert.equal(typed({ amount: 4200, currency: "JPY" }), "¥4,200");
+  assert.equal(typed({ amount: 42, currency: "USD" }), "US$42.00");
+  assert.equal(typed({ amount: 12.5, currency: "USD" }), "US$12.50");
   assert.equal(typed({ amount: 130, currency: "CAD" }), "$130.00");
   assert.equal(typed({ amount: 12.5, currency: "CAD" }), "$12.50");
 });
@@ -35,7 +37,7 @@ test("tripSpan", () => {
 });
 
 test("pt wraps punctuation in spans", () => {
-  assert.equal(pt("¥14,500"), '<span class="pt">¥</span>14<span class="pt">,</span>500');
+  assert.equal(pt("US$1,450.00"), 'US<span class="pt">$</span>1<span class="pt">,</span>450<span class="pt">.</span>00');
   assert.equal(pt("$1.50"), '<span class="pt">$</span>1<span class="pt">.</span>50');
 });
 
@@ -61,8 +63,8 @@ test("sentence", () => {
 });
 
 test("changeText", () => {
-  const dinner = { title: "Dinner", amount: 14500, currency: "JPY" };
-  assert.equal(changeText({ action: "add", kind: "expense", item: dinner }), "Rang up Dinner ¥14,500.");
+  const dinner = { title: "Dinner", amount: 94.15, currency: "USD" };
+  assert.equal(changeText({ action: "add", kind: "expense", item: dinner }), "Rang up Dinner US$94.15.");
   assert.equal(changeText({ action: "edit", kind: "expense", item: dinner }), "Changed Dinner.");
   assert.equal(changeText({ action: "delete", kind: "expense", item: dinner }), "Deleted Dinner.");
   assert.equal(changeText({ action: "restore", kind: "expense", item: dinner }), "Brought back Dinner.");

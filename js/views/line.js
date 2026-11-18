@@ -7,10 +7,11 @@
 // store change; it closes itself when its line is no longer on the receipt.
 // Text from people or the Sheet goes in with textContent only.
 
-import { expenseShares, cadCents, jpyOf } from "../money.js";
-import { dollars, yen, typed, dayHead, pt, historySentence } from "../format.js";
+import { expenseShares, cadCents, tripCents } from "../money.js";
+import { dollars, tripMoney, typed, dayHead, pt, historySentence } from "../format.js";
 import { fillSeal } from "../picture.js";
 import { tripDate } from "../time.js";
+import { HOME_CURRENCY } from "../trip.js";
 
 const NO_HISTORY = "History needs a connection.";
 const UNSAVED = "Not saved yet.";
@@ -107,7 +108,7 @@ export function mountLine(root, store, { onEdit = () => {} } = {}) {
 
     title.textContent = e.title;
     amount.replaceChildren(fig("span", "", typed(e)));
-    const other = e.currency === "CAD" ? yen(jpyOf(e)) : dollars(cadCents(e));
+    const other = e.currency === HOME_CURRENCY ? tripMoney(tripCents(e)) : dollars(cadCents(e));
     amount.append(el("i", "", "about " + other));
 
     paid.replaceChildren(seal(e.paidBy), el("b", "", e.paidBy + " paid"));

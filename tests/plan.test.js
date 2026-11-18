@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { minutesOf, nowIn, instantOf, openDayIndex, dayState, daysToGo, stopsFor, nextStopId, isPast, nextLine, stayFor, stayShownFor, NEXT_GRACE_MIN, NIGHT_ENDS_MIN, safeHref, originFor, mapsUrl, stayMapsUrl, inkFor, header, dayTotalYen, gateDate, issueLine } from "../js/plan.js";
+import { minutesOf, nowIn, instantOf, openDayIndex, dayState, daysToGo, stopsFor, nextStopId, isPast, nextLine, stayFor, stayShownFor, NEXT_GRACE_MIN, NIGHT_ENDS_MIN, safeHref, originFor, mapsUrl, stayMapsUrl, inkFor, header, dayTotalTrip, gateDate, issueLine } from "../js/plan.js";
 
 const TZ = "America/Chicago";
 const TRIP = { start: "2026-12-10", end: "2026-12-20", tz: TZ };
@@ -79,8 +79,8 @@ test("the header copes with a sparse or hand-edited day", () => {
   assert.equal(inkFor("#1A1A6E"), "#FFFFFF");
 });
 test("the fare and the small print", () => {
-  const ex = [{ day: "2026-12-11", amount: 3000, currency: "JPY", rate: 111, deleted: false }, { day: "2026-12-11", amount: 10, currency: "CAD", rate: 111, deleted: false }, { day: "2026-12-11", amount: 999, currency: "JPY", rate: 111, deleted: true }];
-  assert.equal(dayTotalYen(ex, "2026-12-11"), 4110);
+  const ex = [{ day: "2026-12-11", amount: 30, currency: "USD", rate: 0.72, deleted: false }, { day: "2026-12-11", amount: 10, currency: "CAD", rate: 0.72, deleted: false }, { day: "2026-12-11", amount: 999, currency: "USD", rate: 0.72, deleted: true }];
+  assert.equal(dayTotalTrip(ex, "2026-12-11"), 3720); // US$30.00 + US$7.20, in cents
   assert.equal(gateDate("2026-12-11"), "12.11");
   assert.equal(issueLine("2026-12-11", 2, "MAT"), "2026.12.11 MAT発行 00002-01");
 });

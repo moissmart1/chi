@@ -6,7 +6,7 @@ import { freshText, historySentence, localDay } from "../js/format.js";
 const base = { me: "Ajen", screen: "Money", version: "7", when: "Sat Dec 12, 13:20" };
 
 test("reportText names who, which screen, the version, the time and the newest history sentences", () => {
-  const sentences = ["Mo rang up Ramen ¥1,200", "Ajen deleted Taxi ¥3,000"];
+  const sentences = ["Mo rang up Ramen US$12.00", "Ajen deleted Taxi US$30.00"];
   const t = reportText({ ...base, sentences });
   assert.deepEqual(t.split("\n"), [
     "MAT: a problem to look at",
@@ -15,8 +15,8 @@ test("reportText names who, which screen, the version, the time and the newest h
     "App version: 7",
     "Time: Sat Dec 12, 13:20",
     "Latest changes, newest first:",
-    "- Mo rang up Ramen ¥1,200",
-    "- Ajen deleted Taxi ¥3,000",
+    "- Mo rang up Ramen US$12.00",
+    "- Ajen deleted Taxi US$30.00",
     "What went wrong: ",
   ]);
 });
@@ -35,7 +35,7 @@ test("reportText says history unavailable with no signal, and none yet for an em
 
 test("freshText and historySentence", () => {
   assert.equal(freshText(Date.parse("2026-12-12T13:20:00")), "Up to date 13:20");
-  assert.equal(historySentence({ who: "Ajen", summary: "rang up Tempura ¥101", via: "app" }), "Ajen rang up Tempura ¥101");
+  assert.equal(historySentence({ who: "Ajen", summary: "rang up Tempura US$1.01", via: "app" }), "Ajen rang up Tempura US$1.01");
   assert.equal(historySentence({ who: "Ajen", summary: "renamed A to B", via: "claude" }), "Ajen renamed A to B (through Claude)");
   assert.equal(historySentence({ who: "Mo", summary: "rang up Rail pass $221.52", via: "planner" }), "Mo rang up Rail pass $221.52 (from the planner)");
 });

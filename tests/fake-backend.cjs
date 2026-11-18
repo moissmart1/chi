@@ -27,7 +27,7 @@
 // request the connector makes reaches handle_), fake.primitives (the in-memory helpers), fake.props (Script
 // Properties), fake.propReads (every Script Properties key read, in order),
 // fake.setRate(rate, source) (today's rate and where it came from: "live",
-// "last" or "fallback"; default 111, "live"), fake.planner ({ rows, fails,
+// "last" or "fallback"; default 0.72, "live"), fake.planner ({ rows, fails,
 // reads }: the planner's Payments tab; fails makes reading it throw, with the
 // planner's id in the error's text; reads counts the reads; also tabs (the
 // other tabs by name, which its writes change as Sheets would), writes (every
@@ -59,7 +59,7 @@ const MCP = script("Mcp.js");
 
 const TRIP_KEY = "test-key";
 const CLAUDE_TOKEN = "claude-token";
-const RATE = 111;
+const RATE = 0.72;
 const SHEET_URL = "https://example.test/sheet";
 
 const copy = (v) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));

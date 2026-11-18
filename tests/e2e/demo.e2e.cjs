@@ -126,8 +126,8 @@ module.exports = [
       await expectText(page, "#xDay", "Before");
       assert.equal(writes(backend).length, 0, "opening the register sends nothing");
       await page.fill("#xWhat", "Ramen");
-      await page.click("#kCur"); // dollars to yen
-      for (const k of "5 0 0".split(" ")) await page.click('#pad .key[data-k="' + k + '"]');
+      await page.click("#kCur"); // Canadian dollars to US dollars
+      for (const k of "1 4 . 5 0".split(" ")) await page.click('#pad .key[data-k="' + k + '"]');
       await until(() => page.evaluate(() => !document.getElementById("kGo").disabled), "Ring it up is ready");
       await page.click("#kGo");
       const add = await until(() => backend.requests.find((r) => r.action === "addExpense"), "the line is sent");
@@ -142,7 +142,7 @@ module.exports = [
       await until(() => page.evaluate(() => document.querySelectorAll("#tape .tp-row").length > 0), "History has rows");
       const first = await page.$eval("#tape .tp-row time", (t) => t.textContent);
       assert.equal(first, "12:01", "History shows the real time");
-      assert.equal(await text(page, "#tape .tp-row .tp-s"), "Mo rang up Ramen ¥500");
+      assert.equal(await text(page, "#tape .tp-row .tp-s"), "Mo rang up Ramen US$14.50");
     },
   },
   {

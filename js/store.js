@@ -33,6 +33,7 @@
 // Everything outside comes in through createStore's arguments.
 
 import { STORAGE_PREFIX } from "./config.js";
+import { HOME_CURRENCY, TRIP_CURRENCY } from "./trip.js";
 import { newId } from "./time.js";
 
 const BUSY_RETRIES = 3;
@@ -107,8 +108,8 @@ function unreadable(kind, x, names) {
   if (kind === "expense") {
     if (!isName(names, x.paidBy)) return "name";
     if (!Array.isArray(x.split) || !x.split.length || !x.split.every((n) => isName(names, n))) return "name";
-    if (!positive(x.amount) || (x.currency !== "JPY" && x.currency !== "CAD")) return "amount";
-    if (x.currency === "JPY" && !positive(x.rate)) return "amount";
+    if (!positive(x.amount) || (x.currency !== TRIP_CURRENCY && x.currency !== HOME_CURRENCY)) return "amount";
+    if (x.currency === TRIP_CURRENCY && !positive(x.rate)) return "amount";
     if (x.splitMode === "parts" || x.splitMode === "exact") {
       if (!Array.isArray(x.splitVals) || x.splitVals.length !== x.split.length || !x.splitVals.every(positive)) return "amount";
     }

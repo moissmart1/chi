@@ -91,7 +91,7 @@ test("get_trip and explain_debt agree with the app's own maths", () => {
 
 test("add_expense defaults: everyone shares it, and the day is today in Chicago", () => {
   const fake = createFakeBackend({}, { clock: () => "2026-12-12T19:20:00.000Z" }); // 13:20 in Chicago
-  const e = body(fake.mcp(rpc("tools/call", { name: "add_expense", arguments: { title: "Ramen", amount: 3000, currency: "JPY", paid_by: "Mo" } }), T)).expense;
+  const e = body(fake.mcp(rpc("tools/call", { name: "add_expense", arguments: { title: "Ramen", amount: 30, currency: "USD", paid_by: "Mo" } }), T)).expense;
   assert.deepEqual([e.day, e.split.length, e.addedBy], ["2026-12-12", 3, "Mo"]);
 });
 
@@ -209,9 +209,9 @@ test("bad arguments are -32602 and write nothing", () => {
     ["change_stop", { id: "planstop1101", time: "noon" }],
     ["change_stop", { id: "planstop1101", travel_min: 2.5 }],
     ["remove_stop", {}],
-    ["add_expense", { title: "x", amount: "3000", currency: "JPY", paid_by: "Mo" }],
-    ["add_expense", { title: "x", amount: 3000, currency: "JPY", paid_by: "Mo", split: "Mo" }],
-    ["add_expense", { title: "x", amount: 3000, currency: "JPY", paid_by: "Mo", split: [1] }],
+    ["add_expense", { title: "x", amount: "30", currency: "USD", paid_by: "Mo" }],
+    ["add_expense", { title: "x", amount: 30, currency: "USD", paid_by: "Mo", split: "Mo" }],
+    ["add_expense", { title: "x", amount: 30, currency: "USD", paid_by: "Mo", split: [1] }],
     ["save_stay", { name: "x", first_night: "2026-12-12" }],
     ["set_day", { city: "Tokyo" }],
     ["undo", {}],
@@ -283,9 +283,9 @@ test("the write tools map their arguments to the API and answer { <kind>, log_id
   assert.equal(refusal(fake, "set_day", { date: "2027-01-01", city: "x" }), "That day isn’t on this trip.");
 
   const e = ok(fake, "add_expense", { title: "Taxi", amount: 12.5, currency: "CAD", paid_by: "Ajen", split: ["Mo", "Ajen"], note: "airport", kind: "transport", day: "2026-12-13" });
-  assert.deepEqual([e.expense.amount, e.expense.currency, e.expense.paidBy, e.expense.split, e.expense.note, e.expense.kind, e.expense.day, e.expense.rate], [12.5, "CAD", "Ajen", ["Mo", "Ajen"], "airport", "transport", "2026-12-13", 111]);
-  assert.equal(refusal(fake, "add_expense", { title: "x", amount: 1, currency: "USD", paid_by: "Mo" }), "Use yen or Canadian dollars.");
-  assert.equal(refusal(fake, "add_expense", { title: "x", amount: 1, currency: "JPY", paid_by: "Nobody" }), "Pick who paid.");
+  assert.deepEqual([e.expense.amount, e.expense.currency, e.expense.paidBy, e.expense.split, e.expense.note, e.expense.kind, e.expense.day, e.expense.rate], [12.5, "CAD", "Ajen", ["Mo", "Ajen"], "airport", "transport", "2026-12-13", 0.72]);
+  assert.equal(refusal(fake, "add_expense", { title: "x", amount: 1, currency: "JPY", paid_by: "Mo" }), "Use US or Canadian dollars.");
+  assert.equal(refusal(fake, "add_expense", { title: "x", amount: 1, currency: "USD", paid_by: "Nobody" }), "Pick who paid.");
 });
 
 test("change_stop writes only the columns that changed (a hand-typed cell elsewhere is kept)", () => {
@@ -301,7 +301,7 @@ test("change_stop writes only the columns that changed (a hand-typed cell elsewh
 
 test("add_expense's default day follows the register: pre before the trip, today during, the last day after", () => {
   const at = (iso) => createFakeBackend({}, { clock: () => iso });
-  const day = (fake) => ok(fake, "add_expense", { title: "x", amount: 100, currency: "JPY", paid_by: "Mo" }).expense.day;
+  const day = (fake) => ok(fake, "add_expense", { title: "x", amount: 1, currency: "USD", paid_by: "Mo" }).expense.day;
   assert.equal(day(at("2026-12-10T05:59:00.000Z")), "pre"); // 23:59 on the 9th in Chicago
   assert.equal(day(at("2026-12-10T06:00:00.000Z")), "2026-12-10"); // midnight in Chicago
   assert.equal(day(at("2026-12-21T05:59:00.000Z")), "2026-12-20");
@@ -323,7 +323,7 @@ test("undo through the connector obeys the app's rules", async () => {
   const personLog = fake.tables.Log.at(-1).id;
   assert.equal(refusal(fake, "undo", { log_id: personLog }), "That change can’t be undone.");
   // An expense added in the app can be undone from Claude, and vice versa.
-  const e = await app(fake, "addExpense", { expense: { id: "exp0000001", day: "2026-12-12", title: "Ramen", amount: 1200, currency: "JPY", paidBy: "Mo", split: NAMES } });
+  const e = await app(fake, "addExpense", { expense: { id: "exp0000001", day: "2026-12-12", title: "Ramen", amount: 12, currency: "USD", paidBy: "Mo", split: NAMES } });
   assert.equal(ok(fake, "undo", { log_id: e.data.logId }).expense.deleted, true);
 });
 
@@ -437,7 +437,7 @@ test("the trip key and the token never reach a reply, an error, the Log, History
   r(call(fake, "change_stop", { id: body(added).stop.id, note: "n" }));
   r(call(fake, "undo", { log_id: body(added).log_id }));
   r(call(fake, "undo", { log_id: "x" }));
-  r(call(fake, "add_expense", { title: "Tea", amount: 500, currency: "JPY", paid_by: "Mo" }));
+  r(call(fake, "add_expense", { title: "Tea", amount: 5, currency: "USD", paid_by: "Mo" }));
   r(call(fake, "save_stay", { name: "Inn", first_night: "2026-12-14", last_night: "2026-12-14" }));
   r(call(fake, "set_day", { date: "2026-12-14", city: "Kyoto" }));
   r(await fake({ key: "test-key", action: "migrate", args: {} }));
@@ -539,7 +539,7 @@ test("R35: an `as` that names no one refuses every write with -32602 and stores 
   const before = JSON.stringify(fake.tables);
   const q = { ...T, as: "nobody" };
   for (const [name, args] of [
-    ["add_expense", { title: "Tea", amount: 500, currency: "JPY", paid_by: "Mo" }],
+    ["add_expense", { title: "Tea", amount: 5, currency: "USD", paid_by: "Mo" }],
     ["add_stop", { date: "2026-12-12", title: "Tea" }],
     ["remove_stop", { id: "planstop1101" }],
     ["undo", { log_id: 1 }],
@@ -602,7 +602,7 @@ test("a string argument holding (hidden) is refused, so leaving a field out keep
   assert.equal(stop.note, "confirm with (hidden)");
   const logs = fake.tables.Log.length;
   assert.equal(badArgs(fake, "change_stop", { id: stop.id, note: stop.note + " at 7" }), "Invalid params: note holds (hidden); leave that field out to keep it.");
-  assert.equal(badArgs(fake, "add_expense", { title: "x", amount: 1, currency: "JPY", paid_by: "Mo", split: ["Mo", "(hidden)"] }), "Invalid params: split holds (hidden); leave that field out to keep it.");
+  assert.equal(badArgs(fake, "add_expense", { title: "x", amount: 1, currency: "USD", paid_by: "Mo", split: ["Mo", "(hidden)"] }), "Invalid params: split holds (hidden); leave that field out to keep it.");
   assert.equal(badArgs(fake, "add_stop", { date: "2026-12-12", title: "(hidden)" }), "Invalid params: title holds (hidden); leave that field out to keep it.");
   assert.equal(fake.tables.Log.length, logs);
   ok(fake, "change_stop", { id: stop.id, time: "19:00" });
@@ -628,7 +628,7 @@ test("an e-Transfer address that is an ordinary word hides only a field that is 
     JSON.stringify(call(fake, "get_history", { limit: 200 })),
     JSON.stringify(call(fake, "explain_debt", { from: "Ajen", to: "Mo" })),
     JSON.stringify(call(fake, "change_stop", { id: s.id, link: "javascript:+1 (416) 555-0123" })),
-    JSON.stringify(call(fake, "add_expense", { title: "x", amount: 1, currency: "JPY", paid_by: "trent@example.net" })),
+    JSON.stringify(call(fake, "add_expense", { title: "x", amount: 1, currency: "USD", paid_by: "trent@example.net" })),
   ].join("");
   assert.equal(all.includes("555-0123") || all.includes("trent@example.net"), false);
   assert.ok(all.includes("Tokyo Tower"));
@@ -704,7 +704,7 @@ test("M1: ping answers {} after the token check", () => {
 test("M2: add_expense refuses a day that is neither pre nor a trip day; pre and a trip day are stored", () => {
   const fake = createFakeBackend(plan);
   const rows = fake.tables.Expenses.length;
-  const base = { title: "Ramen", amount: 1200, currency: "JPY", paid_by: "Mo" };
+  const base = { title: "Ramen", amount: 12, currency: "USD", paid_by: "Mo" };
   for (const day of ["2030-01-01", "2026-12-09", "2026-12-21", "tomorrow", ""]) {
     assert.match(badArgs(fake, "add_expense", { ...base, day }), /day/, day);
   }
@@ -720,7 +720,7 @@ test("M2: add_expense refuses a day that is neither pre nor a trip day; pre and 
 const PLANNER_ID = "fakePlannerSheet_0123456789abcdefXYZ";
 const PHEAD = ["payment_id", "date_paid", "payer", "description", "category", "vendor", "booking_ref", "amount", "currency", "amount_cad", "cad_is_exact", "split_between", "split_type", "status", "include_in_split", "source", "added_by", "notes"];
 const prow = (o) => PHEAD.map((h) => (o[h] === undefined ? "" : o[h]));
-const PX7 = { payment_id: "X7", date_paid: "2026-12-11", payer: "Mo", description: "Rail pass", category: "transport", vendor: "North Rail", booking_ref: "AB12", amount: 24750, currency: "JPY", amount_cad: 221.52, cad_is_exact: "yes", split_between: "Mo, Ajen, Trenton", split_type: "equal", include_in_split: "yes" };
+const PX7 = { payment_id: "X7", date_paid: "2026-12-11", payer: "Mo", description: "Rail pass", category: "transport", vendor: "North Rail", booking_ref: "AB12", amount: 247.5, currency: "USD", amount_cad: 221.52, cad_is_exact: "yes", split_between: "Mo, Ajen, Trenton", split_type: "equal", include_in_split: "yes" };
 const PLANNER = [PHEAD, prow(PX7), prow({ ...PX7, payment_id: "P5", split_type: "personal" }), prow({ ...PX7, payment_id: "Z1", include_in_split: "no" })];
 
 test("sync_payments brings the planner's payments in, each credited to who paid, logged as from the planner", () => {
@@ -736,7 +736,7 @@ test("sync_payments brings the planner's payments in, each credited to who paid,
   assert.equal(h.entries[0].sentence, "Mo rang up Rail pass $221.52 (from the planner)");
   assert.equal(badArgs(fake, "sync_payments", { id: "x" }), "Invalid params: unknown argument id.");
   // R40: the tie to the planner is the backend's own business.
-  const seen = JSON.stringify([call(fake, "get_trip", {}), call(fake, "get_history", { limit: 200 }), call(fake, "add_expense", { title: "Tea", amount: 300, currency: "JPY", paid_by: "Mo" })]);
+  const seen = JSON.stringify([call(fake, "get_trip", {}), call(fake, "get_history", { limit: 200 }), call(fake, "add_expense", { title: "Tea", amount: 3, currency: "USD", paid_by: "Mo" })]);
   assert.equal(/planner_?[iI]d/.test(seen), false);
   assert.equal(fake.tables.Expenses[0].planner_id, "X7");
 });

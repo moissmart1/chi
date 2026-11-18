@@ -117,9 +117,10 @@ function validateExpense(input, peopleNames) {
   if (!title) return fail_("Say what it was for.");
   if (title.length > 80) return fail_("Keep the name under 80 letters.");
   if (typeof amount !== "number" || !isFinite(amount)) return fail_("Put in an amount.");
-  if (input.currency !== "JPY" && input.currency !== "CAD") return fail_("Use yen or Canadian dollars.");
+  if (input.currency !== TRIP_CURRENCY_ && input.currency !== HOME_CURRENCY_) return fail_("Use US or Canadian dollars.");
   var currency = input.currency;
-  amount = currency === "JPY" ? Math.round(amount) : round2_(amount);
+  // Both currencies have cents.
+  amount = round2_(amount);
   if (!(amount > 0)) return fail_("The amount has to be more than zero.");
   if (amount > 10000000) return fail_("That amount is too big.");
   if (typeof input.paidBy !== "string" || peopleNames.indexOf(input.paidBy) === -1) return fail_("Pick who paid.");
@@ -152,12 +153,12 @@ function validateExpense(input, peopleNames) {
     for (var x = 0; x < vals.length; x++) {
       var v = vals[x];
       if (typeof v !== "number" || !isFinite(v) || !(v > 0)) return fail_("Every amount has to be more than zero.");
-      var units = currency === "JPY" ? Math.round(v) : cents_(v);
-      if (units < 1) return fail_("Every amount has to be at least " + (currency === "JPY" ? "one yen." : "one cent."));
+      var units = cents_(v);
+      if (units < 1) return fail_("Every amount has to be at least one cent.");
       sum += units;
-      rounded.push(currency === "JPY" ? units : units / 100);
+      rounded.push(units / 100);
     }
-    var total = currency === "JPY" ? amount : cents_(amount);
+    var total = cents_(amount);
     if (sum !== total) return fail_("The amounts don’t add up to the total.");
     vals = rounded;
   } else {
@@ -636,8 +637,13 @@ function setupSeedRows() {
 
 // ---- exchange rate ----
 
+// A rate as it is stored and stamped on a line: four decimals (0.7234).
+function rateRounded(x) {
+  return Math.round(x * 10000) / 10000;
+}
+
 // Where the rate in use came from: today's stored rate is "live", an earlier
-// day's (RATE_LAST) is "last", none at all means the stand-in 111, "fallback".
+// day's (RATE_LAST) is "last", none at all means the stand-in 0.72, "fallback".
 function rateSource(todayKeyValue, lastValue) {
   if (Number(todayKeyValue) > 0) return "live";
   if (Number(lastValue) > 0) return "last";
@@ -666,12 +672,13 @@ function shouldFetchRate(todayKeyValue, failAtIso, nowIso) {
 
 // ---- history and undo ----
 
+// An amount as History writes it: "$12.50" at home, "US$12.50" for the trip's
+// currency (never a bare $ for US dollars).
 function money_(n, currency) {
   var neg = n < 0;
-  var s = currency === "JPY" ? String(Math.round(Math.abs(n))) : Math.abs(n).toFixed(2);
-  var parts = s.split(".");
+  var parts = Math.abs(n).toFixed(2).split(".");
   parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  return (neg ? "-" : "") + (currency === "JPY" ? "\u00a5" : "$") + parts.join(".");
+  return (neg ? "-" : "") + (currency === HOME_CURRENCY_ ? "$" : "US$") + parts.join(".");
 }
 
 function same_(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
@@ -835,13 +842,13 @@ var PLANNER_KINDS_ = { lodging: "stay", transport: "transport", flight: "transpo
 
 function plannerText_(v) { return v === undefined || v === null ? "" : String(v).trim(); }
 
-// A number, or text such as "CA$1,234.50" or "¥24,750"; null when blank,
+// A number, or text such as "CA$1,234.50" or "US$247.50"; null when blank,
 // NaN when there but unreadable.
 function plannerNum_(v) {
   if (typeof v === "number") return isFinite(v) ? v : NaN;
   if (plannerText_(v) === "") return null;
   if (typeof v !== "string") return NaN;
-  var s = v.replace(/CA\$/gi, "").replace(/[$¥\s,]/g, "");
+  var s = v.replace(/(CA|US)\$/gi, "").replace(/[$\s,]/g, "");
   if (s === "") return NaN;
   var n = Number(s);
   return isFinite(n) ? n : NaN;
@@ -960,10 +967,10 @@ function expenseFromPayment(p, people, dayDates) {
   var amount, currency;
   if (useCad) {
     amount = round2_(p.amountCad);
-    currency = "CAD";
-  } else if ((charged === "JPY" || charged === "CAD") && p.amount > 0) {
+    currency = HOME_CURRENCY_;
+  } else if ((charged === TRIP_CURRENCY_ || charged === HOME_CURRENCY_) && p.amount > 0) {
     currency = charged;
-    amount = charged === "JPY" ? Math.round(p.amount) : round2_(p.amount);
+    amount = round2_(p.amount);
   } else {
     return fail_("That payment has no usable amount.");
   }
@@ -976,8 +983,8 @@ function expenseFromPayment(p, people, dayDates) {
 
   var parts = [p.id, p.vendor, p.bookingRef ? "ref " + p.bookingRef : ""];
   if (useCad && typeof p.amount === "number" && isFinite(p.amount)) {
-    if (charged === "JPY") parts.push(money_(p.amount, "JPY") + " charged");
-    else if (charged !== "CAD" && charged !== "") parts.push(p.amount + " " + p.currency);
+    if (charged === TRIP_CURRENCY_) parts.push(money_(p.amount, TRIP_CURRENCY_) + " charged");
+    else if (charged !== HOME_CURRENCY_ && charged !== "") parts.push(p.amount + " " + p.currency);
   }
   if (useCad && p.cadExact.toLowerCase().indexOf("yes") !== 0) parts.push("CAD amount is an estimate");
   var note = parts.filter(function (x) { return x !== ""; }).join(" · ");
@@ -1268,5 +1275,5 @@ function changeLogRow(rows, fields) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { TABS, KINDS, tripMismatch, TRIP_TZ_, TRIP_UTC_OFFSET_MS_, TRIP_ZONE_WORD_, HOME_CURRENCY_, TRIP_CURRENCY_, TRIP_FIRST_DAY_, TRIP_LAST_DAY_, isTextColumn, sanitizeCell, unsanitizeCell, rowToObj, objToRow, validateExpense, validatePayment, validatePersonPatch, validateStop, validateStay, validateDayPatch, DAY_PATCH_KEYS, safeUrl, safeHttpsUrl, dayLabel, stopFromRow, stopToRow, stayFromRow, stayToRow, dayFromRow, dayToRow, expenseFromRow, paymentFromRow, personFromRow, cellDate_, cellStamp_, summarize, undoTarget, canUndo, entryFromRow, parseLogRow, expenseToRow, paymentToRow, setupSeedRows, shouldFetchRate, rateSource, sameKey, paymentsFromRows, expenseFromPayment, paymentIdOf, todosFromRows, bookByDay, todoFromRow, isBooked, colLetter, changeLogRow, shortDay_, stampWindow, pressRefusal, stampDefFromRow, stampFromRow, stampSnap_, plannerWhat_ };
+  module.exports = { TABS, KINDS, tripMismatch, rateRounded, TRIP_TZ_, TRIP_UTC_OFFSET_MS_, TRIP_ZONE_WORD_, HOME_CURRENCY_, TRIP_CURRENCY_, TRIP_FIRST_DAY_, TRIP_LAST_DAY_, isTextColumn, sanitizeCell, unsanitizeCell, rowToObj, objToRow, validateExpense, validatePayment, validatePersonPatch, validateStop, validateStay, validateDayPatch, DAY_PATCH_KEYS, safeUrl, safeHttpsUrl, dayLabel, stopFromRow, stopToRow, stayFromRow, stayToRow, dayFromRow, dayToRow, expenseFromRow, paymentFromRow, personFromRow, cellDate_, cellStamp_, summarize, undoTarget, canUndo, entryFromRow, parseLogRow, expenseToRow, paymentToRow, setupSeedRows, shouldFetchRate, rateSource, sameKey, paymentsFromRows, expenseFromPayment, paymentIdOf, todosFromRows, bookByDay, todoFromRow, isBooked, colLetter, changeLogRow, shortDay_, stampWindow, pressRefusal, stampDefFromRow, stampFromRow, stampSnap_, plannerWhat_ };
 }

@@ -80,11 +80,12 @@ module.exports = [
       const { dollars } = await import("../../js/format.js");
       const e = SEED.expenses.find((x) => x.title === "Shibuya dinner");
       const mine = dollars(expenseShares({ ...e, deleted: false })["Mo"]);
-      assert.equal(mine, "$43.55");
+      assert.equal(mine, "$43.59");
       await expectText(page, "#lnShare", "Your share " + mine);
       const body = await text(page, "#lineBody");
       assert.ok(body.includes("Shibuya dinner"), body);
-      assert.ok(body.includes("¥14,500"), body);
+      assert.ok(body.includes("US$94.15"), body);
+      assert.ok(body.includes("about $130.76"), body);
       assert.ok(body.includes("Trenton paid"), body);
       assert.equal(SEEDED_DAY, "Fri Nov 20");
       await expectText(page, "#lnBy", "Rung up by Trenton, " + SEEDED_DAY);
@@ -129,15 +130,15 @@ module.exports = [
       await expectText(page, "#regTitle", "Change this line");
       assert.equal(await page.inputValue("#xWhat"), "Shibuya dinner");
       await keys(page, "del del del del del 1 5 0 0 0");
-      await expectText(page, "#xAmt", "¥15,000");
+      await expectText(page, "#xAmt", "US$15,000");
       await page.click("#kGo");
       await until(() => page.evaluate(() => !document.getElementById("reg").classList.contains("is-open")), "the register closes after Save");
-      await waitRow(page, "Shibuya dinner", (r) => r.amt === "¥15,000", "has the new amount");
+      await waitRow(page, "Shibuya dinner", (r) => r.amt === "US$15,000.00", "has the new amount");
       await page.evaluate(() => globalThis.__matTest.store.idle());
 
       await openLine(page, "Shibuya dinner");
       const after = await waitSentences(page, (s) => s.length === 2, "the edit shows in the line's history");
-      assert.equal(after[0], "Mo changed Shibuya dinner ¥14,500 → ¥15,000", "newest first");
+      assert.equal(after[0], "Mo changed Shibuya dinner US$94.15 → US$15,000.00", "newest first");
       assert.match(after[1], /^Trenton rang up /);
 
       // A change made through Claude, seen from another phone, is marked as such.
@@ -219,7 +220,7 @@ module.exports = [
       await waitRegOpen(page);
       await expectText(page, "#regTitle", "Change this line");
       assert.equal(await page.inputValue("#xWhat"), "Taxi back");
-      await expectText(page, "#xAmt", "¥3,600");
+      await expectText(page, "#xAmt", "US$23.40");
       assert.equal(await page.evaluate(() => document.querySelector('#xSplit .seal[data-p="Mo"]').classList.contains("is-on")), false, "Mo is not in this one");
     },
   },

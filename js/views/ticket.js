@@ -16,7 +16,7 @@
 // - state: dayState(...) ("used", "today", "ahead"); minutes: the trip zone's
 //   minutes past midnight; nextId: today's next stop (nextStopId, which keeps
 //   a stop just started for a while, R38), else null;
-//   total: the day's logged yen (dayTotalYen), printed as the fare when above
+//   total: the day's logged spending in trip cents (dayTotalTrip), printed as the fare when above
 //   zero; toGo: days until the trip starts (daysToGo), counted down on Day 1;
 //   stampOpen: today's stamp in the stamp book is open and not yet pressed,
 //   so the ticket carries a line, .tk-stampline, that opens the book.
@@ -31,7 +31,7 @@
 // A used day's gate stamp is made once per day, place and mark, and reused.
 
 import { minutesOf, issueLine, isPast, nextLine, originFor, mapsUrl, safeHref, gateDate } from "../plan.js";
-import { dayHead, yen } from "../format.js";
+import { dayHead, tripMoney } from "../format.js";
 import { rng, gateStampSVG } from "../stamp.js";
 
 const SVG = "http://www.w3.org/2000/svg";
@@ -261,7 +261,7 @@ export function ticketEl(model) {
   const kind = el("div", "tk-kind");
   const k = el("span", "", "一日乗車券");
   k.append(el("i", "", "1-Day Ticket"));
-  kind.append(k, el("span", "fare", total > 0 ? yen(total) : ""));
+  kind.append(k, el("span", "fare", total > 0 ? tripMoney(total) : ""));
   head.append(kind, route(h, tripName));
   if (h.title) head.append(el("div", "tk-title", h.title));
   const dh = dayHead(date);

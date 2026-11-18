@@ -18,7 +18,7 @@ function client(seed, opts) {
 }
 
 function ramen(over = {}) {
-  return { id: "exp0000001", day: "2026-12-10", title: "Ramen", amount: 4200, currency: "JPY", paidBy: "Mo", split: ALL.slice(), ...over };
+  return { id: "exp0000001", day: "2026-12-10", title: "Ramen", amount: 4200, currency: "USD", paidBy: "Mo", split: ALL.slice(), ...over };
 }
 
 function stampOf(over = {}) {
@@ -50,7 +50,7 @@ test("load returns the trip, three people with Simplify on and no email, no expe
   assert.deepEqual(d.payments, []);
   assert.deepEqual(d.stops, []);
   assert.deepEqual(d.stays, []);
-  assert.equal(d.rateToday, 111);
+  assert.equal(d.rateToday, 0.72);
   assert.equal(d.sheetUrl, "https://example.test/sheet");
   assert.equal(d.days.length, 11);
   assert.equal(d.days[0].date, "2026-12-10");
@@ -96,7 +96,7 @@ test("addExpense stamps the rate and the actor, is live, gets a numeric logId an
   const r = await call("addExpense", { expense: ramen() }, { actor: "Ajen" });
   assert.equal(r.ok, true);
   const e = r.data.expense;
-  assert.equal(e.rate, 111);
+  assert.equal(e.rate, 0.72);
   assert.equal(e.addedBy, "Ajen");
   assert.equal(e.addedAt, "2026-12-10T05:00:00.000Z");
   assert.equal(e.deleted, false);
@@ -142,7 +142,7 @@ test("updateExpense changing the amount keeps the original rate and logs an edit
   assert.equal(typeof r.data.logId, "number");
   const [top] = await historyAll(call);
   assert.equal(top.action, "edit");
-  assert.equal(top.summary, "changed Ramen ¥4,200 → ¥4,500");
+  assert.equal(top.summary, "changed Ramen US$4,200.00 → US$4,500.00");
   assert.equal(top.id, r.data.logId);
 });
 
@@ -346,11 +346,11 @@ test("a fake built from the seed fixture has nine expenses, one deleted, and ten
   assert.equal(load.data.expenses.filter((e) => e.deleted).length, 1);
   assert.equal(load.data.expenses.find((e) => e.deleted).id, "seedexp005");
   const live = load.data.expenses.filter((e) => !e.deleted);
-  assert.equal(live.reduce((s, e) => s + e.amount, 0), 438340);
+  assert.equal(live.reduce((s, e) => s + Math.round(e.amount * 100), 0), 285000); // US$2,850.00
   const lodge = load.data.expenses.find((e) => e.id === "seedexp001");
   assert.equal(lodge.note, "ref NK-4471");
   assert.equal(lodge.kind, "stay");
-  assert.equal(lodge.rate, 111);
+  assert.equal(lodge.rate, 0.72);
   assert.equal(lodge.addedBy, "Mo");
   assert.deepEqual(load.data.expenses.find((e) => e.id === "seedexp008").split, ["Ajen", "Trenton"]);
   const hist = await historyAll(call);
@@ -373,7 +373,7 @@ test("updateExpense refuses patch keys it does not allow", async () => {
   for (const patch of [null, "x", [1]]) {
     assert.equal((await call("updateExpense", { id: "exp0000001", patch })).error, "bad_input");
   }
-  assert.equal((await call("load")).data.expenses[0].rate, 111);
+  assert.equal((await call("load")).data.expenses[0].rate, 0.72);
   assert.equal((await historyAll(call)).length, 1);
 });
 
@@ -541,7 +541,7 @@ for (const keepsApostrophe of [false, true]) {
     assert.deepEqual(load.map((e) => e.title), titles);
     assert.deepEqual(load.map((e) => e.note), ["-5% off", "+81 3", "@home", "=probe"]);
     const hist = await historyAll(call);
-    assert.deepEqual(hist.map((e) => e.summary).reverse(), titles.map((t) => "rang up " + t + " ¥4,200"));
+    assert.deepEqual(hist.map((e) => e.summary).reverse(), titles.map((t) => "rang up " + t + " US$4,200.00"));
 
     const ed = await call("updateExpense", { id: "fx000000", patch: { title: "-renamed" } });
     assert.equal(ed.data.expense.title, "-renamed");
@@ -554,7 +554,7 @@ for (const keepsApostrophe of [false, true]) {
     assert.equal(ua.data.expense.deleted, true);
     const after = (await call("load")).data.expenses;
     assert.deepEqual(after.map((e) => e.title), titles);
-    assert.equal((await historyAll(call))[0].summary, "undid: rang up @home ¥4,200");
+    assert.equal((await historyAll(call))[0].summary, "undid: rang up @home US$4,200.00");
   });
 }
 
@@ -629,7 +629,7 @@ test("text that looks like a date or a number comes back exactly as typed", asyn
   assert.equal(typeof load[0].amount, "number");
   assert.equal(typeof load[0].rate, "number");
   const hist = await historyAll(call);
-  assert.deepEqual(hist.map((e) => e.summary), ["rang up 0012 ¥4,200", "rang up 1/2 ¥4,200"]);
+  assert.deepEqual(hist.map((e) => e.summary), ["rang up 0012 US$4,200.00", "rang up 1/2 US$4,200.00"]);
   assert.deepEqual(hist.map((e) => e.id), [2, 1]);
   const u = await call("undo", { logId: b.data.logId });
   assert.equal(u.data.expense.title, "0012");
@@ -639,12 +639,12 @@ test("text that looks like a date or a number comes back exactly as typed", asyn
 test("the in-memory sheet hands cells back the way Sheets does under the column formats", () => {
   const fake = createFakeBackend();
   const p = fake.primitives;
-  p.appendObj_("Expenses", { id: "exp0000001", title: 12, note: true, amount: "0012", rate: "111.5", split_vals: 3 });
+  p.appendObj_("Expenses", { id: "exp0000001", title: 12, note: true, amount: "0012", rate: "0.7234", split_vals: 3 });
   const row = p.readTable_("Expenses")[0];
   assert.equal(row.title, "12");
   assert.equal(row.note, "TRUE");
   assert.equal(row.amount, 12);
-  assert.equal(row.rate, 111.5);
+  assert.equal(row.rate, 0.7234);
   assert.equal(row.split_vals, "3");
   p.appendObj_("Log", { id: "5", undoes: "2", summary: 7 });
   const log = p.readTable_("Log")[0];
@@ -702,9 +702,9 @@ test("a write that cannot get the lock answers busy, writes nothing and leaves r
 test("load says where today's rate came from: live by default, or what the fake is set to (F7)", async () => {
   const call = client();
   assert.equal((await call("load")).data.rateSource, "live");
-  call.fake.setRate(111, "fallback");
+  call.fake.setRate(0.72, "fallback");
   const r = await call("load");
-  assert.equal(r.data.rateToday, 111);
+  assert.equal(r.data.rateToday, 0.72);
   assert.equal(r.data.rateSource, "fallback");
   call.fake.setRate(109.5, "last");
   assert.deepEqual([(await call("load")).data.rateToday, (await call("load")).data.rateSource], [109.5, "last"]);
@@ -1106,10 +1106,10 @@ test("a hand-typed stay link survives a name change", async () => {
 
 test("pinned: addExpense and updateExpense answer, store and log exactly as before", async () => {
   const call = client(undefined, { clock: () => "2026-12-11T02:00:00.000Z" });
-  const added = { id: "pinexp0001", day: "2026-12-11", title: "Udon", amount: 980, currency: "JPY", rate: 111, paidBy: "Mo", split: ALL, splitMode: "equal", splitVals: [], note: "hot", kind: "food", addedBy: "Ajen", addedAt: "2026-12-11T02:00:00.000Z", deleted: false };
-  const a = await call("addExpense", { expense: { id: "pinexp0001", day: "2026-12-11", title: " Udon ", amount: 980.4, currency: "JPY", paidBy: "Mo", split: ALL, note: " hot ", kind: "food" } }, { actor: "Ajen" });
+  const added = { id: "pinexp0001", day: "2026-12-11", title: "Udon", amount: 980, currency: "USD", rate: 0.72, paidBy: "Mo", split: ALL, splitMode: "equal", splitVals: [], note: "hot", kind: "food", addedBy: "Ajen", addedAt: "2026-12-11T02:00:00.000Z", deleted: false };
+  const a = await call("addExpense", { expense: { id: "pinexp0001", day: "2026-12-11", title: " Udon ", amount: 980.004, currency: "USD", paidBy: "Mo", split: ALL, note: " hot ", kind: "food" } }, { actor: "Ajen" });
   assert.deepEqual(a, { ok: true, rev: 1, data: { expense: added, logId: 1 } });
-  const again = await call("addExpense", { expense: { id: "pinexp0001", day: "2026-12-11", title: "Other", amount: 1, currency: "JPY", paidBy: "Mo", split: ALL } }, { actor: "Ajen" });
+  const again = await call("addExpense", { expense: { id: "pinexp0001", day: "2026-12-11", title: "Other", amount: 1, currency: "USD", paidBy: "Mo", split: ALL } }, { actor: "Ajen" });
   assert.deepEqual(again, a, "a repeated add answers the first");
   // A hand-typed split cell: the app's own edit writes every editable column, so it is rewritten.
   call.fake.tables.Expenses[0].split = "Mo, Ajen, Trenton";
@@ -1118,10 +1118,10 @@ test("pinned: addExpense and updateExpense answer, store and log exactly as befo
   assert.deepEqual(u, { ok: true, rev: 2, data: { expense: edited, logId: 2 } });
   assert.deepEqual(await call("updateExpense", { id: "pinexp0001", patch: { amount: 1200 } }), { ok: true, rev: 2, data: { expense: edited, logId: null } });
   assert.deepEqual(await call("updateExpense", { id: "pinexp0001", patch: { amount: -1 } }), { ok: false, error: "bad_input", message: "The amount has to be more than zero.", rev: 2 });
-  assert.deepEqual(call.fake.tables.Expenses, [{ id: "pinexp0001", day: "2026-12-11", title: "Udon", amount: 1200, currency: "JPY", rate: 111, paid_by: "Mo", split: "Mo,Ajen,Trenton", split_mode: "equal", split_vals: "", note: "hot", kind: "food", receipt: "", added_by: "Ajen", added_at: "2026-12-11T02:00:00.000Z", deleted_at: "", planner_id: "" }], "R40 adds the planner_id column; the app's own writes leave it empty");
+  assert.deepEqual(call.fake.tables.Expenses, [{ id: "pinexp0001", day: "2026-12-11", title: "Udon", amount: 1200, currency: "USD", rate: 0.72, paid_by: "Mo", split: "Mo,Ajen,Trenton", split_mode: "equal", split_vals: "", note: "hot", kind: "food", receipt: "", added_by: "Ajen", added_at: "2026-12-11T02:00:00.000Z", deleted_at: "", planner_id: "" }], "R40 adds the planner_id column; the app's own writes leave it empty");
   assert.deepEqual(call.fake.tables.Log, [
-    { id: 1, at: "2026-12-11T02:00:00.000Z", who: "Ajen", via: "app", action: "add", kind: "expense", ref: "pinexp0001", summary: "rang up Udon ¥980", before: "", after: JSON.stringify(added), undoes: "", undone_by: "" },
-    { id: 2, at: "2026-12-11T02:00:00.000Z", who: "Mo", via: "app", action: "edit", kind: "expense", ref: "pinexp0001", summary: "changed Udon ¥980 → ¥1,200", before: JSON.stringify(added), after: JSON.stringify(edited), undoes: "", undone_by: "" },
+    { id: 1, at: "2026-12-11T02:00:00.000Z", who: "Ajen", via: "app", action: "add", kind: "expense", ref: "pinexp0001", summary: "rang up Udon US$980.00", before: "", after: JSON.stringify(added), undoes: "", undone_by: "" },
+    { id: 2, at: "2026-12-11T02:00:00.000Z", who: "Mo", via: "app", action: "edit", kind: "expense", ref: "pinexp0001", summary: "changed Udon US$980.00 → US$1,200.00", before: JSON.stringify(added), after: JSON.stringify(edited), undoes: "", undone_by: "" },
   ]);
 });
 
@@ -1131,13 +1131,13 @@ test("pinned: addExpense and updateExpense answer, store and log exactly as befo
 const PLANNER_ID = "fakePlannerSheet_0123456789abcdefXYZ";
 const PHEAD = ["payment_id", "date_paid", "payer", "description", "category", "vendor", "booking_ref", "amount", "currency", "amount_cad", "cad_is_exact", "split_between", "split_type", "status", "include_in_split", "source", "added_by", "notes"];
 const prow = (o) => PHEAD.map((h) => (o[h] === undefined ? "" : o[h]));
-const PX7 = { payment_id: "X7", date_paid: "2026-12-11", payer: "Mo", description: "Rail pass", category: "transport", vendor: "North Rail", booking_ref: "AB12", amount: 24750, currency: "JPY", amount_cad: 221.52, cad_is_exact: "yes", split_between: "Mo, Ajen, Trenton", split_type: "equal", include_in_split: "yes" };
-const PQ3 = { payment_id: "Q3", date_paid: "2026-12-12", payer: "ajen", description: "Noodle bar", category: "food", vendor: "Ramen Ya", amount: "¥3,600", currency: "JPY", split_between: "Mo, Ajen", split_type: "equal", include_in_split: "Yes" };
+const PX7 = { payment_id: "X7", date_paid: "2026-12-11", payer: "Mo", description: "Rail pass", category: "transport", vendor: "North Rail", booking_ref: "AB12", amount: 24750, currency: "USD", amount_cad: 221.52, cad_is_exact: "yes", split_between: "Mo, Ajen, Trenton", split_type: "equal", include_in_split: "yes" };
+const PQ3 = { payment_id: "Q3", date_paid: "2026-12-12", payer: "ajen", description: "Noodle bar", category: "food", vendor: "Ramen Ya", amount: "US$3,600.00", currency: "USD", split_between: "Mo, Ajen", split_type: "equal", include_in_split: "Yes" };
 const PZ1 = { ...PX7, payment_id: "Z1", description: "Later tickets", include_in_split: "no (until charged)" };
 const PP5 = { ...PX7, payment_id: "P5", description: "Own souvenir", split_type: "personal" };
 const PU2 = { ...PX7, payment_id: "U2", payer: "Nadia" };
 const PLANNER = [PHEAD, prow(PX7), [], prow(PQ3), prow(PZ1), prow(PP5), prow(PU2)];
-const NOTE_X7 = "X7 · North Rail · ref AB12 · ¥24,750 charged";
+const NOTE_X7 = "X7 · North Rail · ref AB12 · US$24,750.00 charged";
 
 function linked(over = {}, rows = PLANNER, opts = {}) {
   return client({ ...over, planner: rows, plannerId: PLANNER_ID }, { clock: () => "2026-12-12T03:00:00.000Z", ...opts });
@@ -1163,15 +1163,15 @@ test("a first pull adds each included payment as an expense, as addExpense would
   const exps = (await call("load")).data.expenses;
   const x7 = exps.find((e) => e.note === NOTE_X7);
   assert.match(x7.id, /^[A-Za-z0-9]{20}$/);
-  assert.deepEqual({ ...x7, id: "" }, { id: "", day: "2026-12-11", title: "Rail pass", amount: 221.52, currency: "CAD", rate: 111, paidBy: "Mo", split: ALL, splitMode: "equal", splitVals: [], note: NOTE_X7, kind: "transport", addedBy: "Mo", addedAt: "2026-12-12T03:00:00.000Z", deleted: false }); // credited to who paid
+  assert.deepEqual({ ...x7, id: "" }, { id: "", day: "2026-12-11", title: "Rail pass", amount: 221.52, currency: "CAD", rate: 0.72, paidBy: "Mo", split: ALL, splitMode: "equal", splitVals: [], note: NOTE_X7, kind: "transport", addedBy: "Mo", addedAt: "2026-12-12T03:00:00.000Z", deleted: false }); // credited to who paid
   assert.equal(stored(call, x7.id).planner_id, "X7");
   const q3 = exps.find((e) => e.note === "Q3 · Ramen Ya");
   assert.equal(stored(call, q3.id).planner_id, "Q3");
-  assert.deepEqual([q3.title, q3.amount, q3.currency, q3.paidBy, q3.split, q3.day, q3.kind], ["Noodle bar", 3600, "JPY", "Ajen", ["Mo", "Ajen"], "2026-12-12", "food"]);
+  assert.deepEqual([q3.title, q3.amount, q3.currency, q3.paidBy, q3.split, q3.day, q3.kind], ["Noodle bar", 3600, "USD", "Ajen", ["Mo", "Ajen"], "2026-12-12", "food"]);
   assert.equal(exps.length, 2, "nothing for the personal, the unknown payer or the not-included rows");
   const log = call.fake.tables.Log;
   assert.deepEqual(log.map((l) => [l.who, l.via, l.action, l.kind]), [["Mo", "planner", "add", "expense"], ["Ajen", "planner", "add", "expense"]]);
-  assert.deepEqual(log.map((l) => l.summary), ["rang up Rail pass $221.52", "rang up Noodle bar ¥3,600"]);
+  assert.deepEqual(log.map((l) => l.summary), ["rang up Rail pass $221.52", "rang up Noodle bar US$3,600.00"]);
   const hist = await historyAll(call);
   assert.deepEqual(hist.map((e) => e.via), ["planner", "planner"]);
   const u = await call("undo", { logId: hist[0].id });
@@ -1248,7 +1248,7 @@ test("each planner-owned field that differs is changed; day and kind are the app
   const r = await call("syncPayments");
   assert.equal(r.data.changed, 1);
   const e = (await call("load")).data.expenses.find((x) => x.id === id);
-  assert.deepEqual([e.title, e.paidBy, e.split, e.note, e.day, e.kind], ["Rail pass (7 days)", "Ajen", ALL, "X7 · North Rail Co · ref AB12 · ¥24,750 charged", "2026-12-13", "activity"]);
+  assert.deepEqual([e.title, e.paidBy, e.split, e.note, e.day, e.kind], ["Rail pass (7 days)", "Ajen", ALL, "X7 · North Rail Co · ref AB12 · US$24,750.00 charged", "2026-12-13", "activity"]);
   assert.deepEqual(JSON.parse(call.fake.tables.Log.at(-1).after).split, ALL, "the same people in another order is the same split");
 });
 

@@ -55,32 +55,48 @@ test("tripKey_ keeps the key in the script cache for six hours, reading Script P
   assert.equal(none.tripKey_(), null);
 });
 
-test("getRateInfo_ says live for a fetched rate, last for an earlier day's, fallback for 111 (F7)", () => {
-  const live = world({ fetch: reply(200, { rates: { JPY: 108.4 } }) });
-  assert.deepEqual(JSON.parse(JSON.stringify(live.getRateInfo_())), { rate: 108.4, source: "live" });
-  assert.equal(live.getRate_(), 108.4);
-  const last = world({ props: { RATE_LAST: "107.9" }, fetch: reply(500, {}) });
-  assert.deepEqual(JSON.parse(JSON.stringify(last.getRateInfo_())), { rate: 107.9, source: "last" });
+test("getRateInfo_ says live for a fetched rate, last for an earlier day's, fallback for 0.72 (F7)", () => {
+  const live = world({ fetch: reply(200, { rates: { USD: 0.7234, JPY: 108.4 } }) });
+  assert.deepEqual(JSON.parse(JSON.stringify(live.getRateInfo_())), { rate: 0.7234, source: "live" });
+  assert.equal(live.getRate_(), 0.7234);
+  assert.ok(live.calls.includes("fetch:https://open.er-api.com/v6/latest/CAD"), "asks for Canadian dollars");
+  const last = world({ props: { RATE_LAST: "0.7189" }, fetch: reply(500, {}) });
+  assert.deepEqual(JSON.parse(JSON.stringify(last.getRateInfo_())), { rate: 0.7189, source: "last" });
   const none = world({ fetch: () => { throw new Error("DNS error"); } });
-  assert.deepEqual(JSON.parse(JSON.stringify(none.getRateInfo_())), { rate: 111, source: "fallback" });
+  assert.deepEqual(JSON.parse(JSON.stringify(none.getRateInfo_())), { rate: 0.72, source: "fallback" });
+});
+
+test("the rate is kept to four decimals, and only between 0.5 and 1.0 US dollars a Canadian dollar", () => {
+  const long = world({ fetch: reply(200, { rates: { USD: 0.723456 } }) });
+  assert.equal(long.getRate_(), 0.7235);
+  assert.equal(long.props["RATE_2026-12-10"], "0.7235");
+  assert.equal(long.props.RATE_LAST, "0.7235");
+  for (const bad of [0.5, 1.0, 1.38, 0.2, 111, "x"]) {
+    const w = world({ fetch: reply(200, { rates: { USD: bad } }) });
+    assert.deepEqual(JSON.parse(JSON.stringify(w.getRateInfo_())), { rate: 0.72, source: "fallback" }, String(bad));
+    assert.equal(w.props["RATE_2026-12-10"], undefined, String(bad));
+  }
+  // a feed that answers yen only has no US dollar rate
+  const yenOnly = world({ fetch: reply(200, { rates: { JPY: 108.4 } }) });
+  assert.equal(yenOnly.getRate_(), 0.72);
 });
 
 test("requireLiveRate_ (run by setup) fetches once and fails loudly with the reason (F7)", () => {
-  const ok = world({ fetch: reply(200, { rates: { JPY: 108.4 } }) });
+  const ok = world({ fetch: reply(200, { rates: { USD: 0.7234 } }) });
   ok.requireLiveRate_();
-  assert.equal(ok.props["RATE_2026-12-10"], "108.4");
+  assert.equal(ok.props["RATE_2026-12-10"], "0.7234");
 
   const blocked = world({ props: { RATE_FAIL_AT: new Date().toISOString() }, fetch: reply(403, {}) });
-  assert.throws(() => blocked.requireLiveRate_(), (e) => e.message === "Couldn’t fetch today’s yen rate from open.er-api.com: HTTP 403. The app would fall back to 111.");
+  assert.throws(() => blocked.requireLiveRate_(), (e) => e.message === "Couldn’t fetch today’s US dollar rate from open.er-api.com: HTTP 403. The app would fall back to 0.72.");
   assert.equal(blocked.calls.filter((c) => c.startsWith("fetch:")).length, 1, "tried even within the hour after a failure");
 
   const down = world({ fetch: () => { throw new Error("Address unavailable"); } });
-  assert.throws(() => down.requireLiveRate_(), /: Address unavailable\. The app would fall back to 111\.$/);
+  assert.throws(() => down.requireLiveRate_(), /: Address unavailable\. The app would fall back to 0\.72\.$/);
 
-  const odd = world({ fetch: reply(200, { rates: { JPY: 5 } }) });
+  const odd = world({ fetch: reply(200, { rates: { USD: 5 } }) });
   assert.throws(() => odd.requireLiveRate_(), /: an unexpected rate \(5\)\./);
 
-  const stored = world({ props: { "RATE_2026-12-10": "108" }, fetch: () => { throw new Error("not called"); } });
+  const stored = world({ props: { "RATE_2026-12-10": "0.72" }, fetch: () => { throw new Error("not called"); } });
   stored.requireLiveRate_();
 });
 
@@ -153,7 +169,7 @@ const byRange = (payments, book = BOOK, log = CLOG) => (id, range) => {
 };
 
 test("checkPlanner logs the row count or the problem, never a value or the id", () => {
-  const row = PHEAD.map((h) => ({ payment_id: "X7", payer: "Mo", description: "Secret Inn", amount: 24750, currency: "JPY", split_between: "Mo", split_type: "equal", include_in_split: "yes" })[h] || "");
+  const row = PHEAD.map((h) => ({ payment_id: "X7", payer: "Mo", description: "Secret Inn", amount: 160.5, currency: "USD", split_between: "Mo", split_type: "equal", include_in_split: "yes" })[h] || "");
   const tabs = ["Payments", "Book Now", "Change Log"];
   const good = plannerWorld({ props: { PLANNER_ID }, tabs, get: byRange([PHEAD, row, [], row.map((c, i) => (i === 0 ? "X8" : c))]) });
   good.ctx.checkPlanner();

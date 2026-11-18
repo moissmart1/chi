@@ -5,10 +5,12 @@
 // amt, cur, rate and split. It changes those and calls onChange(); the
 // register redraws everything, this panel included, through render().
 //
-// Amounts are handled in whole units of the entered currency: yen, or cents.
+// Amounts are handled in cents of the entered currency (Canadian or US
+// dollars: both have cents).
 
 import { expenseShares } from "../money.js";
-import { yen, dollars } from "../format.js";
+import { tripMoney, dollars } from "../format.js";
+import { HOME_CURRENCY } from "../trip.js";
 
 export const MAX_PARTS = 99;
 const MAX_DIGITS = 8;
@@ -22,21 +24,20 @@ function el(tag, cls, text) {
   return n;
 }
 
-// A typed amount ("12.5", "14500") in whole units: cents for dollars, yen for yen.
-export function toUnits(str, cur) {
+// A typed amount ("12.5", "1450") in cents. Both currencies have cents, so
+// cur only says which sign to print (showUnits).
+export function toUnits(str) {
   const [whole = "", dec = ""] = String(str || "").split(".");
-  if (cur === "JPY") return Number(whole || 0);
   return Number(whole || 0) * 100 + Number((dec + "00").slice(0, 2));
 }
 
-// Whole units back to the number the backend takes (12.5 for 1250 cents).
-export const fromUnits = (units, cur) => (cur === "JPY" ? units : units / 100);
-export const showUnits = (units, cur) => (cur === "JPY" ? yen(units) : dollars(units));
+// Cents back to the number the backend takes (12.5 for 1250 cents).
+export const fromUnits = (units) => units / 100;
+export const showUnits = (units, cur) => (cur === HOME_CURRENCY ? dollars(units) : tripMoney(units));
 
-// What a typed amount can hold: digits, and for dollars one point and two decimals.
-export function cleanAmount(str, cur) {
+// What a typed amount can hold: digits, one point and two decimals.
+export function cleanAmount(str) {
   const s = String(str).replace(/[^\d.]/g, "");
-  if (cur === "JPY") return s.replace(/\./g, "").slice(0, MAX_DIGITS);
   const dot = s.indexOf(".");
   if (dot === -1) return s.slice(0, MAX_DIGITS);
   return s.slice(0, dot).slice(0, MAX_DIGITS) + "." + s.slice(dot + 1).replace(/\./g, "").slice(0, 2);
@@ -47,11 +48,11 @@ export function cleanAmount(str, cur) {
 // the amounts to add up to the total (left === 0).
 export function splitOf(d) {
   if (d.mode === "exact") {
-    const total = toUnits(d.amt, d.cur);
-    const units = d.split.map((n) => toUnits(d.exact[n], d.cur));
+    const total = toUnits(d.amt);
+    const units = d.split.map((n) => toUnits(d.exact[n]));
     const left = total - units.reduce((a, u) => a + u, 0);
     const everyone = units.every((u) => u >= 1);
-    return { mode: "exact", vals: units.map((u) => fromUnits(u, d.cur)), units, left, everyone, ok: total > 0 && left === 0 && everyone };
+    return { mode: "exact", vals: units.map((u) => fromUnits(u)), units, left, everyone, ok: total > 0 && left === 0 && everyone };
   }
   if (d.mode === "parts") {
     const vals = d.split.map((n) => d.parts[n] || 1);
@@ -107,7 +108,7 @@ export function mountUneven(host, { onChange }) {
   rows.addEventListener("input", (ev) => {
     const input = ev.target.closest("input.un-val");
     if (!input || !draft) return;
-    const clean = cleanAmount(input.value, draft.cur);
+    const clean = cleanAmount(input.value);
     if (clean !== input.value) input.value = clean;
     draft.exact[input.closest(".un-row").dataset.p] = clean;
     onChange();
@@ -160,22 +161,22 @@ export function mountUneven(host, { onChange }) {
     }
     for (const b of modes.children) b.classList.toggle("is-on", b.dataset.mode === d.mode);
 
-    const total = toUnits(d.amt, d.cur);
+    const total = toUnits(d.amt);
     const split = splitOf(d);
     let cents = null;
-    if (d.mode === "parts" && total > 0 && (d.cur === "CAD" || d.rate > 0)) {
-      cents = expenseShares({ amount: fromUnits(total, d.cur), currency: d.cur, rate: d.rate, split: d.split, splitMode: "parts", splitVals: d.split.map((n) => d.parts[n] || 1) });
+    if (d.mode === "parts" && total > 0 && (d.cur === HOME_CURRENCY || d.rate > 0)) {
+      cents = expenseShares({ amount: fromUnits(total), currency: d.cur, rate: d.rate, split: d.split, splitMode: "parts", splitVals: d.split.map((n) => d.parts[n] || 1) });
     }
     for (const row of rows.children) {
       const name = row.dataset.p;
       const val = row.querySelector(".un-val");
       const amt = row.querySelector(".un-amt");
       if (d.mode === "exact") {
-        val.inputMode = d.cur === "JPY" ? "numeric" : "decimal";
-        val.placeholder = d.cur === "JPY" ? "¥0" : "$0.00";
+        val.inputMode = "decimal";
+        val.placeholder = showUnits(0, d.cur);
         const v = d.exact[name] || "";
         if (val.value !== v) val.value = v;
-        const u = toUnits(v, d.cur);
+        const u = toUnits(v);
         amt.textContent = u > 0 ? showUnits(u, d.cur) : "";
       } else {
         const n = d.parts[name] || 1;

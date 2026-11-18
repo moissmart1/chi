@@ -50,7 +50,7 @@ async function arm(page, key) {
   await until(async () => (await armed(page)).includes(key), key + " is armed");
 }
 
-// The seed's open transfers with Simplify on: Trenton → Mo $1,121.35, Ajen → Mo $221.73.
+// The seed's open transfers with Simplify on: Trenton → Mo $1,124.29, Ajen → Mo $224.72.
 const pay = (o) => ({ id: "seedpay" + o.n + "aaaa", from: o.from || "Ajen", to: o.to || "Mo", cad: o.cad, seed: o.seed || 100 + o.n, rot: o.rot === undefined ? 2 : o.rot, stampedBy: o.by, stampedAt: o.at, removed: false });
 
 module.exports = [
@@ -85,7 +85,7 @@ module.exports = [
       const backend = await ready(page);
       await waitOpen(page, 2);
       await arm(page, "Ajen>Mo");
-      assert.equal(await page.inputValue("#stampAmt"), "221.73");
+      assert.equal(await page.inputValue("#stampAmt"), "224.72");
       assert.equal(await page.getAttribute("#stampAmt", "inputmode"), "decimal");
       const size = await page.evaluate(() => parseFloat(getComputedStyle(document.getElementById("stampAmt")).fontSize));
       assert.ok(size >= 16, "no zoom on focus: " + size);
@@ -99,7 +99,7 @@ module.exports = [
       // Arming another row disarms the first.
       await arm(page, "Trenton>Mo");
       assert.deepEqual(await armed(page), ["Trenton>Mo"]);
-      assert.equal(await page.inputValue("#stampAmt"), "1121.35");
+      assert.equal(await page.inputValue("#stampAmt"), "1124.29");
     },
   },
   {
@@ -120,7 +120,7 @@ module.exports = [
     async run({ page }) {
       const backend = await ready(page);
       await waitOpen(page, 2);
-      await expectText(page, "#say", "You’re owed $1,343.08.");
+      await expectText(page, "#say", "You’re owed $1,349.01.");
       await arm(page, "Ajen>Mo");
       await page.click(spot("Ajen>Mo"));
       // Drawn at once, with the hit, before the backend answers.
@@ -130,12 +130,12 @@ module.exports = [
       await idle(page);
       const rows = saved(backend);
       assert.equal(rows.length, 1);
-      assert.deepEqual({ from: rows[0].from, to: rows[0].to, cad: rows[0].cad, stampedBy: rows[0].stampedBy }, { from: "Ajen", to: "Mo", cad: 221.73, stampedBy: "Mo" });
+      assert.deepEqual({ from: rows[0].from, to: rows[0].to, cad: rows[0].cad, stampedBy: rows[0].stampedBy }, { from: "Ajen", to: "Mo", cad: 224.72, stampedBy: "Mo" });
       const [paid] = await paidRows(page);
-      assert.deepEqual(paid, { id: rows[0].id, who: "Ajen → you", amt: "$221.73", sub: "Paid " + TODAY + ". Nothing more to send." });
+      assert.deepEqual(paid, { id: rows[0].id, who: "Ajen → you", amt: "$224.72", sub: "Paid " + TODAY + ". Nothing more to send." });
       assert.deepEqual((await openRows(page)).map((r) => r.key), ["Trenton>Mo"], "open transfers first, the transfer is gone");
-      await expectText(page, "#say", "Trenton owes you $1,121.35.");
-      await expectText(page, "#ubarT", "Stamped $221.73 to Mo.");
+      await expectText(page, "#say", "Trenton owes you $1,124.29.");
+      await expectText(page, "#ubarT", "Stamped $224.72 to Mo.");
       assert.ok(await visible(page, "#ubarU"));
 
       await page.click("#ubarU");
@@ -143,7 +143,7 @@ module.exports = [
       await waitOpen(page, 2);
       await idle(page);
       assert.equal(saved(backend)[0].removed, true, "undone on the backend (marked, never erased)");
-      await expectText(page, "#say", "You’re owed $1,343.08.");
+      await expectText(page, "#say", "You’re owed $1,349.01.");
     },
   },
   {
@@ -161,8 +161,8 @@ module.exports = [
       assert.deepEqual({ from: rows[0].from, to: rows[0].to, cad: rows[0].cad }, { from: "Trenton", to: "Mo", cad: 100 });
       const open = await openRows(page);
       assert.deepEqual(open, [
-        { key: "Trenton>Mo", who: "Trenton → you", amt: "$1,021.35" },
-        { key: "Ajen>Mo", who: "Ajen → you", amt: "$221.73" },
+        { key: "Trenton>Mo", who: "Trenton → you", amt: "$1,024.29" },
+        { key: "Ajen>Mo", who: "Ajen → you", amt: "$224.72" },
       ]);
       const paid = await paidRows(page);
       assert.equal(paid.length, 1);
@@ -201,7 +201,7 @@ module.exports = [
       const backend = await ready(page);
       await waitOpen(page, 2);
       await arm(page, "Ajen>Mo");
-      assert.equal(await page.inputValue("#stampAmt"), "221.73");
+      assert.equal(await page.inputValue("#stampAmt"), "224.72");
       // Another phone: Mo paid $30 that Ajen and Mo share, so Ajen owes $15 more.
       const lunch = { id: "otherexp001", day: "2026-12-12", title: "Lunch", amount: 30, currency: "CAD", paidBy: "Mo", split: ["Mo", "Ajen"], splitMode: "equal", splitVals: [], note: "", kind: "" };
       await otherPhone(backend, "Trenton", "addExpense", { expense: lunch });
@@ -232,7 +232,7 @@ module.exports = [
       await advance(page, backend, 200);
       await until(async () => (await armed(page)).length === 0, "disarmed after 8 s");
       assert.equal(await page.locator("#stampAmt").count(), 0);
-      await expectText(page, '#slip .s-row[data-key="Ajen>Mo"] .s-amt', "$221.73");
+      await expectText(page, '#slip .s-row[data-key="Ajen>Mo"] .s-amt', "$224.72");
     },
   },
   {
@@ -260,7 +260,7 @@ module.exports = [
   {
     name: "tapping a stamped row offers 'Remove this stamp'; removing reopens it; Undo puts it back with the same seed",
     async run({ page }) {
-      const seed = { ...SEED, payments: [pay({ n: 1, cad: 221.73, seed: 777, rot: 4 })] };
+      const seed = { ...SEED, payments: [pay({ n: 1, cad: 224.72, seed: 777, rot: 4 })] };
       const backend = await ready(page, { seed });
       await until(async () => (await paidRows(page)).length === 1, "the seeded stamp");
       await waitOpen(page, 1);
@@ -339,7 +339,7 @@ module.exports = [
       await page.click(spot("Trenton>Mo"));
       await idle(page);
       const [row] = saved(backend);
-      assert.deepEqual({ from: row.from, to: row.to, cad: row.cad, stampedBy: row.stampedBy }, { from: "Trenton", to: "Mo", cad: 1121.35, stampedBy: "Ajen" });
+      assert.deepEqual({ from: row.from, to: row.to, cad: row.cad, stampedBy: row.stampedBy }, { from: "Trenton", to: "Mo", cad: 1124.29, stampedBy: "Ajen" });
     },
   },
   {

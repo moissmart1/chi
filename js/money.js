@@ -1,11 +1,17 @@
 // Money maths in integer Canadian cents. Pure: no DOM, no globals, no imports.
+//
+// A line is in the home currency ("CAD", HOME_CURRENCY in js/trip.js; this
+// file can't import it, tests/money.test.js checks the two agree) or in the
+// trip's (US dollars). Both have 100 cents to the unit. e.rate is how many
+// trip dollars one home dollar bought that day (about 0.72).
 
 export function cadCents(e) {
-  return e.currency === "JPY" ? Math.round((e.amount / e.rate) * 100) : Math.round(e.amount * 100);
+  return e.currency === "CAD" ? Math.round(e.amount * 100) : Math.round((e.amount / e.rate) * 100);
 }
 
-export function jpyOf(e) {
-  return e.currency === "JPY" ? e.amount : Math.round(e.amount * e.rate);
+// The line in the trip's currency, in cents.
+export function tripCents(e) {
+  return e.currency === "CAD" ? Math.round(e.amount * e.rate * 100) : Math.round(e.amount * 100);
 }
 
 export function shares(cents, names) {

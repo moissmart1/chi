@@ -3,14 +3,25 @@ import assert from "node:assert/strict";
 import * as M from "../js/money.js";
 
 const P = ["Mo", "Ajen", "Trenton"];
-const E = (o) => ({ id: "e", day: "pre", title: "x", currency: "JPY", rate: 111, split: P, deleted: false, ...o });
+const E = (o) => ({ id: "e", day: "pre", title: "x", currency: "USD", rate: 0.72, split: P, deleted: false, ...o });
 const pay = (from, to, cad, removed = false) => ({ id: "p", from, to, cad, removed });
 
-test("yen converts at the stored rate, dollars are exact", () => {
-  assert.equal(M.cadCents(E({ amount: 1000 })), 901);
+test("US dollars convert at the stored rate, Canadian dollars are exact; both in cents", () => {
+  assert.equal(M.cadCents(E({ amount: 6.49 })), 901);
+  assert.equal(M.cadCents(E({ amount: 622.8 })), 86500);
   assert.equal(M.cadCents(E({ amount: 130, currency: "CAD", rate: 999 })), 13000);
-  assert.equal(M.jpyOf(E({ amount: 130, currency: "CAD", rate: 111 })), 14430);
-  assert.equal(M.jpyOf(E({ amount: 1000 })), 1000);
+  assert.equal(M.tripCents(E({ amount: 130, currency: "CAD", rate: 0.72 })), 9360);
+  assert.equal(M.tripCents(E({ amount: 12.5 })), 1250);
+  assert.equal(M.tripCents(E({ amount: 0.01, currency: "CAD", rate: 0.7234 })), 1);
+});
+
+test("money.js's home currency is the trip's home currency (js/trip.js)", async () => {
+  const { HOME_CURRENCY } = await import("../js/trip.js");
+  const fs = await import("node:fs");
+  const src = fs.readFileSync(new URL("../js/money.js", import.meta.url), "utf8");
+  const homes = [...src.matchAll(/e\.currency === "([A-Z]{3})"/g)].map((m) => m[1]);
+  assert.ok(homes.length >= 2);
+  assert.deepEqual([...new Set(homes)], [HOME_CURRENCY]);
 });
 
 test("equal shares always sum to the whole", () => {
@@ -25,16 +36,16 @@ test("parts and exact amounts always sum to the whole", () => {
   assert.deepEqual(M.sharesWeighted(100, ["Mo", "Ajen"], [1, 2]), { Mo: 33, Ajen: 67 });
   assert.deepEqual(M.expenseShares(E({ amount: 80, currency: "CAD", splitMode: "parts", splitVals: [2, 3, 3] })), { Mo: 2000, Ajen: 3000, Trenton: 3000 });
   assert.deepEqual(M.expenseShares(E({ amount: 100, currency: "CAD", splitMode: "exact", splitVals: [50, 30, 20] })), { Mo: 5000, Ajen: 3000, Trenton: 2000 });
-  assert.deepEqual(M.expenseShares(E({ amount: 10000, splitMode: "exact", splitVals: [5000, 3000, 2000] })), { Mo: 4504, Ajen: 2703, Trenton: 1802 });
-  assert.deepEqual(M.expenseShares(E({ amount: 1000 })), { Mo: 301, Ajen: 300, Trenton: 300 });
+  assert.deepEqual(M.expenseShares(E({ amount: 72, splitMode: "exact", splitVals: [36, 21.6, 14.4] })), { Mo: 5000, Ajen: 3000, Trenton: 2000 });
+  assert.deepEqual(M.expenseShares(E({ amount: 6.49 })), { Mo: 301, Ajen: 300, Trenton: 300 });
 });
 
 test("one fronted expense: two transfers that sum to the balance", () => {
-  const bal = M.balances(P, [E({ amount: 96000, paidBy: "Mo" })], []);
-  assert.deepEqual(bal, { Mo: 57657, Ajen: -28829, Trenton: -28828 });
+  const bal = M.balances(P, [E({ amount: 622.81, paidBy: "Mo" })], []);
+  assert.deepEqual(bal, { Mo: 57667, Ajen: -28834, Trenton: -28833 });
   assert.deepEqual(M.transfers(bal), [
-    { from: "Ajen", to: "Mo", cents: 28829 },
-    { from: "Trenton", to: "Mo", cents: 28828 },
+    { from: "Ajen", to: "Mo", cents: 28834 },
+    { from: "Trenton", to: "Mo", cents: 28833 },
   ]);
 });
 
@@ -49,12 +60,12 @@ test("payer outside the split, deleted expenses, removed payments, uneven parts"
 });
 
 test("a recorded payment reduces the debt; an overpayment flips it", () => {
-  const ex = [E({ amount: 96000, paidBy: "Mo" })];
-  assert.equal(M.balances(P, ex, [pay("Ajen", "Mo", 100)]).Ajen, -18829);
+  const ex = [E({ amount: 622.8, paidBy: "Mo" })];
+  assert.equal(M.balances(P, ex, [pay("Ajen", "Mo", 100)]).Ajen, -18833);
   const over = M.balances(P, ex, [pay("Ajen", "Mo", 300)]);
   assert.deepEqual(M.transfers(over), [
-    { from: "Trenton", to: "Mo", cents: 27657 },
-    { from: "Trenton", to: "Ajen", cents: 1171 },
+    { from: "Trenton", to: "Mo", cents: 27666 },
+    { from: "Trenton", to: "Ajen", cents: 1167 },
   ]);
 });
 
@@ -152,8 +163,8 @@ test("transfers always move exactly each person's balance", () => {
 
 test("both Simplify readings move the same money, and are empty together exactly when square", () => {
   const cases = [
-    { ex: [E({ amount: 96000, paidBy: "Mo" })], pays: [] },
-    { ex: [E({ amount: 1000, paidBy: "Ajen" }), E({ amount: 777, paidBy: "Trenton", split: ["Mo", "Trenton"] })], pays: [pay("Mo", "Ajen", 3.33)] },
+    { ex: [E({ amount: 622.8, paidBy: "Mo" })], pays: [] },
+    { ex: [E({ amount: 6.49, paidBy: "Ajen" }), E({ amount: 5.59, paidBy: "Trenton", split: ["Mo", "Trenton"] })], pays: [pay("Mo", "Ajen", 3.33)] },
     { ex: chain, pays: [pay("Mo", "Trenton", 10)] },
     { ex: chain, pays: [pay("Mo", "Ajen", 10), pay("Ajen", "Trenton", 10)] },
     { ex: [E({ amount: 100, currency: "CAD", paidBy: "Mo", splitMode: "parts", splitVals: [1, 1, 1] }),

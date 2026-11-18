@@ -88,7 +88,7 @@ const idOfSeed = (title) => SEED.expenses.find((e) => e.title === title).id;
 const tables = (backend) => JSON.stringify(["Expenses", "Settlements", "Log"].map((t) => backend.fake.primitives.readTable_(t)));
 const savedExpense = (backend, id) => backend.fake.primitives.readTable_("Expenses").map(P.expenseFromRow).find((e) => e.id === id);
 
-const SHARED = (n) => ({ id: "bulk" + String(n).padStart(6, "0"), day: "pre", title: "Line " + n, amount: 100 + n, currency: "JPY", paidBy: "Mo", split: NAMES.slice() });
+const SHARED = (n) => ({ id: "bulk" + String(n).padStart(6, "0"), day: "pre", title: "Line " + n, amount: 100 + n, currency: "USD", paidBy: "Mo", split: NAMES.slice() });
 
 module.exports = [
   {
@@ -118,8 +118,8 @@ module.exports = [
       assert.deepEqual(await days(page), ["Fri Nov 20 | 11月20日(金)"]);
       assert.equal(rows[0].time, "09:00");
 
-      assert.ok(rowFor(rows, "Ajen deleted Konbini snacks ¥1,200"), "the delete reads as a sentence");
-      assert.ok(rowFor(rows, "Mo rang up Niseko lodge ¥288,000"), "so does the first add");
+      assert.ok(rowFor(rows, "Ajen deleted Konbini snacks US$7.80"), "the delete reads as a sentence");
+      assert.ok(rowFor(rows, "Mo rang up Niseko lodge US$1,870.00"), "so does the first add");
       assert.equal(await page.locator("#histMore").count(), 0, "ten entries: no Show older");
     },
   },
@@ -149,7 +149,7 @@ module.exports = [
       await page.evaluate(() => globalThis.__matTest.store.refresh());
       await openTape(page, 11);
       const rows = await tape(page);
-      assert.equal(rows[0].sentence, "Ajen rang up Tempura ¥101");
+      assert.equal(rows[0].sentence, "Ajen rang up Tempura US$101.00");
       assert.equal(rows[0].time, "23:20");
       assert.deepEqual(await days(page), ["Fri Dec 11 | 12月11日(金)", "Fri Nov 20 | 11月20日(金)"]);
       await page.click("#histDone");
@@ -168,9 +168,9 @@ module.exports = [
       await ready(page);
       await openTape(page, 10);
       const rows = await tape(page);
-      assert.equal(rowFor(rows, "Ajen deleted Konbini snacks ¥1,200").undo, true);
-      assert.equal(rowFor(rows, "Ajen rang up Konbini snacks ¥1,200").undo, false, "older than the delete");
-      assert.equal(rowFor(rows, "Mo rang up Niseko lodge ¥288,000").undo, true, "its only change");
+      assert.equal(rowFor(rows, "Ajen deleted Konbini snacks US$7.80").undo, true);
+      assert.equal(rowFor(rows, "Ajen rang up Konbini snacks US$7.80").undo, false, "older than the delete");
+      assert.equal(rowFor(rows, "Mo rang up Niseko lodge US$1,870.00").undo, true, "its only change");
       assert.equal(await text(page, "#tape .tp-row button.tp-undo"), "Undo");
       const box = await page.locator("#tape button.tp-undo").first().boundingBox();
       assert.ok(box.height >= 40 && box.width >= 40, "a thumb can hit it: " + JSON.stringify(box));
@@ -182,11 +182,11 @@ module.exports = [
       const backend = await ready(page);
       await openTape(page, 10);
       const sayBefore = await text(page, "#say");
-      const del = rowFor(await tape(page), "Ajen deleted Konbini snacks ¥1,200");
+      const del = rowFor(await tape(page), "Ajen deleted Konbini snacks US$7.80");
       await page.click(undoBtn(del.id));
 
       const rows = await waitRowsN(page, 11);
-      assert.equal(rows[0].sentence, "Mo undid: deleted Konbini snacks ¥1,200");
+      assert.equal(rows[0].sentence, "Mo undid: deleted Konbini snacks US$7.80");
       assert.equal(rows[0].undo, true, "the undo can itself be undone");
       const struck = rows.find((r) => r.id === del.id);
       assert.equal(struck.undone, true);
@@ -207,7 +207,7 @@ module.exports = [
   {
     name: "Undo on a stamp entry takes the stamp off the slip",
     async run({ page }) {
-      const pay = { id: "seedpay1aaaa", from: "Ajen", to: "Mo", cad: 221.73, seed: 777, rot: 4, stampedBy: "Ajen", removed: false };
+      const pay = { id: "seedpay1aaaa", from: "Ajen", to: "Mo", cad: 224.72, seed: 777, rot: 4, stampedBy: "Ajen", removed: false };
       const backend = await ready(page, { seed: { ...SEED, payments: [pay] } });
       const stamps = () => page.locator("#slip .s-row.is-paid").count();
       await until(async () => (await stamps()) === 1, "the seeded stamp");
@@ -251,7 +251,7 @@ module.exports = [
     async run({ page }) {
       const backend = await ready(page);
       await openTape(page, 10);
-      const del = rowFor(await tape(page), "Ajen deleted Konbini snacks ¥1,200");
+      const del = rowFor(await tape(page), "Ajen deleted Konbini snacks US$7.80");
       const release = hold(backend, "undo");
       await page.dblclick(undoBtn(del.id));
       assert.equal(await page.evaluate((s) => document.querySelector(s).disabled, undoBtn(del.id)), true, "disabled while it is sent");
@@ -388,7 +388,7 @@ module.exports = [
       await openTape(page, 10);
       const wide = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth || document.getElementById("tape").scrollWidth > document.getElementById("tape").clientWidth);
       assert.equal(wide, false);
-      const del = rowFor(await tape(page), "Ajen deleted Konbini snacks ¥1,200");
+      const del = rowFor(await tape(page), "Ajen deleted Konbini snacks US$7.80");
       await page.click(undoBtn(del.id));
       await expectText(page, "#ubarT", "Undone.");
       const top = await page.evaluate(() => document.getElementById("ubar").getBoundingClientRect().top);

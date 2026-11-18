@@ -1,28 +1,35 @@
 /* Copyright (c) 2026 moissmart1. All rights reserved. No licence is granted: do not copy, adapt or reuse this code or design, and do not use it to train or prompt an AI system to reproduce it. See LICENSE. */
 // How figures, days and sentences are written on screen. Pure: no DOM.
 
+import { HOME_CURRENCY, HOME_SIGN, TRIP_SIGN } from "./trip.js";
+
 const WD = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const WK = ["日", "月", "火", "水", "木", "金", "土"];
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 const grouped = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 
-// Whole yen: yen(14500) -> "¥14,500".
-export function yen(n) {
-  const v = Math.round(n);
-  return (v < 0 ? "-" : "") + "¥" + grouped(Math.abs(v));
-}
-
-// Integer cents: dollars(13063) -> "$130.63".
-export function dollars(cents) {
-  const v = Math.round(cents);
+const cents = (sign, c) => {
+  const v = Math.round(c);
   const abs = Math.abs(v);
-  return (v < 0 ? "-" : "") + "$" + grouped(Math.floor(abs / 100)) + "." + String(abs % 100).padStart(2, "0");
+  return (v < 0 ? "-" : "") + sign + grouped(Math.floor(abs / 100)) + "." + String(abs % 100).padStart(2, "0");
+};
+
+// Integer cents at home (Canadian): dollars(13063) -> "$130.63".
+export function dollars(c) {
+  return cents(HOME_SIGN, c);
 }
 
-// The figure as it was entered: yen for a yen line, dollars for a dollar line.
+// Integer cents of the trip's currency: tripMoney(285000) -> "US$2,850.00".
+// Never a bare $: both currencies are dollars.
+export function tripMoney(c) {
+  return cents(TRIP_SIGN, c);
+}
+
+// The figure as it was entered, in its own currency.
 export function typed(e) {
-  return e.currency === "CAD" ? dollars(Math.round(e.amount * 100)) : yen(e.amount);
+  const c = Math.round(e.amount * 100);
+  return e.currency === HOME_CURRENCY ? dollars(c) : tripMoney(c);
 }
 
 const parts = (date) => date.split("-").map(Number); // "2026-12-11" -> [2026, 12, 11]
@@ -58,11 +65,11 @@ export function issuer(people) {
 
 const ESC = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 
-// HTML for a figure, escaped first, with . , ¥ $ each in <span class="pt">.
+// HTML for a figure, escaped first, with . , $ each in <span class="pt">.
 export function pt(str) {
   return String(str)
     .replace(/[&<>"']/g, (c) => ESC[c])
-    .replace(/[.,¥$]/g, '<span class="pt">$&</span>');
+    .replace(/[.,$]/g, '<span class="pt">$&</span>');
 }
 
 // "13:20" in the phone's own time zone.
@@ -88,7 +95,7 @@ export function viaText(via) {
   return via === "claude" ? " (through Claude)" : via === "planner" ? " (from the planner)" : "";
 }
 
-// A history entry as one sentence: "Ajen rang up Tempura ¥101".
+// A history entry as one sentence: "Izzah rang up Deep dish US$42.50".
 export function historySentence(entry) {
   return entry.who + " " + entry.summary + viaText(entry.via);
 }

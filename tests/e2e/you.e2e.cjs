@@ -13,10 +13,10 @@ const PHEAD = ["payment_id", "date_paid", "payer", "description", "category", "v
 const prow = (o) => PHEAD.map((h) => (o[h] === undefined ? "" : o[h]));
 const PLANNER = [
   PHEAD,
-  prow({ payment_id: "X7", date_paid: "2026-12-11", payer: "Mo", description: "Rail pass", category: "transport", vendor: "North Rail", booking_ref: "AB12", amount: 24750, currency: "JPY", amount_cad: 221.52, cad_is_exact: "yes", split_between: "Mo, Ajen, Trenton", split_type: "equal", include_in_split: "yes" }),
-  prow({ payment_id: "Q3", date_paid: "2026-12-12", payer: "Ajen", description: "Noodle bar", category: "food", vendor: "Ramen Ya", amount: 3600, currency: "JPY", split_between: "Mo, Ajen", split_type: "equal", include_in_split: "yes" }),
+  prow({ payment_id: "X7", date_paid: "2026-12-11", payer: "Mo", description: "Rail pass", category: "transport", vendor: "North Rail", booking_ref: "AB12", amount: 160.5, currency: "USD", amount_cad: 221.52, cad_is_exact: "yes", split_between: "Mo, Ajen, Trenton", split_type: "equal", include_in_split: "yes" }),
+  prow({ payment_id: "Q3", date_paid: "2026-12-12", payer: "Ajen", description: "Noodle bar", category: "food", vendor: "Ramen Ya", amount: 36, currency: "USD", split_between: "Mo, Ajen", split_type: "equal", include_in_split: "yes" }),
   // Read fine but can't be brought in (a personal payment): it needs a look in the planner.
-  prow({ payment_id: "P5", payer: "Mo", description: "Own souvenir", amount: 900, currency: "JPY", split_between: "Mo", split_type: "personal", include_in_split: "yes" }),
+  prow({ payment_id: "P5", payer: "Mo", description: "Own souvenir", amount: 9, currency: "USD", split_between: "Mo", split_type: "personal", include_in_split: "yes" }),
 ];
 
 const isOpen = (page) => page.evaluate(() => document.getElementById("you").classList.contains("is-open"));
@@ -123,7 +123,7 @@ module.exports = [
     name: "switching person stores chi.me and #say follows; the field then shows that person's own address and a half-typed one is dropped",
     async run({ page }) {
       const backend = await ready(page);
-      await expectText(page, "#say", "You’re owed $1,343.08.");
+      await expectText(page, "#say", "You’re owed $1,349.01.");
       await openYou(page);
       assert.equal(await page.locator("#setWho [data-me]").count(), 3);
       assert.equal(await page.getAttribute('#setWho [data-me="Mo"]', "aria-pressed"), "true");
@@ -133,7 +133,7 @@ module.exports = [
 
       await page.fill("#setMail", "half-typed");
       await pick(page, "Ajen");
-      await expectText(page, "#say", "You owe Mo $221.73.");
+      await expectText(page, "#say", "You owe Mo $224.72.");
       assert.equal(await page.getAttribute('#setWho [data-me="Ajen"]', "aria-pressed"), "true");
       assert.equal(await page.getAttribute('#setWho [data-me="Mo"]', "aria-pressed"), "false");
       await waitMail(page, "");
@@ -608,7 +608,7 @@ module.exports = [
     name: "Planner payments: ten a tap; the notice says when there is more, and the next tap brings the rest",
     async run({ page }) {
       const rows = [PHEAD];
-      for (let i = 1; i <= 12; i++) rows.push(prow({ payment_id: "R" + i, date_paid: "2026-12-11", payer: "Mo", description: "Ticket " + i, category: "activity", amount: 1000 + i, currency: "JPY", split_between: "Mo, Ajen, Trenton", split_type: "equal", include_in_split: true }));
+      for (let i = 1; i <= 12; i++) rows.push(prow({ payment_id: "R" + i, date_paid: "2026-12-11", payer: "Mo", description: "Ticket " + i, category: "activity", amount: 10 + i, currency: "USD", split_between: "Mo, Ajen, Trenton", split_type: "equal", include_in_split: true }));
       const backend = await ready(page, { seed: { ...SEED, planner: rows, plannerId: PLANNER_ID, paymentsPulledAt: JUST_PULLED } });
       await openYou(page);
       await page.click("#setPlanner");
