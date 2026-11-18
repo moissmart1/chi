@@ -51,6 +51,11 @@ button.bar-t{border:0;background:none;padding:0;min-height:36px;min-width:0;colo
 .tk-route{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;margin-top:12px}
 .stn{display:flex;flex-direction:column;min-width:0}
 .stn b{font-weight:900;line-height:1;letter-spacing:.07em;white-space:nowrap}
+/* Two stations share the width evenly; a name too long for its half is cut with an ellipsis, never
+   run into the other one (the padding keeps descenders clear of the cut). */
+.tk-route:not(.is-one) .stn{flex:1 1 0}
+.tk-route:not(.is-one) .stn{flex:1 1 0}
+.tk-route:not(.is-one) .stn b{overflow:hidden;text-overflow:ellipsis;padding-bottom:.15em;margin-bottom:-.15em}
 .stn span{font-size:12.5px;margin-top:7px}
 .stn.to{align-items:flex-end;text-align:right}
 .stn.to b{letter-spacing:.07em;margin-right:-.07em}

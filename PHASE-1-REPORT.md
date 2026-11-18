@@ -14,7 +14,7 @@ Survey: `triplit/docs/superpowers/specs/2026-11-17-second-trip-survey.md`.
 - [x] 6. No planner
 - [x] 7. Japanese words in the interface
 - [x] 8. README and PHOTO-CREDITS
-- [ ] Finish: stamp, unit, full e2e, screenshots, this report
+- [x] Finish: stamp, unit, full e2e, screenshots, this report
 
 ## What changed, per item
 
@@ -81,6 +81,12 @@ Survey: `triplit/docs/superpowers/specs/2026-11-17-second-trip-survey.md`.
 ### 8. README and photo credits
 - README rewritten for this trip: what it is, the fixed facts and the Trip-tab check, "not connected yet", running and testing (with `MAT_PORT`), the one-time backend set-up from survey section 5 with the owner-only steps marked **owner**, later deploys, the Claude connector (11 tools, no sync_payments), "No planner", money, the stamp book in Chicago time, the Sheet. No ids, addresses or links of the live apps.
 - `PHOTO-CREDITS.md`: the Japan photos removed; an empty table for this trip's.
+
+### Finish
+- `npm run stamp`; `npm test`: 519 pass, 0 fail.
+- Full e2e, once, `MAT_PORT=4187`: 385 passed, 1 failed: `small > the no-key screen: the paste field and Open` ("clock.pauseAt: Cannot fast-forward to the past", a timing race in the shared `open()` helper under load: the page clock ran past `nowMs` between `install` and `pauseAt`). Rerun alone it passed (7/7 in `small`), twice.
+- Screenshots (393x852 and 1440x900) in `/private/tmp/claude-501/mat-shots/chi/` (1-who-are-you … 9-desktop-1440x900), over a separate, Chicago-looking plan. Fixed from looking at them: English-only station names ran into each other on the ticket (`Clark/Lake → Jackson`): `fsFor` now counts a Latin letter as 0.7 of a Japanese one with two smaller sizes, the two stations share the route evenly, and a name still too long ends in an ellipsis (`js/views/ticket.js`, `css/days.css`). Days, today, small re-run alone after it.
+- Isolation checks: no `mat.` key, `mat-shell`/`mat-fonts`/`mat-new-version` or `github.io/mat` in `js/` or `sw.js` (unit test); no `JPY`, `¥`, `yen`, `Asia/Tokyo` or 111 rate in `js/` or `backend/`; no deployment or spreadsheet id anywhere; the bare `$` left in code is the home (Canadian) sign only: `js/trip.js` HOME_SIGN, the slip's amount field (`js/views/slip.js:139`, a Canadian payment), the connector's owed amounts (`backend/Mcp.js:228`, Canadian), and History's home amounts (`backend/Pure.js:687`).
 
 ## Tests deleted (and why)
 
@@ -185,7 +191,35 @@ All with item 6 (the planner pull and "Before we go" write-back are left out of 
 
 ## Left for phase 2 (still says or assumes Japan)
 
-(filled in at the end)
+The look (fonts, palette, ornaments, icons) is phase 2's by design; these are listed so nothing is missed.
+
+Look and wording
+1. `index.html:26`: Google Fonts DotGothic16, Zen Antique, Zen Kaku Gothic New (Japanese faces).
+2. `css/base.css:12-14`: `--f`, `--dot`, `--seal` font stacks name Zen / Hiragino / Yu faces.
+3. `css/base.css:6`, `index.html:13`, `manifest.webmanifest:8-9`, `sw.js:187`: the dark ground `#1A1614` and the rest of the palette (ticket stock, vermilion `--shu`).
+4. `css/days.css:29-30`: the ticket stock's pattern prints the letters "MAT".
+5. `icons/icon-180.png`, `icon-192.png`, `icon-512.png`, `scripts/make-icons.cjs:2-62`: the 済 seal icons (Zen Antique).
+6. `js/stamp.js:80` (and its ghost `js/views/slip.js:160`): the 済 paid stamp; `js/stamp.js:103` gate stamp faces.
+7. `js/views/stampbook.js:40`: `スタンプ帳 Stamp book`; `:43`: `MAT 記念スタンプ帳`; `:183`: `今日` / `発行`; `:112`: fallback face "MAT".
+8. `js/stampbook.js:43-53`: the issue crest draws the letters "MAT"; `:218,221` stamp text faces; `:54-67` motif library (onsen, temple, sake, lantern are Japan-flavoured).
+9. `js/plan.js:232` (printed by `js/views/ticket.js` foot): issue line `2026.12.28 MI発行 00003-01`.
+10. `js/views/ticket.js` validity: "Good for this day only" now on the date row and in the foot (twice).
+11. `js/views/you.js:97`: Report a problem note starts "MAT: a problem to look at".
+12. `js/format.js:61` comment and `js/views/ticket.js:14` comment: the issuer's mark example "MAT" (the mark itself is now "MI").
+13. `js/views/register.js:28`: quick chip "Onsen".
+14. `js/views/stopsheet.js:49`: field "Japanese name on signs" (`sign_jp`); `backend/Mcp.js:460,510,511,528,531,533`: connector field help "in Japanese" (`sign_jp`, `name_jp`, `address_jp`, `line_jp`, `from_jp`, `to_jp`); `backend/Pure.js:337` "Keep the Japanese name under 80 letters."; the ticket and stay card still show a Japanese name large when the Sheet has one (`js/views/ticket.js:59-93`, `js/views/staycard.js:35-72`).
+15. `js/format.js:7,40,44`: `dayHead()` still computes the Japanese date and 出発前 (no longer printed anywhere).
+16. `js/views/money.js:22-23`, `js/views/first.js:21`, `backend/Actions.js:33-34`: "Tell Mo" / "Ask Mo" (fine if Mo runs this trip too).
+17. `css/days.css:118,177,181`, `css/money.css:169`, `css/sheet.css:146`, `css/history.css:5` and other comments that name the old Japanese labels.
+18. `backend/Mcp.js:191-192`: comment example "Tokyo" / "Tokyo Tower".
+
+Dormant planner pieces (kept, hidden)
+19. `js/views/todos.js`, `js/todos.js` (incl. `HOME_TZ = "America/Toronto"` `:12`), the Before key `index.html:45`, `js/app.js` Before wiring, `js/store.js` planner pulls (`syncPayments`, `autoPayments`, `syncTodos`, `tickTodo`, `claimTodo`), `js/views/you.js` Planner payments row and problems panel: unreachable (load says no planner). Remove or keep in phase 2.
+20. `backend/Pure.js:38,41`: the Sheet schema still has the `Todos` tab and `Expenses.planner_id` (unused); `backend/Pure.js:800` and `backend/Mcp.js:343` still know the "planner" History source.
+
+Test fixtures (data, not trip facts)
+21. `tests/fixtures/plan.json`: Tokyo and Niseko days, Ginza / Yamanote lines with Japanese station names, stops (Senso-ji, Meiji Shrine, Shibuya Sky …), the Asakusa hotel with a Japanese address. `tests/fixtures/seed.json`: lines named Niseko lodge, Rail passes, Skyliner, Ramen, Konbini snacks, Shibuya dinner, Shibuya Sky. They now sit on Chicago dates in US dollars between Mo and Izzah; the names were left so the tests that pin them stayed readable. (The phase-1 screenshots use a separate, Chicago-looking plan.)
+22. Tests that use a Japanese string as plain input data (e.g. `name_ja` in stamp definitions, `sign_jp` values, the IME Enter tests in `tests/e2e/stopedit.e2e.cjs` / `js/views/register.js:413` comment): generic behaviour, kept.
 
 ## Unsure / my calls
 

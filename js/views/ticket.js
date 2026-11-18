@@ -46,14 +46,17 @@ function el(tag, cls, text) {
 const str = (v) => (typeof v === "string" ? v.trim() : "");
 
 // The large type shrinks with the name's length, as the mockup's fsFor does.
-// A Latin letter is about half as wide as a Japanese character, so it counts
-// as a little over half of one. `wide`: the name has the ticket's whole width
-// to itself (no arrow, no second station), so it may be twice as long.
+// A Latin letter in this heavy face is about seven tenths as wide as a
+// Japanese character, so it counts as that. `wide`: the name has the
+// ticket's whole width to itself (no arrow, no second station), so it may be
+// twice as long. Chicago's station names are English and often long
+// ("Clark/Lake"), hence the two smaller steps; a name longer still is cut
+// with an ellipsis (css/days.css) rather than run into the other station.
 export function fsFor(name, wide = false) {
   let n = 0;
-  for (const c of name) n += c.codePointAt(0) < 0x2e80 ? 0.55 : 1;
+  for (const c of name) n += c.codePointAt(0) < 0x2e80 ? 0.7 : 1;
   if (wide) n /= 2;
-  return n <= 2 ? 46 : n <= 3 ? 38 : n <= 4 ? 31 : n <= 5 ? 26 : 22;
+  return n <= 2 ? 46 : n <= 3 ? 38 : n <= 4 ? 31 : n <= 5 ? 26 : n <= 6 ? 22 : n <= 8 ? 16 : 14;
 }
 
 // A station: its name large (Japanese when there is one), English under it.
