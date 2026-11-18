@@ -1103,7 +1103,7 @@ test("a hand-typed stay link survives a name change", async () => {
   assert.deepEqual([row.name, row.note, row.link], ["Niseko lodge", "", "www.booking.com/x"]);
 });
 
-// ---------- pinned before the planner pull shared their code (Task 12) ----------
+// ---------- pinned: the expense writes, column by column ----------
 
 test("pinned: addExpense and updateExpense answer, store and log exactly as before", async () => {
   const call = client(undefined, { clock: () => "2026-12-27T02:00:00.000Z" });
@@ -1119,40 +1119,12 @@ test("pinned: addExpense and updateExpense answer, store and log exactly as befo
   assert.deepEqual(u, { ok: true, rev: 2, data: { expense: edited, logId: 2 } });
   assert.deepEqual(await call("updateExpense", { id: "pinexp0001", patch: { amount: 1200 } }), { ok: true, rev: 2, data: { expense: edited, logId: null } });
   assert.deepEqual(await call("updateExpense", { id: "pinexp0001", patch: { amount: -1 } }), { ok: false, error: "bad_input", message: "The amount has to be more than zero.", rev: 2 });
-  assert.deepEqual(call.fake.tables.Expenses, [{ id: "pinexp0001", day: "2026-12-27", title: "Udon", amount: 1200, currency: "USD", rate: 0.72, paid_by: "Mo", split: "Mo,Izzah", split_mode: "equal", split_vals: "", note: "hot", kind: "food", receipt: "", added_by: "Izzah", added_at: "2026-12-27T02:00:00.000Z", deleted_at: "", planner_id: "" }], "R40 adds the planner_id column; the app's own writes leave it empty");
+  assert.deepEqual(call.fake.tables.Expenses, [{ id: "pinexp0001", day: "2026-12-27", title: "Udon", amount: 1200, currency: "USD", rate: 0.72, paid_by: "Mo", split: "Mo,Izzah", split_mode: "equal", split_vals: "", note: "hot", kind: "food", receipt: "", added_by: "Izzah", added_at: "2026-12-27T02:00:00.000Z", deleted_at: "" }], "the Sheet's Expenses columns, without the old planner_id");
   assert.deepEqual(call.fake.tables.Log, [
     { id: 1, at: "2026-12-27T02:00:00.000Z", who: "Izzah", via: "app", action: "add", kind: "expense", ref: "pinexp0001", summary: "rang up Udon US$980.00", before: "", after: JSON.stringify(added), undoes: "", undone_by: "" },
     { id: 2, at: "2026-12-27T02:00:00.000Z", who: "Mo", via: "app", action: "edit", kind: "expense", ref: "pinexp0001", summary: "changed Udon US$980.00 → US$1,200.00", before: JSON.stringify(added), after: JSON.stringify(edited), undoes: "", undone_by: "" },
   ]);
 });
-
-// ---------- payments from the planner sheet (Task 12, R39, R40) ----------
-// Every planner value here is made up: ids, vendors, refs and amounts.
-
-const PLANNER_ID = "fakePlannerSheet_0123456789abcdefXYZ";
-const PHEAD = ["payment_id", "date_paid", "payer", "description", "category", "vendor", "booking_ref", "amount", "currency", "amount_cad", "cad_is_exact", "split_between", "split_type", "status", "include_in_split", "source", "added_by", "notes"];
-const prow = (o) => PHEAD.map((h) => (o[h] === undefined ? "" : o[h]));
-const PX7 = { payment_id: "X7", date_paid: "2026-12-27", payer: "Mo", description: "Rail pass", category: "transport", vendor: "North Rail", booking_ref: "AB12", amount: 24750, currency: "USD", amount_cad: 221.52, cad_is_exact: "yes", split_between: "Mo, Izzah", split_type: "equal", include_in_split: "yes" };
-const PQ3 = { payment_id: "Q3", date_paid: "2026-12-28", payer: "izzah", description: "Noodle bar", category: "food", vendor: "Ramen Ya", amount: "US$3,600.00", currency: "USD", split_between: "Mo, Izzah", split_type: "equal", include_in_split: "Yes" };
-const PZ1 = { ...PX7, payment_id: "Z1", description: "Later tickets", include_in_split: "no (until charged)" };
-const PP5 = { ...PX7, payment_id: "P5", description: "Own souvenir", split_type: "personal" };
-const PU2 = { ...PX7, payment_id: "U2", payer: "Nadia" };
-const PLANNER = [PHEAD, prow(PX7), [], prow(PQ3), prow(PZ1), prow(PP5), prow(PU2)];
-const NOTE_X7 = "X7 · North Rail · ref AB12 · US$24,750.00 charged";
-
-function linked(over = {}, rows = PLANNER, opts = {}) {
-  return client({ ...over, planner: rows, plannerId: PLANNER_ID }, { clock: () => "2026-12-28T03:00:00.000Z", ...opts });
-}
-// The Sheet's Expenses rows tied to payment pid by their planner_id.
-const byPayment = (call, pid) => call.fake.primitives.readTable_("Expenses").filter((r) => r.planner_id === pid);
-const stored = (call, id) => call.fake.tables.Expenses.find((r) => r.id === id);
-const live = (call) => call.fake.primitives.readTable_("Expenses").filter((r) => !r.deleted_at);
-const reply = (o = {}) => ({ added: 0, changed: 0, same: 0, removed: 0, notCounted: [], problems: [], more: false, capped: false, ...o });
-const PROBLEMS = [
-  { id: "P5", message: "Only payments split equally can be brought in.", row: 6, what: "Own souvenir" },
-  { id: "U2", message: "The payer isn’t one of the people on this trip.", row: 7, what: "Rail pass" },
-];
-const HAND = { id: "handexp0001", day: "pre", title: "Rail pass", amount: 221.52, currency: "CAD", paidBy: "Mo", split: ["Izzah", "Mo"], note: NOTE_X7, kind: "" };
 
 // ---------- Task 16: a picture in each person's seal ----------
 
@@ -1263,34 +1235,4 @@ test("an older picture change cannot be undone over a newer one, and only its ow
   const theirs = await call("undo", { logId: last.id }, { actor: "Izzah" });
   assert.deepEqual([theirs.ok, theirs.message], [false, "You can only change your own picture."]);
   assert.equal((await call("load")).data.people.find((p) => p.name === "Mo").photo, JPEG2);
-});
-
-// ---------- payments pulled on their own (Mo, 2026-12-03: "needs to be updated more often") ----------
-// A phone asks with { auto: true } when it opens and every so often. Within 10
-// minutes of the last pull the planner is not read again; the Fetch button and
-// the connector (no auto) always read it.
-
-
-// ---------- planner payments: loose ends from the review (2026-12-03) ----------
-
-
-// ---------- which payment needs a look (Task 22) ----------
-// The last pull's problems are kept in PAYMENT_PROBLEMS so every phone gets
-// them from load. Rows and descriptions here are made up.
-
-const NOPROB = { at: "", list: [], more: 0 };
-const badRows = (n) => {
-  const rows = [PHEAD];
-  for (let i = 1; i <= n; i++) rows.push(prow({ ...PX7, payment_id: "B" + i, description: "Bad " + i, payer: "Nadia" }));
-  return rows;
-};
-
-test("garbage in PAYMENT_PROBLEMS loads as the empty shape and never throws", async () => {
-  const call = linked();
-  for (const bad of ["{{not json", "null", "[]", '{"list":"x"}', '{"at":1,"list":[]}', '"text"', ""]) {
-    call.fake.props.PAYMENT_PROBLEMS = bad;
-    const r = await call("load");
-    assert.equal(r.ok, true, bad);
-    assert.deepEqual(r.data.paymentProblems, NOPROB, bad);
-  }
 });

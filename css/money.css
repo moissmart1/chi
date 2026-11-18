@@ -16,8 +16,6 @@
 .say .say-warn{margin-top:9px;padding-left:10px;border-left:3px solid var(--red);color:var(--text);font-weight:700;font-size:13.5px;line-height:1.35}
 /* The arrival of the register's paper slips (#un, the undo bar). */
 @keyframes roll{from{transform:translateY(.55em);opacity:0}}
-/* A count that changed while the app was open (js/fx.js rollIn): the new number rolls in. */
-.rolls{animation:roll .22s ease-out}
 
 /* History: the dark pill, as Placemat on Days. */
 .hist-btn{margin-top:12px;height:34px;padding:0 13px;border:0;border-radius:17px;background:var(--print);color:var(--stock);
@@ -180,7 +178,7 @@ button.s-wl > span{text-decoration:underline dotted rgba(19,38,31,.5) 1.5px;text
   border-top:1px solid #9aa39b;box-shadow:inset 0 1px 0 #fff}
 .nav button{position:relative;flex:1 1 0;min-width:0;height:56px;padding:8px 2px 0;border:0;border-radius:10px;background:var(--key);color:var(--key-ink);
   display:grid;justify-items:center;align-content:center;font-weight:900;
-  /* 15px, but a word like Before is about 4.2 em wide: on a narrow phone the label scales so it always sits whole inside its key. */
+  /* 15px, but a word like Money is about 4.2 em wide: on a narrow phone the label scales so it always sits whole inside its key. */
   font-size:min(15px,calc((100vw - 44px) / 21.8 - 1.67px));line-height:1.15;white-space:nowrap;
   box-shadow:var(--key-edge);
   transition:transform .08s,background .12s,color .12s,box-shadow .08s}
@@ -190,25 +188,12 @@ button.s-wl > span{text-decoration:underline dotted rgba(19,38,31,.5) 1.5px;text
 .nav button::before{content:"";position:absolute;top:6px;left:50%;width:5px;height:5px;margin-left:-2.5px;border-radius:50%;background:var(--lamp-off)}
 .nav button.is-active{background:var(--key-hi);color:var(--print)}
 .nav button.is-active::before{background:var(--red);box-shadow:0 0 6px rgba(194,54,43,.8)}
-/* The open count on the Before key: digits only, on its small line. */
-.nav .sub{display:flex;align-items:center;justify-content:center;gap:3px}
-.nav .pill{min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--key-ink);color:var(--key);
-  font-size:11px;font-weight:900;line-height:16px;text-align:center;font-variant-numeric:tabular-nums}
-/* Ring up: the red key, a little wider and taller, no lamp. */
-.nav .ring{flex:1.2 1 0;height:64px;padding:0 2px;background:var(--red);color:#fff;box-shadow:var(--paper-edge)}
+/* Ring up: the red key, a little taller, no lamp; four keys, so the row is even and Ring up is last. */
+.nav .ring{flex:1 1 0;height:64px;padding:0 2px;background:var(--red);color:#fff;box-shadow:var(--paper-edge)}
 .nav .ring::before{display:none}
-/* Four keys (no Before key): Ring up is last and the row is even. */
-.nav #beforeBtn[hidden] ~ .ring{flex:1 1 0}
 .nav .ring:active{box-shadow:var(--paper-down)}
 .nav .ring-p{display:block;font-size:22px;line-height:.9;margin-top:-3px}
 .nav .ring[hidden]{display:none}
-/* Narrow phones: the count is a badge on the key's top-right corner, so no word has to give way to it. */
-@media (max-width:379px){
-  .nav button{padding-top:12px}
-  .nav .ring{padding-top:0}
-  .nav .sub{display:block}
-  .nav .pill{position:absolute;top:1px;right:1px}
-}
 @media (max-width:340px){ .nav button small{font-size:9.5px} }
 @media (prefers-reduced-motion: reduce){ .nav button{transition:none !important} }
 .phone.reg-open .nav{opacity:0;pointer-events:none}
@@ -221,20 +206,16 @@ button.s-wl > span{text-decoration:underline dotted rgba(19,38,31,.5) 1.5px;text
     padding:calc(8px + env(safe-area-inset-top, 0px)) 8px calc(8px + env(safe-area-inset-bottom, 0px));
     background:linear-gradient(90deg,var(--bar-top),var(--bar-foot));border-top:0;border-left:1px solid #9aa39b;box-shadow:inset 1px 0 0 #fff}
   .nav button{flex:1 1 0;min-height:44px;height:auto;max-height:64px}
-  .nav .ring{flex:1.2 1 0;max-height:72px;height:auto}
-  .nav #beforeBtn[hidden] ~ .ring{flex:1 1 0}
+  .nav .ring{flex:1 1 0;max-height:72px;height:auto}
 }
 
 /* WIDE: both panes are always in view, so the rail holds only what is not a
-   pane: Before (when the list is there), Ring up and You. While Before stands
-   in the Days pane, the Days key is the way back. The register opens in the
-   Money pane, so the rail stays in reach beside it. */
+   pane: Ring up and You. The register opens in the Money pane, so the rail
+   stays in reach beside it. */
 @media (min-width:1000px) and (min-height:521px){
   .nav button[data-tab="days"],.nav button[data-tab="money"]{display:none}
-  .phone:has(#vBefore.is-active) .nav button[data-tab="days"]{display:grid}
   .nav button{flex:0 1 64px}
   .nav .ring{flex:0 1 76px}
-  .nav #beforeBtn[hidden] ~ .ring{flex:0 1 76px}
   .phone.reg-open .nav{opacity:1;pointer-events:auto}
 }
 /* A mouse: keys answer the pointer before they are pressed, on screens that are neither phone shape. */

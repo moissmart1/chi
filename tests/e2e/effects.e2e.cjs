@@ -16,7 +16,7 @@ async function daysReady(page) {
   const backend = makeBackend(WITH_PLAN, { now: DAY3 });
   await open(page, { backend, nowMs: DAY3, tab: "days" });
   await until(() => page.evaluate(() => document.querySelectorAll("#rail .tk").length > 0), "the tickets draw");
-  assert.equal(await visible(page, "#beforeBtn"), false, "no Before tab");
+  assert.equal(await page.locator("#beforeBtn").count(), 0, "no Before tab");
   return backend;
 }
 
@@ -243,7 +243,7 @@ module.exports = [
       const scan = () =>
         page.evaluate(() => {
           const bad = { backdrop: [], filter: [] };
-          const inList = (e) => e.closest("#rail, #rc, #tape, #todos");
+          const inList = (e) => e.closest("#rail, #rc, #tape");
           for (const e of document.querySelectorAll("*")) {
             for (const p of [null, "::before", "::after"]) {
               const c = getComputedStyle(e, p);

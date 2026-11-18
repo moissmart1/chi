@@ -260,15 +260,8 @@ function load_() {
     rateToday: rate.rate,
     rateSource: rate.source,
     sheetUrl: sheetUrl_(),
-    // This trip has no planner sheet: the app's planner screens (the Before
-    // tab, Planner payments) key off these and stay hidden.
-    plannerLinked: false,
-    todos: [],
-    todosPulledAt: "",
-    paymentsPulledAt: "",
     stampDefs: book.defs,
     stamps: book.stamps,
-    paymentProblems: { at: "", list: [], more: 0 },
   }, rev);
 }
 

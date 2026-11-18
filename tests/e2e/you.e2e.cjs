@@ -54,7 +54,7 @@ module.exports = [
       assert.equal(await text(page, "#you .sheet-top span"), "You");
       assert.equal(await page.evaluate(() => document.getElementById("you").contains(document.activeElement)), true, "focus moves into the sheet");
       const order = await page.evaluate(() => {
-        const ids = ["setWho", "setMail", "setSound", "setHist", "setFresh", "setDemo", "setHow", "setInstall", "setInvite", "setClaude", "setPlanner", "setSheet", "setReport"];
+        const ids = ["setWho", "setMail", "setSound", "setHist", "setFresh", "setDemo", "setHow", "setInstall", "setInvite", "setClaude", "setSheet", "setReport"];
         const all = [...document.querySelectorAll("#you *")];
         return ids.map((id) => all.indexOf(document.getElementById(id)));
       });
@@ -532,15 +532,6 @@ module.exports = [
       await until(async () => !(await page.isDisabled("#setClaude")), "the tap has finished");
       assert.equal(await clipboard(page), "before", "nothing was copied after Settings closed");
       assert.notEqual(await text(page, "#ubarT"), "Claude link copied.");
-    },
-  },
-  {
-    name: "Planner payments: no row while no planner sheet is linked",
-    async run({ page }) {
-      await ready(page);
-      await openYou(page);
-      assert.equal(await page.evaluate(() => document.getElementById("setPlanner").hidden), true, "the row is there, hidden");
-      assert.equal(await page.isHidden("#setPlanner"), true);
     },
   },
 ];

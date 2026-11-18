@@ -89,7 +89,7 @@ The backend is also an MCP server, so someone's Claude can read the trip and mak
 
 ## No planner
 
-The Japan app could pull payments and a "Before we go" list from a separate planner sheet. This trip has none, and the backend no longer has that code, so the script needs no permission beyond its own Sheet. `load` always says no planner is linked, and the phone's Before tab and Planner payments row never appear.
+The Japan app could pull payments and a "Before we go" list from a separate planner sheet. This trip has none: the backend, the phone (the Before tab, the Planner payments row) and the Sheet's schema (the `Todos` tab, `Expenses.planner_id`) no longer have any of it, so the script needs no permission beyond its own Sheet.
 
 ## Money
 
@@ -122,7 +122,6 @@ A souvenir placemat of Chicago that each person stamps by hand: one spot per tri
 - Once the trip is live, do not delete rows by hand. Deleted expenses, stops and stays and removed payments stay as rows with a date in `deleted_at` / `removed_at`; clear that cell, or use History in the app, to bring one back.
 - Text columns are stored as plain text, so a title like `=SUM(1)` or `1/2 price` stays exactly as typed.
 - To change the trip key: delete `TRIP_KEY` in Script Properties, run `setup`, then `showInvite`. Old links stop working.
-- The `Todos` tab and the Expenses `planner_id` column are left from the Japan app's planner and are unused.
 
 ### Typing into the Sheet
 

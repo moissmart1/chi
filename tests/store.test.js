@@ -2734,11 +2734,10 @@ test("a Trip tab set up for another trip: boot keeps the backend's sentence in t
   assert.equal(p.store.state.status, "ready");
 });
 
-test("no planner: load says none is linked, and the store's own pulls send nothing", async () => {
+test("no planner: the store has no planner pulls or Before list, and nothing it sends is a planner action", async () => {
   const p = phone();
   await p.store.boot();
-  assert.equal(p.store.state.plannerLinked, false);
-  assert.deepEqual(p.store.state.todos, []);
-  assert.equal(await p.store.autoPayments(), null);
+  for (const k of ["plannerLinked", "todos", "todosPulledAt", "paymentsPulledAt", "paymentProblems"]) assert.equal(k in p.store.state, false, k);
+  for (const f of ["syncPayments", "autoPayments", "syncTodos", "tickTodo", "claimTodo"]) assert.equal(f in p.store, false, f);
   assert.equal(p.net.sent.some((b) => /^(syncPayments|syncTodos|tickTodo|claimTodo)$/.test(b.action)), false);
 });

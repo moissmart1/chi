@@ -90,9 +90,9 @@ export function freshText(ms) {
   return "Up to date " + clock(ms);
 }
 
-// Who a change came through, after its sentence: " (through Claude)", " (from the planner)" or "".
+// Who a change came through, after its sentence: " (through Claude)" or "".
 export function viaText(via) {
-  return via === "claude" ? " (through Claude)" : via === "planner" ? " (from the planner)" : "";
+  return via === "claude" ? " (through Claude)" : "";
 }
 
 // A history entry as one sentence: "Izzah rang up Deep dish US$42.50".
@@ -117,15 +117,6 @@ export function changeText(c) {
       case "edit": return "Changed " + item.title + ".";
       case "delete": return "Removed " + item.title + ".";
       case "restore": return "Put back " + item.title + ".";
-      default: return "Undone.";
-    }
-  }
-  if (c.kind === "todo") {
-    switch (c.action) {
-      case "tick": return "Ticked off " + item.item + ".";
-      case "claim": return "You’re on " + item.item + ".";
-      case "takeover": return "Took over " + item.item + ".";
-      case "unclaim": return "Handed back " + item.item + ".";
       default: return "Undone.";
     }
   }

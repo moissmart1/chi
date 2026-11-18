@@ -1,6 +1,6 @@
 /* Copyright (c) 2026 moissmart1. All rights reserved. No licence is granted: do not copy, adapt or reuse this code or design, and do not use it to train or prompt an AI system to reproduce it. See LICENSE. */
 // Starts the app: takes the trip key from the invite link, builds the api and
-// the store, mounts the screens (Days, Before we go and Money) and boots.
+// the store, mounts the screens (Days and Money) and boots.
 
 import { API_URL, STORAGE_PREFIX, NEW_VERSION_MESSAGE } from "./config.js";
 import { TRIP_TZ } from "./trip.js";
@@ -20,10 +20,7 @@ import { mountAllDays } from "./views/alldays.js";
 import { mountStopSheet } from "./views/stopsheet.js";
 import { mountUndoBar } from "./views/ubar.js";
 import { mountNet } from "./views/net.js";
-import { mountTodos } from "./views/todos.js";
 import { mountStampBook } from "./views/stampbook.js";
-import { tabName } from "./todos.js";
-import { rollingCount } from "./fx.js";
 import { createUpdater } from "./update.js";
 import { isWide, onWide } from "./shape.js";
 
@@ -96,7 +93,7 @@ function withKey(storage, keyHere) {
 // others inert; with `remember` it keeps the choice (the stored tab) and the trip day
 // it was made on (the stored tabDay, by the real time, never the demo clock).
 function mountTabs(store, storage) {
-  const views = { days: document.getElementById("vDays"), before: document.getElementById("vBefore"), money: document.getElementById("vMoney") };
+  const views = { days: document.getElementById("vDays"), money: document.getElementById("vMoney") };
   const nav = document.getElementById("nav");
   const read = (k) => {
     try {
@@ -111,12 +108,10 @@ function mountTabs(store, storage) {
   let settled = false; // the opening screen has been decided with the trip known
   const shownHooks = []; // called with the tab's name each time a tab is shown
 
-  // A computer's window (WIDE) shows Money and Days side by side, Before over
-  // the Days pane while it is the tab. `tab` stays what a phone would show,
-  // so a narrower window goes back to it.
+  // A computer's window (WIDE) shows Money and Days side by side. `tab`
+  // stays what a phone would show, so a narrower window goes back to it.
   let wide = isWide();
-  let cameFrom = null; // WIDE: the tab Before was opened from
-  const shows = (name, t) => (wide ? name === "money" || name === (t === "before" ? "before" : "days") : name === t);
+  const shows = (name, t) => (wide ? true : name === t);
 
   function showTab(t, remember = true) {
     const changed = t !== tab;
@@ -124,8 +119,8 @@ function mountTabs(store, storage) {
     for (const b of nav.querySelectorAll("button[data-tab]")) {
       const on = b.dataset.tab === t;
       b.classList.toggle("is-active", on);
-      // WIDE hides the Days and Money keys (the panes are both there): only Before can be the current key.
-      if (on && !(wide && b.dataset.tab !== "before")) b.setAttribute("aria-current", "page");
+      // WIDE hides the Days and Money keys (the panes are both there): no key is the current one.
+      if (on && !wide) b.setAttribute("aria-current", "page");
       else b.removeAttribute("aria-current");
     }
     for (const [name, view] of Object.entries(views)) {
@@ -135,9 +130,8 @@ function mountTabs(store, storage) {
     }
     // The hooks are for arriving: a tap on the tab already showing leaves it as it is.
     if (changed) for (const f of shownHooks) f(t);
-    // The Before tab comes and goes with the list: it is never what the app opens on.
     // In WIDE there is nothing to choose between, so what is remembered is left as it was.
-    if (!remember || wide || t === "before") return;
+    if (!remember || wide) return;
     const trip = store.state.trip;
     try {
       storage.setItem(STORAGE_PREFIX + "tab", t);
@@ -176,11 +170,6 @@ function mountTabs(store, storage) {
     const b = ev.target.closest("button[data-tab]");
     if (!b) return;
     settled = true;
-    // WIDE: Before takes the Days pane and the Days key brings back the tab it
-    // was opened from (Money's pane never went away), so a narrower window
-    // shows what it showed before.
-    if (wide && b.dataset.tab === "before" && tab !== "before") cameFrom = tab;
-    else if (wide && b.dataset.tab === "days" && tab === "before") return showTab(cameFrom || "days");
     showTab(b.dataset.tab);
   });
   return { showTab, tab: () => tab, onShown: (f) => shownHooks.push(f) };
@@ -271,7 +260,7 @@ function start() {
   const you = mountYou(phone, store, {
     demo: clock,
     getKey: () => storage.getItem(STORAGE_PREFIX + "key"),
-    screen: () => (tabs.tab() === "days" ? "Days" : tabs.tab() === "before" ? "Before we go" : "Money"),
+    screen: () => (tabs.tab() === "days" ? "Days" : "Money"),
     // Try another day: Days follows the demo clock from the picked day's
     // 07:00. Nothing is stored, so a reload ends it.
     onDemo: (date) => {
@@ -318,48 +307,6 @@ function start() {
     you.close(false);
     closeDaySheets();
   };
-  // "Before we go": the bookings and prep from the planner, on its own tab.
-  // The tab is in the bar only while the list says so; if it goes while it is
-  // showing, the person lands on Days.
-  const beforeBtn = document.getElementById("beforeBtn");
-  const beforeN = document.getElementById("beforeN");
-  const pillRoll = rollingCount(beforeN); // a change after the count has settled rolls in
-  const todos = mountTodos(document.getElementById("vBefore"), store, {
-    clock,
-    onState: ({ show, open }) => {
-      // A hidden button cannot keep focus: if it has it, Days takes it.
-      const hadFocus = !show && document.activeElement === beforeBtn;
-      beforeBtn.hidden = !show;
-      // Five keys: Ring up is the middle one (before Money). Four: it is last. The DOM order is the visual and focus order.
-      const ringBtn = document.getElementById("ring");
-      const navEl = document.getElementById("nav");
-      const moneyBtn = navEl.querySelector('button[data-tab="money"]');
-      const wantBefore = show ? moneyBtn : null;
-      if (ringBtn && moneyBtn && (show ? ringBtn.nextElementSibling !== moneyBtn : ringBtn.nextElementSibling !== null)) {
-        const had = document.activeElement === ringBtn;
-        navEl.insertBefore(ringBtn, wantBefore);
-        if (had) ringBtn.focus({ preventScroll: true });
-      }
-      beforeN.hidden = !show || open < 1;
-      beforeN.textContent = open > 0 ? String(open) : "";
-      // A change while the app is open rolls the new number in; the first count shown, and loading, do not.
-      if (show && open > 0) pillRoll.set(open);
-      else pillRoll.reset();
-      beforeBtn.setAttribute("aria-label", tabName(open));
-      if (!show && tabs.tab() === "before") tabs.showTab("days", false);
-      if (hadFocus) {
-        // The Days key, or in WIDE (where it is hidden) the rail's first key that shows.
-        const keys = [...document.querySelectorAll("#nav button")];
-        const daysBtn = document.querySelector('#nav button[data-tab="days"]');
-        const to = daysBtn && daysBtn.getClientRects().length ? daysBtn : keys.find((k) => k.getClientRects().length);
-        if (to) to.focus({ preventScroll: true });
-      }
-    },
-  });
-  // Showing the tab folds the done group and fetches quietly if the list is an hour old.
-  tabs.onShown((t) => {
-    if (t === "before") todos.shown();
-  });
   const days = mountDays(document.getElementById("vDays"), store, {
     clock,
     onStay: (id) => {
@@ -448,10 +395,8 @@ function start() {
     });
     return inFlight;
   };
-  // Each look also asks for the planner's payments, at most every 10 minutes (store.autoPayments).
   const look = () => {
     check();
-    store.autoPayments();
   };
   const startChecking = () => {
     if (connected && !checking) checking = setInterval(look, CHECK_MS);
@@ -474,10 +419,7 @@ function start() {
     store.flush().then(check);
   });
 
-  // Once started, the list is fetched if it is an hour old.
   if (connected) store.boot().then(() => {
-    todos.wake();
-    store.autoPayments();
     // History is fetched quietly, so it opens at once (it then keeps itself up to date).
     if (store.state.status === "ready") store.loadHistory();
   });

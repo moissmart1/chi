@@ -2,8 +2,7 @@
 // Settings (the "You" sheet): who you are, your e-Transfer address, your
 // picture (it shows in your seal; js/picture.js shrinks it first), the stamp
 // sound, History, when the figures were last fetched, how this works,
-// the invite link, the Claude link, planner payments (only once a planner
-// sheet is linked), the Google Sheet and "Report a problem".
+// the invite link, the Claude link, the Google Sheet and "Report a problem".
 // One sheet, no sub-pages.
 //
 // mountYou(root, store, { onHistory(), onDemo(date), getKey(), screen() }) -> { open(), close(restoreFocus), isOpen() }
@@ -37,13 +36,11 @@ const COPY = "Copy";
 const COPIED = "Copied ✓";
 const NOT_COPIED = "Not copied";
 const GETTING = "Getting…";
-const FETCH = "Fetch";
 const FETCHING = "Fetching…";
 const FETCHED = "Up to date ✓";
 const NO_SIGNAL_WORD = "No signal";
 const SAID_MS = 2000; // how long a row says it worked
 const FAILED_MS = 3000; // how long a row says it did not
-const PULLED_MS = 4000; // how long Planner payments says what came in
 
 const MARKUP = `
 <div class="sheet-top"><span>You</span><button type="button" id="youDone">Done</button></div>
@@ -76,8 +73,6 @@ const MARKUP = `
   <button type="button" class="set-r" id="setInstall" aria-expanded="false"><span>Add to Home Screen<small>Opens like an app, full screen</small><span class="set-steps" id="setInstallHow" hidden><span>1. Tap Share, then Add to Home Screen.</span><span>2. If it asks for your trip link, paste: it’s already copied.</span></span></span><b>Set up</b></button>
   <button type="button" class="set-r" id="setInvite"><span>Invite link<small id="setInviteFor">For the others. Keep it between you.</small></span><b id="setInviteV" aria-live="polite" data-w="Not copied">Copy</b></button>
   <button type="button" class="set-r" id="setClaude"><span>Claude link<small>Lets your Claude add stops and expenses. Keep it to yourself.</small></span><b id="setClaudeV" aria-live="polite" data-w="Not copied">Copy</b></button>
-  <button type="button" class="set-r" id="setPlanner" hidden><span>Planner payments<small>Brings in what’s been paid from the planner sheet</small></span><b id="setPlannerV" aria-live="polite" data-w="Needs a look">Fetch</b></button>
-  <div class="set-pp" id="setPlannerP" hidden></div>
   <a class="set-r" id="setSheet" target="_blank" rel="noopener" hidden><span>Google Sheet<small>Where all of this is kept</small></span><b>Open ↗</b></a>
   <button type="button" class="set-r" id="setReport"><span>Report a problem<small>Copies a short note to paste to Mo or Claude</small></span><b id="setReportV" aria-live="polite" data-w="Not copied">Copy</b></button>
 </div>`;
@@ -102,27 +97,6 @@ export function reportText({ me, screen, version, when, sentences, setAside = []
   if (sizes.length) lines.push("This phone’s screen:", ...sizes.map((x) => "  " + x)); // not "- ": those lines are the changes
   lines.push("What went wrong: ");
   return lines.join("\n");
-}
-
-// The few words the Planner payments row shows after a pull, from what
-// store.syncPayments resolved with (null: it did not go through). The full
-// sentence goes to the notice.
-export function plannerWord(r) {
-  if (!r) return "Not fetched";
-  if (r.added) return "Added " + r.added;
-  if (r.changed) return "Changed " + r.changed;
-  if (Array.isArray(r.problems) && r.problems.length) return "Needs a look";
-  return "Nothing new";
-}
-
-// The first line of a payment that was not brought in: "P011 · row 14 · Ryokan
-// deposit". Each part is left out when the backend had none.
-export function problemHead({ id, row, what } = {}) {
-  const parts = [];
-  if (typeof id === "string" && id !== "") parts.push(id);
-  if (typeof row === "number" && Number.isFinite(row)) parts.push("row " + row);
-  if (typeof what === "string" && what !== "") parts.push(what);
-  return parts.length ? parts.join(" · ") : "A payment row";
 }
 
 // Who the invite link is for, as the Invite link row says it: the one other
@@ -175,8 +149,6 @@ export function mountYou(root, store, { onHistory = () => {}, onDemo = () => {},
   const demoV = $("setDemoV");
   const demoDays = $("setDemoDays");
   const sheetLink = $("setSheet");
-  const planner = $("setPlanner");
-  const plannerP = $("setPlannerP");
   const report = $("setReport");
   const install = $("setInstall");
   const installHow = $("setInstallHow");
@@ -278,33 +250,6 @@ export function mountYou(root, store, { onHistory = () => {}, onDemo = () => {},
     picRow.classList.toggle("has-pic", has);
   }
 
-  // The payments the last pull could not bring in, under the Planner payments
-  // row. Planner text is untrusted: textContent only. Redrawn only when the
-  // list changes, so a screen reader is not read it again on every store change.
-  let shownProblems = null;
-  function drawProblems(s) {
-    const pp = s.paymentProblems && typeof s.paymentProblems === "object" ? s.paymentProblems : {};
-    const list = Array.isArray(pp.list) ? pp.list : [];
-    const more = Number.isFinite(pp.more) && pp.more > 0 ? pp.more : 0;
-    const show = s.plannerLinked === true && list.length > 0;
-    const key = show ? JSON.stringify([pp.at, list, more]) : "";
-    plannerP.hidden = !show;
-    if (key === shownProblems) return;
-    shownProblems = key;
-    plannerP.replaceChildren();
-    if (!show) return;
-    const head = el("div", "set-pp-h", "Not brought in from the planner");
-    const at = Date.parse(pp.at || "");
-    if (Number.isFinite(at)) head.append(el("small", "", whenText(at)));
-    plannerP.append(head);
-    for (const p of list) {
-      const one = el("div", "set-pp-i");
-      one.append(el("div", "set-pp-w", problemHead(p)), el("div", "set-pp-m", typeof p.message === "string" ? p.message : ""));
-      plannerP.append(one);
-    }
-    if (more) plannerP.append(el("div", "set-pp-more", "and " + more + " more"));
-  }
-
   const freshWord = (s) => (s.loadedAt === null ? NOT_YET : freshText(s.loadedAt));
 
   function render(s) {
@@ -316,8 +261,6 @@ export function mountYou(root, store, { onHistory = () => {}, onDemo = () => {},
     drawDemoDays(s);
     setDemo(!demoDays.hidden);
     if (!fetching && !saying.has(fresh)) fresh.textContent = freshWord(s);
-    planner.hidden = s.plannerLinked !== true;
-    drawProblems(s);
     const url = typeof s.sheetUrl === "string" && /^https?:\/\//i.test(s.sheetUrl) ? s.sheetUrl : "";
     sheetLink.hidden = !url;
     if (url) sheetLink.href = url;
@@ -571,29 +514,6 @@ export function mountYou(root, store, { onHistory = () => {}, onDemo = () => {},
     }
   }
   claude.addEventListener("click", copyClaude);
-
-  // ---- planner payments ----
-  // One pull at a time: while it runs the row says so and a tap does nothing.
-  // The store says what came in (or why not) on the undo bar; the row says
-  // it in a few words for a moment (plannerWord), then goes back to Fetch.
-  const plannerV = $("setPlannerV");
-  let pulling = false;
-  planner.addEventListener("click", async () => {
-    if (pulling) return;
-    pulling = true;
-    planner.disabled = true;
-    say(plannerV, FETCHING);
-    let r = null;
-    try {
-      r = await store.syncPayments();
-    } catch {
-      r = null;
-    } finally {
-      pulling = false;
-      planner.disabled = false;
-    }
-    say(plannerV, plannerWord(r), PULLED_MS, () => FETCH);
-  });
 
   // ---- Add to Home Screen ----
   // An app on the iPhone Home Screen keeps storage of its own, without the key

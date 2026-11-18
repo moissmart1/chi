@@ -204,7 +204,7 @@ i{font-style:normal}
   /* BETWEEN: one square column of at most 560 px, the window's height, the bar across its foot as on a phone. */
   .phone{width:min(100%,560px);height:100%;border-radius:0;box-shadow:none}
   /* A ring in the app's ink, on the paper as on the counter. */
-  :is(.tk,.slip,.rc,.ln,.ubar,.un,.how,.bw-card,.tape,.lcd,.sheet.stay,.sheet.stop,.bk-leg) :focus-visible{outline-color:var(--print)}
+  :is(.tk,.slip,.rc,.ln,.ubar,.un,.how,.tape,.lcd,.sheet.stay,.sheet.stop,.bk-leg) :focus-visible{outline-color:var(--print)}
 }
 
 /* WIDE: the diner's counter. One block, centred, the window's height, at
@@ -219,7 +219,7 @@ i{font-style:normal}
   .phone{width:min(100%, calc(1000px + var(--rail)))}
   .views{right:var(--rail)}
   .view{padding-bottom:28px}
-  #vDays,#vBefore{right:50%}
+  #vDays{right:50%}
   #vMoney{left:50%}
   /* A tear line between the two panes, as the check's stub. */
   .views::after{content:"";position:absolute;top:0;bottom:0;left:50%;border-left:2px dashed rgba(19,38,31,.3);pointer-events:none}

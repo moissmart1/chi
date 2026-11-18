@@ -340,7 +340,7 @@ function mcpGetHistory_(args, who) {
         // The sentence the app's History shows (js/format.js historySentence).
         // An e-Transfer change is kept, as its sentence only: the address is
         // never in a sentence (summarize in Pure.js).
-        var by = e.via === "claude" ? " (through Claude)" : e.via === "planner" ? " (from the planner)" : "";
+        var by = e.via === "claude" ? " (through Claude)" : "";
         return { id: e.id, when: e.at, who: e.who, sentence: e.who + " " + e.summary + by, can_undo: e.canUndo };
       }),
     },

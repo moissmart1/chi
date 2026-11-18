@@ -174,7 +174,7 @@ test("no planner: the script asks only for its own Sheet and outside fetches, wi
   }
 });
 
-test("no planner: the old planner actions are unknown to the backend, and load says no planner is linked", async () => {
+test("no planner: the old planner actions are unknown to the backend, load carries no planner fields, and the Sheet has no Todos tab or planner_id", async () => {
   const { createFakeBackend } = require("./fake-backend.cjs");
   const fake = createFakeBackend();
   for (const action of ["linkPlanner", "syncPayments", "syncTodos", "tickTodo", "claimTodo"]) {
@@ -182,5 +182,8 @@ test("no planner: the old planner actions are unknown to the backend, and load s
     assert.deepEqual([r.ok, r.error], [false, "bad_input"], action);
   }
   const d = (await fake({ key: "test-key", actor: "Mo", action: "load", args: {} })).data;
-  assert.deepEqual([d.plannerLinked, d.todos, d.todosPulledAt, d.paymentsPulledAt, d.paymentProblems], [false, [], "", "", { at: "", list: [], more: 0 }]);
+  for (const k of ["plannerLinked", "todos", "todosPulledAt", "paymentsPulledAt", "paymentProblems"]) assert.equal(k in d, false, k);
+  const P = require("../backend/Pure.js");
+  assert.equal("Todos" in P.TABS, false);
+  assert.equal(P.TABS.Expenses.includes("planner_id"), false);
 });
