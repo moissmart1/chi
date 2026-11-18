@@ -89,8 +89,8 @@ test("get_trip and explain_debt agree with the app's own maths", () => {
   assert.equal(why.from.paid, dollars(w.paid));
 });
 
-test("add_expense defaults: everyone shares it, and the day is today in Japan", () => {
-  const fake = createFakeBackend({}, { clock: () => "2026-12-12T04:20:00.000Z" }); // 13:20 in Japan
+test("add_expense defaults: everyone shares it, and the day is today in Chicago", () => {
+  const fake = createFakeBackend({}, { clock: () => "2026-12-12T19:20:00.000Z" }); // 13:20 in Chicago
   const e = body(fake.mcp(rpc("tools/call", { name: "add_expense", arguments: { title: "Ramen", amount: 3000, currency: "JPY", paid_by: "Mo" } }), T)).expense;
   assert.deepEqual([e.day, e.split.length, e.addedBy], ["2026-12-12", 3, "Mo"]);
 });
@@ -302,10 +302,10 @@ test("change_stop writes only the columns that changed (a hand-typed cell elsewh
 test("add_expense's default day follows the register: pre before the trip, today during, the last day after", () => {
   const at = (iso) => createFakeBackend({}, { clock: () => iso });
   const day = (fake) => ok(fake, "add_expense", { title: "x", amount: 100, currency: "JPY", paid_by: "Mo" }).expense.day;
-  assert.equal(day(at("2026-12-09T14:59:00.000Z")), "pre"); // 23:59 on the 9th in Japan
-  assert.equal(day(at("2026-12-09T15:00:00.000Z")), "2026-12-10"); // midnight in Japan
-  assert.equal(day(at("2026-12-20T14:59:00.000Z")), "2026-12-20");
-  assert.equal(day(at("2026-12-21T03:00:00.000Z")), "2026-12-20");
+  assert.equal(day(at("2026-12-10T05:59:00.000Z")), "pre"); // 23:59 on the 9th in Chicago
+  assert.equal(day(at("2026-12-10T06:00:00.000Z")), "2026-12-10"); // midnight in Chicago
+  assert.equal(day(at("2026-12-21T05:59:00.000Z")), "2026-12-20");
+  assert.equal(day(at("2026-12-21T18:00:00.000Z")), "2026-12-20");
 });
 
 test("undo through the connector obeys the app's rules", async () => {

@@ -25,6 +25,9 @@ function setup() {
   seedIfEmpty_("Trip", seed.Trip);
   seedIfEmpty_("People", seed.People);
   seedIfEmpty_("Days", seed.Days);
+  // A Trip tab typed for another trip is said now, not found later by the app.
+  var wrong = tripMismatch(tripInfo_());
+  if (wrong) throw new Error(wrong);
 
   var plain = ss.getSheetByName("Sheet1");
   if (plain && plain.getLastRow() === 0 && plain.getLastColumn() === 0 && ss.getSheets().length > 1) ss.deleteSheet(plain);

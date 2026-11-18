@@ -39,7 +39,7 @@ test("load returns the trip, three people with Simplify on and no email, no expe
   assert.equal(r.ok, true);
   assert.equal(r.rev, 0);
   const d = r.data;
-  assert.deepEqual(d.trip, { name: "Japan 2026", start: "2026-12-10", end: "2026-12-20", home: "CAD", currency: "JPY", tz: "Asia/Tokyo" });
+  assert.deepEqual(d.trip, { name: "Japan 2026", start: "2026-12-10", end: "2026-12-20", home: "CAD", currency: "USD", tz: "America/Chicago" });
   assert.equal(d.people.length, 3);
   assert.deepEqual(d.people.map((p) => p.name), ALL);
   for (const p of d.people) {
@@ -55,6 +55,19 @@ test("load returns the trip, three people with Simplify on and no email, no expe
   assert.equal(d.days.length, 11);
   assert.equal(d.days[0].date, "2026-12-10");
   assert.equal(d.days[10].date, "2026-12-20");
+});
+
+test("load refuses a Trip tab whose zone or currency is not the app's, saying what to put back", async () => {
+  const fake = createFakeBackend();
+  const call = (action) => fake({ key: "test-key", actor: "Mo", via: "app", action, args: {} });
+  fake.tables.Trip.find((r) => r.key === "currency").value = "JPY";
+  const r = await call("load");
+  assert.equal(r.ok, false);
+  assert.equal(r.error, "wrong_trip");
+  assert.equal(r.message, "The Trip tab doesn’t match this app (currency is JPY, not USD). This app’s zone and currencies are fixed in its code: put the Trip tab back as it was.");
+  assert.equal("data" in r, false);
+  fake.tables.Trip.find((r) => r.key === "currency").value = "USD";
+  assert.equal((await call("load")).ok, true);
 });
 
 test("a wrong or missing key is refused with bad_key and no data", async () => {

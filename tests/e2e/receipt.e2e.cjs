@@ -279,6 +279,17 @@ module.exports = [
     },
   },
   {
+    name: "a Sheet set up for another trip: the gate says what is wrong, and nothing is painted",
+    async run({ page }) {
+      const backend = makeBackend(SEED, { now: NOON12 });
+      backend.fake.tables.Trip.find((r) => r.key === "currency").value = "JPY";
+      await open(page, { backend, nowMs: NOON12 });
+      await expectText(page, "#gate p", "The Trip tab doesn’t match this app (currency is JPY, not USD). This app’s zone and currencies are fixed in its code: put the Trip tab back as it was.");
+      assert.equal(await visible(page, "#keyPaste"), false);
+      assert.equal(await rowCount(page), 0);
+    },
+  },
+  {
     name: "first open: which one are you, then how this works",
     async run({ page }) {
       await open(page, { seed: SEED, nowMs: NOON12, key: null, me: null, how: null, hash: "#k=test-key" });

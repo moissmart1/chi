@@ -285,11 +285,16 @@ function tripInfo_() {
 }
 
 function load_() {
+  // A Trip tab whose zone or currencies differ from the app's would show every
+  // figure and day wrongly: refused, with what to put back.
+  var trip = tripInfo_();
+  var wrong = tripMismatch(trip);
+  if (wrong) return err_("wrong_trip", wrong);
   var rev = rev_();
   var rate = getRateInfo_();
   var book = stampBook_();
   return ok_({
-    trip: tripInfo_(),
+    trip: trip,
     people: peopleRows_().map(personFromRow),
     days: readTable_("Days").filter(function (r) { return cellDate_(r.date) !== ""; }).map(dayFromRow),
     stops: readTable_("Stops").filter(function (r) { return cellText_(r.id) !== ""; }).map(stopFromRow),

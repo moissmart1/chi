@@ -3036,3 +3036,15 @@ test("everyone's stamps come with a load; another phone's press arrives on the n
   await p.store.checkRev();
   assert.deepEqual(p.store.state.stamps.map((s) => [s.def, s.who]), [["d1", "Ajen"]]);
 });
+
+test("a Trip tab set up for another trip: boot keeps the backend's sentence in tripProblem; a good load clears it", async () => {
+  const p = phone();
+  p.fake.tables.Trip.find((r) => r.key === "tz").value = "Asia/Tokyo";
+  await p.store.boot();
+  assert.equal(p.store.state.tripProblem, "The Trip tab doesn’t match this app (tz is Asia/Tokyo, not America/Chicago). This app’s zone and currencies are fixed in its code: put the Trip tab back as it was.");
+  assert.equal(p.store.state.status, "error");
+  p.fake.tables.Trip.find((r) => r.key === "tz").value = "America/Chicago";
+  await p.store.boot();
+  assert.equal(p.store.state.tripProblem, null);
+  assert.equal(p.store.state.status, "ready");
+});

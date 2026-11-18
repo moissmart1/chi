@@ -1,6 +1,34 @@
 // Pure logic. Plain global functions so Apps Script can run it as-is;
 // the footer lets Node tests load the same file.
 
+// The trip's fixed facts. The phone's copy is js/trip.js; tests/trip.test.js
+// fails when the two differ. The Sheet's Trip tab has tz, home and currency
+// too: they must agree with these (tripMismatch), and editing them never
+// changes the app's zone or currencies.
+var TRIP_TZ_ = "America/Chicago";
+// Chicago is UTC−6 for the whole trip (no clock change from Dec 26 to Jan 1):
+// the stamp windows use this fixed offset, as the phone does.
+var TRIP_UTC_OFFSET_MS_ = -6 * 3600000;
+var TRIP_ZONE_WORD_ = "Chicago time";
+var HOME_CURRENCY_ = "CAD";
+var TRIP_CURRENCY_ = "USD";
+var TRIP_FIRST_DAY_ = "2026-12-26";
+var TRIP_LAST_DAY_ = "2027-01-01";
+
+// The Trip tab ({ key: value }) against the constants above: null when tz,
+// home and currency agree (an empty cell agrees), else one sentence saying
+// which disagree, for setup's log and load's refusal.
+function tripMismatch(trip) {
+  var want = { tz: TRIP_TZ_, home: HOME_CURRENCY_, currency: TRIP_CURRENCY_ };
+  var wrong = [];
+  Object.keys(want).forEach(function (k) {
+    var v = trip && trip[k] !== undefined && trip[k] !== null ? String(trip[k]).trim() : "";
+    if (v !== "" && v !== want[k]) wrong.push(k + " is " + v + ", not " + want[k]);
+  });
+  if (!wrong.length) return null;
+  return "The Trip tab doesn\u2019t match this app (" + wrong.join("; ") + "). This app\u2019s zone and currencies are fixed in its code: put the Trip tab back as it was.";
+}
+
 var TABS = {
   Trip: ["key", "value"],
   People: ["name", "initials", "order", "etransfer", "simplify", "email", "photo"],
@@ -595,7 +623,7 @@ function setupSeedRows() {
   return {
     Trip: [
       { key: "name", value: "Japan 2026" }, { key: "start", value: "2026-12-10" }, { key: "end", value: "2026-12-20" },
-      { key: "home", value: "CAD" }, { key: "currency", value: "JPY" }, { key: "tz", value: "Asia/Tokyo" },
+      { key: "home", value: HOME_CURRENCY_ }, { key: "currency", value: TRIP_CURRENCY_ }, { key: "tz", value: TRIP_TZ_ },
     ],
     People: [
       { name: "Mo", initials: "MO", order: 1, etransfer: "", simplify: true, email: "", photo: "" },
@@ -1240,5 +1268,5 @@ function changeLogRow(rows, fields) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { TABS, KINDS, isTextColumn, sanitizeCell, unsanitizeCell, rowToObj, objToRow, validateExpense, validatePayment, validatePersonPatch, validateStop, validateStay, validateDayPatch, DAY_PATCH_KEYS, safeUrl, safeHttpsUrl, dayLabel, stopFromRow, stopToRow, stayFromRow, stayToRow, dayFromRow, dayToRow, expenseFromRow, paymentFromRow, personFromRow, cellDate_, cellStamp_, summarize, undoTarget, canUndo, entryFromRow, parseLogRow, expenseToRow, paymentToRow, setupSeedRows, shouldFetchRate, rateSource, sameKey, paymentsFromRows, expenseFromPayment, paymentIdOf, todosFromRows, bookByDay, todoFromRow, isBooked, colLetter, changeLogRow, shortDay_, stampWindow, pressRefusal, stampDefFromRow, stampFromRow, stampSnap_, plannerWhat_ };
+  module.exports = { TABS, KINDS, tripMismatch, TRIP_TZ_, TRIP_UTC_OFFSET_MS_, TRIP_ZONE_WORD_, HOME_CURRENCY_, TRIP_CURRENCY_, TRIP_FIRST_DAY_, TRIP_LAST_DAY_, isTextColumn, sanitizeCell, unsanitizeCell, rowToObj, objToRow, validateExpense, validatePayment, validatePersonPatch, validateStop, validateStay, validateDayPatch, DAY_PATCH_KEYS, safeUrl, safeHttpsUrl, dayLabel, stopFromRow, stopToRow, stayFromRow, stayToRow, dayFromRow, dayToRow, expenseFromRow, paymentFromRow, personFromRow, cellDate_, cellStamp_, summarize, undoTarget, canUndo, entryFromRow, parseLogRow, expenseToRow, paymentToRow, setupSeedRows, shouldFetchRate, rateSource, sameKey, paymentsFromRows, expenseFromPayment, paymentIdOf, todosFromRows, bookByDay, todoFromRow, isBooked, colLetter, changeLogRow, shortDay_, stampWindow, pressRefusal, stampDefFromRow, stampFromRow, stampSnap_, plannerWhat_ };
 }

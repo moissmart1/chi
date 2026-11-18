@@ -168,7 +168,7 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
   const state = {
     status: "boot", online: true, rev: null, me: null,
     trip: null, people: [], days: [], stops: [], stays: [], expenses: [], payments: [], rateToday: null, rateSource: null, sheetUrl: "", plannerLinked: false, todos: [], todosPulledAt: "", paymentsPulledAt: "", stampDefs: [], stamps: [], paymentProblems: { at: "", list: [], more: 0 },
-    loadedAt: null, seenAt: null, lastChange: null, notice: null, setAside: [], keyRefused: false,
+    loadedAt: null, seenAt: null, lastChange: null, notice: null, setAside: [], keyRefused: false, tripProblem: null,
     history: { entries: [], more: false, loading: false, error: null },
   };
 
@@ -389,6 +389,9 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
     try {
       r = await call("load", {});
     } catch (err) {
+      // A Sheet set up for another trip (its zone or currencies are not this
+      // app's): the backend's sentence is shown on the gate, nothing else.
+      if (err && err.code === "wrong_trip") state.tripProblem = err.message;
       if (state.status !== "nokey") state.status = base ? "ready" : "error";
       changed();
       return false;
@@ -396,6 +399,7 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
     if (reloadAfter !== null && mine > reloadAfter) reloadAfter = null;
     if (mine < appliedLoad) return true; // a newer load already landed
     appliedLoad = mine;
+    state.tripProblem = null;
     const data = copy(r.data);
     base = data;
     for (const s of settled) if (s.seq > startSeq) putBase(s.kind, copy(s.item));

@@ -206,7 +206,7 @@ export function mountFirst(root, store, { connected = true, storage = defaultSto
 
   function render(s) {
     const keyless = connected && s.status === "nokey";
-    const blocked = !connected ? NOT_CONNECTED : keyless ? (s.keyRefused ? KEY_REFUSED : NO_KEY) : null;
+    const blocked = !connected ? NOT_CONNECTED : keyless ? (s.keyRefused ? KEY_REFUSED : NO_KEY) : s.tripProblem || null;
     gate.hidden = !blocked;
     if (blocked) gateText.textContent = blocked;
     paste.hidden = !keyless;
