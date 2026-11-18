@@ -157,8 +157,13 @@ const errors = [];
 try {
   const page = await browser.newPage({ viewport: { width: 393, height: 852 } });
   page.on("pageerror", (e) => errors.push(String(e.message || e)));
-  await page.goto(SITE + "?k=" + env.CHI_KEY, { waitUntil: "load", timeout: 45000 });
+  // The key goes in the fragment, as an invite link has it: a fragment is never
+  // sent to the site's server (a query string is, and until 2026-11-18 this
+  // step put the key in one). The app reads it there, so this is also the only
+  // way the check really signs in: it waits for the trip's own day count.
+  await page.goto(SITE + "#k=" + encodeURIComponent(env.CHI_KEY), { waitUntil: "load", timeout: 45000 });
   await page.waitForSelector("#phone", { timeout: 20000 });
+  await page.waitForSelector("#dayCount", { state: "visible", timeout: 30000 });
   await sleep(4000);
 } catch (e) {
   errors.push("the page did not start: " + String(e.message || e).split("\n")[0].replace(env.CHI_KEY, "(key)"));
