@@ -9,7 +9,7 @@ test("reportText names who, which screen, the version, the time and the newest h
   const sentences = ["Mo rang up Ramen US$12.00", "Izzah deleted Taxi US$30.00"];
   const t = reportText({ ...base, sentences });
   assert.deepEqual(t.split("\n"), [
-    "MAT: a problem to look at",
+    "Wendy’s: a problem to look at",
     "Who: Izzah",
     "Screen: Money",
     "App version: 7",

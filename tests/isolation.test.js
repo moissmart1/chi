@@ -62,7 +62,12 @@ test("the manifest is this app's own", () => {
   assert.equal(m.id, "./?app=chi");
   assert.equal(m.start_url, "./");
   assert.equal(m.scope, "./");
-  assert.equal(m.short_name, "CHI");
+  assert.equal(m.short_name, "Wendy’s");
+  assert.equal(m.name, "Wendy’s Chicago 2026");
   const html = fs.readFileSync(path.join(ROOT, "index.html"), "utf8");
-  assert.match(html, /<title>CHI<\/title>/);
+  assert.match(html, /<title>Wendy’s<\/title>/);
+  assert.match(html, /<meta name="apple-mobile-web-app-title" content="Wendy’s">/);
+  // The name is a person's word, with a typographic apostrophe; never "CHI" where a person sees it.
+  assert.doesNotMatch(html, /\bCHI\b/);
+  assert.match(fs.readFileSync(path.join(ROOT, "sw.js"), "utf8"), /<title>Wendy’s<\/title>/);
 });

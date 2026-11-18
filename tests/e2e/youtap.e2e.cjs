@@ -133,7 +133,7 @@ module.exports = [
       assert.equal(await page.getAttribute("#setReportV", "aria-live"), "polite");
       await page.click("#setReport");
       await expectText(page, "#setReportV", "Copied ✓");
-      assert.match(await clipboard(page), /^MAT: a problem to look at\nWho: Mo\n/);
+      assert.match(await clipboard(page), /^Wendy’s: a problem to look at\nWho: Mo\n/);
       await advance(page, backend, 2000);
       await expectText(page, "#setReportV", "Copy");
 

@@ -307,7 +307,7 @@ module.exports = [
       assert.equal(m.start_url, ORIGIN + "/#k=test-key");
       assert.equal(m.scope, ORIGIN + "/");
       assert.equal(m.id, ORIGIN + "/?app=chi");
-      assert.equal(m.name, "CHI Chicago 2026");
+      assert.equal(m.name, "Wendy’s Chicago 2026");
       assert.ok(m.icons.length > 0 && m.icons.every((i) => i.src.startsWith(ORIGIN + "/icons/")), "absolute icon URLs");
       assert.equal(await page.evaluate(() => document.body.innerText.includes("test-key")), false, "the key is not drawn");
 

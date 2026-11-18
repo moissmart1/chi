@@ -94,7 +94,7 @@ function el(tag, cls, text) {
 // history could not be fetched. setAside: the Sheet rows the app left out
 // (store.state.setAside). The trip key is never part of it.
 export function reportText({ me, screen, version, when, sentences, setAside = [], sizes = [] }) {
-  const lines = ["MAT: a problem to look at", "Who: " + (me || "nobody chosen"), "Screen: " + screen, "App version: " + version, "Time: " + when];
+  const lines = ["Wendy’s: a problem to look at", "Who: " + (me || "nobody chosen"), "Screen: " + screen, "App version: " + version, "Time: " + when];
   if (setAside.length) lines.push("Lines in the Sheet the app can’t read: " + setAside.map((x) => x.id).join(", "));
   if (sentences === null || sentences === undefined) lines.push("Latest changes: " + HISTORY_UNAVAILABLE);
   else if (!sentences.length) lines.push("Latest changes: none yet");

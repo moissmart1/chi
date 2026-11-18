@@ -45,7 +45,7 @@ function frontPage() {
     });
   });
 }
-const isThisApp = (body) => typeof body === "string" && body.includes("<title>CHI</title>");
+const isThisApp = (body) => typeof body === "string" && body.includes("<title>Wendy’s</title>");
 
 async function startServer() {
   const already = await frontPage();
