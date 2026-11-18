@@ -1,0 +1,3 @@
+#!/bin/sh
+# Turned on by `npm run hooks`. See scripts/prepush.mjs.
+exec node "$(dirname "$0")/../prepush.mjs" "$@"

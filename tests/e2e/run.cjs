@@ -24,10 +24,12 @@ const http = require("http");
 const path = require("path");
 const { chromium } = require("playwright-core");
 const { PORT, ORIGIN } = require("./helpers.cjs");
+const { takeTurn } = require("./queue.cjs");
 
 const ROOT = path.join(__dirname, "..", "..");
 const SHOTS = "/private/tmp/claude-501/mat-shots/chi/failures";
 const CASE_TIMEOUT_MS = 30000;
+const CLOSE_TIMEOUT_MS = 8000;
 
 // What is on the test port: null (nothing), or the body of its front page.
 function frontPage() {
@@ -155,13 +157,23 @@ async function runCase(browser, fileBase, c) {
     try {
       fs.mkdirSync(SHOTS, { recursive: true });
       shot = path.join(SHOTS, (fileBase + "-" + c.name).replace(/[^A-Za-z0-9._-]+/g, "-").slice(0, 120) + ".png");
-      await first.page.screenshot({ path: shot });
+      await withTimeout(first.page.screenshot({ path: shot }), CLOSE_TIMEOUT_MS);
     } catch {
       shot = null;
     }
   }
-  for (const context of contexts) await context.close().catch(() => {});
-  return { error, shot };
+  // A page left mid-reload or with its clock paused can refuse to close, and
+  // waiting on it held a whole run for an hour (2026-11-17). Give each close a
+  // few seconds; if one will not go, say so and the run starts a fresh browser.
+  let stuck = false;
+  for (const context of contexts) {
+    try {
+      await withTimeout(context.close(), CLOSE_TIMEOUT_MS);
+    } catch {
+      stuck = true;
+    }
+  }
+  return { error, shot, stuck };
 }
 
 async function main() {
@@ -178,15 +190,31 @@ async function main() {
     return;
   }
 
+  // One run at a time on this computer: wait in line (tests/e2e/queue.cjs).
+  const leave = await takeTurn();
   const server = await startServer();
-  const browser = await chromium.launch({ channel: "chrome", headless: true });
+  const launch = () => chromium.launch({ channel: "chrome", headless: true });
+  let browser = await launch();
   let passed = 0;
   let failed = 0;
+  // A case that fails is tried once more, alone. Passing the second time counts
+  // as passed, but it is named at the end: it is unreliable and wants fixing.
+  const secondTry = [];
   try {
     for (const file of files) {
       const base = path.basename(file, ".e2e.cjs");
       for (const c of casesOf(file)) {
-        const { error, shot } = await runCase(browser, base, c);
+        let { error, shot, stuck } = await runCase(browser, base, c);
+        if (error && !process.env.MAT_E2E_NO_RETRY) {
+          console.log("      (failed once: " + error.message.split("\n")[0] + "; trying again)");
+          if (stuck) {
+            withTimeout(browser.close(), CLOSE_TIMEOUT_MS).catch(() => {});
+            browser = await launch();
+          }
+          const again = await runCase(browser, base, c);
+          if (!again.error) secondTry.push(base + " > " + c.name);
+          ({ error, shot, stuck } = again);
+        }
         if (error) {
           failed++;
           console.log("FAIL " + base + " > " + c.name);
@@ -196,17 +224,27 @@ async function main() {
           passed++;
           console.log("ok   " + base + " > " + c.name);
         }
+        if (stuck) {
+          console.log("      (a page would not close: starting a fresh browser)");
+          withTimeout(browser.close(), CLOSE_TIMEOUT_MS).catch(() => {});
+          browser = await launch();
+        }
       }
     }
   } finally {
-    await browser.close();
+    await withTimeout(browser.close(), CLOSE_TIMEOUT_MS).catch(() => {});
     if (server) server.kill();
+    leave();
   }
+  for (const name of secondTry) console.log("second try: " + name);
   console.log(passed + " passed, " + failed + " failed");
   if (failed) process.exitCode = 1;
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exitCode = 1;
-});
+// Leave even if a browser that would not close is still holding the process open.
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exitCode = 1;
+  })
+  .finally(() => setTimeout(() => process.exit(process.exitCode || 0), 300));

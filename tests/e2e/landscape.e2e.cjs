@@ -436,13 +436,18 @@ cases.push({
       bar.setProperty("bottom", "auto", "important");
     });
     const row = '#rail .pg[data-date="' + D12 + '"] .r[data-id="' + DINNER + '"]';
-    await page.click(row + " .r-b");
+    // Getting to the stop sheet is not what this case is about, so the two taps on the way are
+    // given to the page directly. A real pointer click on a row that is still opening is
+    // retried by the browser driver with other scroll alignments, one of which slides the day
+    // strip to the next day; the row is then never reached.
+    const tap = (sel) => page.dispatchEvent(sel, "click");
+    await tap(row + " .r-b");
     await until(() => page.evaluate((sel) => document.querySelector(sel).classList.contains("is-open"), row), "the stop opens");
     await until(() => page.evaluate((sel) => {
       const e = document.querySelector(sel + " .r-edit");
       return !!e && e.getBoundingClientRect().height > 0;
     }, row), "Edit shows");
-    await page.click(row + " .r-edit");
+    await tap(row + " .r-edit");
     await waitOpen(page, "stop");
     await page.evaluate(() => globalThis.__matTest.store.notify("A notice."));
     await until(() => page.evaluate(() => !document.getElementById("ubar").hidden), "the notice shows");

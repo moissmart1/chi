@@ -10,7 +10,7 @@ const vm = require("node:vm");
 
 const CODE = fs.readFileSync(path.join(__dirname, "..", "backend", "Code.js"), "utf8");
 
-function world({ handle, mcp } = {}) {
+function world({ handle, mcp, stamp } = {}) {
   const seen = { handle: [], mcp: [] };
   const ctx = vm.createContext({
     ContentService: {
@@ -20,6 +20,7 @@ function world({ handle, mcp } = {}) {
     handle_: (body) => { seen.handle.push(body); return handle(body); },
     mcp_: (msg, params) => { seen.mcp.push([msg, params]); return mcp(msg, params); },
   });
+  if (stamp !== undefined) vm.runInContext("var BACKEND_STAMP = " + JSON.stringify(stamp) + ";", ctx);
   vm.runInContext(CODE, ctx, { filename: "Code.js" });
   ctx.seen = seen;
   return ctx;
@@ -45,7 +46,8 @@ test("doPost answers a body that is not JSON-RPC exactly as before the connector
 
   const boom = world({ handle: () => { throw new Error("kaput"); } });
   assert.equal(boom.doPost(post("{}")).text, '{"ok":false,"error":"server","message":"Something went wrong on our side. Try again. (kaput)"}');
-  assert.equal(world({}).doGet().text, '{"ok":true,"rev":0,"data":{"name":"mat"}}');
+  assert.equal(world({}).doGet().text, '{"ok":true,"rev":0,"data":{"name":"mat","stamp":""}}');
+  assert.equal(world({ stamp: "0a1b2c3d4e" }).doGet().text, '{"ok":true,"rev":0,"data":{"name":"mat","stamp":"0a1b2c3d4e"}}');
 });
 
 test("doPost hands a JSON-RPC 2.0 body to mcp_ with the query parameters, never to handle_", () => {

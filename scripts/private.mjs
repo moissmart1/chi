@@ -1,0 +1,59 @@
+// Rebuilds the private list the scan checks against (~/.config/chi/private.txt)
+// from the live trip: the key, people's addresses, the Sheet's id, lodging
+// names and addresses, and every booking or picture link. Run it after the
+// trip's Sheet gains new places or links:
+//
+//   npm run private
+//
+// Prints how many strings it kept, never the strings.
+
+import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { PRIVATE_DIR, call, privateEnv, readConfig } from "./release-lib.mjs";
+
+if (!readConfig().apiUrl) {
+  console.error("private: this app is not connected to a backend yet (API_URL in js/config.js is empty), so there is no live trip to build the private list from.");
+  process.exit(1);
+}
+
+const env = privateEnv();
+if (!env.CHI_KEY) {
+  console.error("private: no CHI_KEY (set it, or put CHI_KEY=... in " + join(PRIVATE_DIR, "env") + ")");
+  process.exit(1);
+}
+
+const res = await call(readConfig().apiUrl, env.CHI_KEY, "load");
+if (!res || res.ok !== true) {
+  console.error("private: the live trip did not answer (" + ((res && res.error) || "no answer") + ")");
+  process.exit(1);
+}
+
+const d = res.data;
+const out = new Set();
+const add = (s, min = 6) => {
+  if (typeof s === "string" && s.trim().length >= min) out.add(s.trim());
+};
+
+add(env.CHI_KEY);
+for (const m of String(d.sheetUrl || "").matchAll(/[A-Za-z0-9_-]{25,}/g)) add(m[0]);
+for (const p of d.people || []) {
+  add(p.etransfer);
+  add(p.photo, 20);
+}
+for (const s of d.stays || []) {
+  add(s.name, 8);
+  add(s.nameJp, 4);
+  add(s.addressJp, 6);
+  add(s.link, 12);
+  add(s.photo, 20);
+}
+for (const s of d.stops || []) {
+  add(s.link, 12);
+  add(s.photo, 20);
+}
+
+mkdirSync(PRIVATE_DIR, { recursive: true, mode: 0o700 });
+const file = join(PRIVATE_DIR, "private.txt");
+writeFileSync(file, [...out].join("\n") + "\n", { mode: 0o600 });
+chmodSync(file, 0o600);
+console.log("private: kept " + out.size + " strings in " + file);

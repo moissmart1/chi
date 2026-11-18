@@ -4,7 +4,7 @@ function json_(obj) {
 }
 
 function doGet() {
-  return json_({ ok: true, rev: 0, data: { name: "mat" } });
+  return json_({ ok: true, rev: 0, data: { name: "mat", stamp: typeof BACKEND_STAMP === "string" ? BACKEND_STAMP : "" } });
 }
 
 // One endpoint: the body is { key, actor, via, action, args }; Actions.js does
