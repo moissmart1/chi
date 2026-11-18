@@ -6,12 +6,12 @@
 const assert = require("node:assert/strict");
 const P = require("../../backend/Pure.js");
 // Three people (Mo, Izzah, Sam): the slip here has more than one debt.
-const { THREE: SEED, NOON12, open, advance, until, text, expectText, visible } = require("./helpers.cjs");
+const { THREE: SEED, NOON28, open, advance, until, text, expectText, visible } = require("./helpers.cjs");
 
 // ---- small tools for this file ----
 
 const NAMES = ["Mo", "Izzah", "Sam"];
-const TODAY = "Sat Dec 12"; // NOON12, on Chicago time
+const TODAY = "Mon Dec 28"; // NOON28, on Chicago time
 const money = () => import("../../js/money.js");
 const fmt = () => import("../../js/format.js");
 
@@ -41,7 +41,7 @@ const asDrawn = async (page, seed) => {
 const otherPhone = (backend, actor, action, args) => backend.handle({ key: "test-key", actor, via: "app", action, args });
 
 async function ready(page, opts = {}) {
-  const backend = await open(page, { seed: SEED, nowMs: NOON12, ...opts });
+  const backend = await open(page, { seed: SEED, nowMs: NOON28, ...opts });
   await until(() => page.evaluate(() => document.querySelectorAll("#rc .rc-row").length > 0), "the receipt draws");
   return backend;
 }
@@ -204,7 +204,7 @@ module.exports = [
       await arm(page, "Izzah>Mo");
       assert.equal(await page.inputValue("#stampAmt"), "224.72");
       // Another phone: Mo paid $30 that Izzah and Mo share, so Izzah owes $15 more.
-      const lunch = { id: "otherexp001", day: "2026-12-12", title: "Lunch", amount: 30, currency: "CAD", paidBy: "Mo", split: ["Mo", "Izzah"], splitMode: "equal", splitVals: [], note: "", kind: "" };
+      const lunch = { id: "otherexp001", day: "2026-12-28", title: "Lunch", amount: 30, currency: "CAD", paidBy: "Mo", split: ["Mo", "Izzah"], splitMode: "equal", splitVals: [], note: "", kind: "" };
       await otherPhone(backend, "Sam", "addExpense", { expense: lunch });
       await page.evaluate(() => globalThis.__matTest.store.checkRev());
       await until(async () => (await page.inputValue("#stampAmt")) === "239.72", "the field follows the new amount");
@@ -295,7 +295,7 @@ module.exports = [
   {
     name: "four stamps fold to the newest two under '2 earlier payments'",
     async run({ page }) {
-      const at = (min) => new Date(NOON12 - min * 60 * 1000).toISOString();
+      const at = (min) => new Date(NOON28 - min * 60 * 1000).toISOString();
       const payments = [10, 20, 30, 40].map((cad, i) => pay({ n: i + 1, cad, at: at(240 - i * 60) }));
       await ready(page, { seed: { ...SEED, payments } });
       await until(async () => (await paidRows(page)).length === 2, "two stamped rows show");
@@ -322,9 +322,9 @@ module.exports = [
   {
     name: "a stamp made by someone else since you looked counts in #histN; your own does not",
     async run({ page }) {
-      const half = new Date(NOON12 - 30 * 60 * 1000).toISOString();
+      const half = new Date(NOON28 - 30 * 60 * 1000).toISOString();
       const payments = [pay({ n: 1, cad: 10, by: "Izzah", at: half }), pay({ n: 2, cad: 5, from: "Sam", by: "Mo", at: half })];
-      await ready(page, { seed: { ...SEED, payments }, storage: { "chi.seen": String(NOON12 - 60 * 60 * 1000) } });
+      await ready(page, { seed: { ...SEED, payments }, storage: { "chi.seen": String(NOON28 - 60 * 60 * 1000) } });
       await expectText(page, "#histN", "1");
       assert.ok(await visible(page, "#histN"));
     },
@@ -454,7 +454,7 @@ module.exports = [
     },
   },
   {
-    name: "on a phone in Tokyo a stamp made at 13:20 on Sat Dec 12 in Chicago reads 'Paid Sun Dec 13.' (the phone's own day)",
+    name: "on a phone in Tokyo a stamp made at 13:20 on Mon Dec 28 in Chicago reads 'Paid Tue Dec 29.' (the phone's own day)",
     timezoneId: "Asia/Tokyo",
     async run({ page }) {
       const backend = await ready(page);
@@ -463,10 +463,10 @@ module.exports = [
       await page.click(spot("Izzah>Mo"));
       await until(async () => (await paidRows(page)).length === 1, "a stamped row");
       await idle(page);
-      // 13:20 Sat Dec 12 in Chicago is 04:20 Sun Dec 13 in Tokyo.
+      // 13:20 Mon Dec 28 in Chicago is 04:20 Tue Dec 29 in Tokyo.
       const [paid] = await paidRows(page);
-      assert.equal(paid.sub, "Paid Sun Dec 13. Nothing more to send.");
-      assert.equal(new Date(saved(backend)[0].stampedAt).getTime(), NOON12);
+      assert.equal(paid.sub, "Paid Tue Dec 29. Nothing more to send.");
+      assert.equal(new Date(saved(backend)[0].stampedAt).getTime(), NOON28);
     },
   },
 ];

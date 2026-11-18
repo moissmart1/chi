@@ -4,7 +4,7 @@
 const assert = require("node:assert/strict");
 const { WITH_PLAN, open, until, expectText, visible } = require("./helpers.cjs");
 
-const NOV15 = Date.parse("2026-11-15T12:00:00-06:00");
+const NOV15 = Date.parse("2026-12-01T12:00:00-06:00");
 
 const isActive = (page, sel) => page.evaluate((s) => document.querySelector(s).classList.contains("is-active"), sel);
 const isInert = (page, sel) => page.evaluate((s) => document.querySelector(s).inert === true, sel);
@@ -70,7 +70,7 @@ module.exports = [
       assert.equal(await isActive(page, '[data-tab="money"]'), true);
       await until(() => visible(page, "#say"), "the sentence shows");
       assert.equal(await stored(page, "chi.tab"), "money");
-      assert.equal(await stored(page, "chi.tabDay"), "2026-12-12");
+      assert.equal(await stored(page, "chi.tabDay"), "2026-12-28");
       await page.click('[data-tab="days"]');
       await showing(page, "#vDays");
       await until(() => visible(page, "#rail"), "the rail shows");
@@ -80,21 +80,21 @@ module.exports = [
   {
     name: "returns to the last screen",
     async run({ page }) {
-      await open(page, { seed: WITH_PLAN, tab: null, storage: { "chi.tab": "money", "chi.tabDay": "2026-12-12" } });
+      await open(page, { seed: WITH_PLAN, tab: null, storage: { "chi.tab": "money", "chi.tabDay": "2026-12-28" } });
       await showing(page, "#vMoney");
     },
   },
   {
     name: "a new day during the trip opens on the ticket",
     async run({ page }) {
-      await open(page, { seed: WITH_PLAN, tab: null, storage: { "chi.tab": "money", "chi.tabDay": "2026-12-11" } });
+      await open(page, { seed: WITH_PLAN, tab: null, storage: { "chi.tab": "money", "chi.tabDay": "2026-12-27" } });
       await showing(page, "#vDays");
     },
   },
   {
     name: "before the trip the last screen wins",
     async run({ page }) {
-      await open(page, { seed: WITH_PLAN, nowMs: NOV15, tab: null, storage: { "chi.tab": "money", "chi.tabDay": "2026-11-14" } });
+      await open(page, { seed: WITH_PLAN, nowMs: NOV15, tab: null, storage: { "chi.tab": "money", "chi.tabDay": "2026-11-30" } });
       await showing(page, "#vMoney");
     },
   },
@@ -105,7 +105,7 @@ module.exports = [
       await showing(page, "#vDays");
       await page.click("#ring");
       await until(() => page.evaluate(() => document.getElementById("reg").classList.contains("is-open")), "the register opens");
-      await expectText(page, "#xDay", "Sat 12");
+      await expectText(page, "#xDay", "Mon 28");
     },
   },
   {

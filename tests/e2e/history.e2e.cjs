@@ -3,7 +3,7 @@
 
 const assert = require("node:assert/strict");
 const P = require("../../backend/Pure.js");
-const { SEED, NOON12, makeBackend, open, advance, until, text, expectText, visible } = require("./helpers.cjs");
+const { SEED, NOON28, makeBackend, open, advance, until, text, expectText, visible } = require("./helpers.cjs");
 
 // ---- small tools for this file ----
 
@@ -51,7 +51,7 @@ const waitReceiptHas = (page, title, yes = true) =>
   until(async () => (await receiptTitles(page)).includes(title) === yes, "receipt " + (yes ? "has " : "no longer has ") + title);
 
 async function ready(page, opts = {}) {
-  const backend = await open(page, { seed: SEED, nowMs: NOON12, ...opts });
+  const backend = await open(page, { seed: SEED, nowMs: NOON28, ...opts });
   await until(() => page.evaluate(() => document.querySelectorAll("#rc .rc-row").length > 0), "the receipt draws");
   // The app fetches History once, quietly, after it starts: wait until that has landed.
   if (opts.bootHistory !== false) {
@@ -95,7 +95,7 @@ module.exports = [
     name: "History opens from its button, titled 履歴 History, with … until the ten entries arrive, newest first under day headings",
     async run({ page }) {
       // Held from before the app starts, so nothing is on the phone yet when History opens.
-      const backend = makeBackend(SEED, { now: NOON12 });
+      const backend = makeBackend(SEED, { now: NOON28 });
       const release = hold(backend, "history");
       await ready(page, { backend, bootHistory: false });
       assert.equal(await isOpen(page, "hist"), false);
@@ -114,8 +114,8 @@ module.exports = [
       assert.equal(histRequests(backend), 2, "the one after starting and the one for this opening");
       const ids = rows.map((r) => Number(r.id));
       assert.deepEqual(ids, ids.slice().sort((a, b) => b - a), "newest first");
-      // Every seeded change was made on 2026-11-20 in Chicago: one heading, in English beside the Japanese date.
-      assert.deepEqual(await days(page), ["Fri Nov 20 | 11月20日(金)"]);
+      // Every seeded change was made on 2026-12-06 in Chicago: one heading, in English beside the Japanese date.
+      assert.deepEqual(await days(page), ["Sun Dec 6 | 12月6日(日)"]);
       assert.equal(rows[0].time, "09:00");
 
       assert.ok(rowFor(rows, "Izzah deleted Konbini snacks US$7.80"), "the delete reads as a sentence");
@@ -127,39 +127,39 @@ module.exports = [
     name: "an entry made through Claude ends with (through Claude); days are the day in Chicago, newest day first",
     async run({ page }) {
       const backend = await ready(page);
-      // 01:00 on Dec 13 in Chicago.
-      backend.now = Date.parse("2026-12-13T07:00:00Z");
+      // 01:00 on Dec 29 in Chicago.
+      backend.now = Date.parse("2026-12-29T07:00:00Z");
       await otherPhone(backend, "updateExpense", { id: idOfSeed("Shibuya dinner"), patch: { title: "Shibuya dinner out" } }, { via: "claude" });
       await openTape(page, 11);
       const rows = await tape(page);
       assert.equal(rows[0].sentence, "Izzah renamed Shibuya dinner to Shibuya dinner out (through Claude)");
       assert.equal(rows[0].time, "01:00");
       assert.ok(!rows[1].sentence.includes("through Claude"));
-      assert.deepEqual(await days(page), ["Sun Dec 13 | 12月13日(日)", "Fri Nov 20 | 11月20日(金)"]);
+      assert.deepEqual(await days(page), ["Tue Dec 29 | 12月29日(火)", "Sun Dec 6 | 12月6日(日)"]);
     },
   },
   {
-    name: "on a phone in Toronto a change made at 23:20 Chicago time (00:20 Saturday in Toronto) reads 23:20 under Fri Dec 11, here and in the line sheet",
+    name: "on a phone in Toronto a change made at 23:20 Chicago time (00:20 Saturday in Toronto) reads 23:20 under Sun Dec 27, here and in the line sheet",
     timezoneId: "America/Toronto",
     async run({ page }) {
       const backend = await ready(page);
       // History and the line sheet go by the trip's clock, not the phone's.
-      backend.now = Date.parse("2026-12-11T23:20:00-06:00");
-      await otherPhone(backend, "addExpense", { expense: { ...SHARED(1), id: "torontoline1", title: "Tempura", day: "2026-12-11", paidBy: "Izzah", splitMode: "equal", splitVals: [], note: "", kind: "" } });
+      backend.now = Date.parse("2026-12-27T23:20:00-06:00");
+      await otherPhone(backend, "addExpense", { expense: { ...SHARED(1), id: "torontoline1", title: "Tempura", day: "2026-12-27", paidBy: "Izzah", splitMode: "equal", splitVals: [], note: "", kind: "" } });
       await page.evaluate(() => globalThis.__matTest.store.refresh());
       await openTape(page, 11);
       const rows = await tape(page);
       assert.equal(rows[0].sentence, "Izzah rang up Tempura US$101.00");
       assert.equal(rows[0].time, "23:20");
-      assert.deepEqual(await days(page), ["Fri Dec 11 | 12月11日(金)", "Fri Nov 20 | 11月20日(金)"]);
+      assert.deepEqual(await days(page), ["Sun Dec 27 | 12月27日(日)", "Sun Dec 6 | 12月6日(日)"]);
       await page.click("#histDone");
       await waitHistClosed(page);
 
       const id = await page.evaluate(() => [...document.querySelectorAll("#rc .rc-row")].find((r) => r.querySelector(".rc-t").firstChild.textContent === "Tempura").dataset.id);
       await page.click('#rc .rc-row[data-id="' + id + '"]');
       await until(() => isOpen(page, "line"), "the line sheet opens");
-      await expectText(page, "#lnBy", "Rung up by Izzah, Fri Dec 11");
-      await until(() => page.evaluate(() => /Fri Dec 11/.test(document.getElementById("lnLog").textContent)), "its history date");
+      await expectText(page, "#lnBy", "Rung up by Izzah, Sun Dec 27");
+      await until(() => page.evaluate(() => /Sun Dec 27/.test(document.getElementById("lnLog").textContent)), "its history date");
     },
   },
   {
@@ -267,7 +267,7 @@ module.exports = [
     async run({ page }) {
       const expenses = [];
       for (let i = 0; i < 230; i++) expenses.push(SHARED(i));
-      await open(page, { seed: { expenses, payments: [] }, nowMs: NOON12 });
+      await open(page, { seed: { expenses, payments: [] }, nowMs: NOON28 });
       await until(() => page.evaluate(() => document.querySelectorAll("#rc .rc-row").length > 0), "the receipt draws");
       await openTape(page, 200);
       assert.equal(await text(page, "#histMore"), "Show older");
@@ -280,7 +280,7 @@ module.exports = [
   {
     name: "opening History clears the new count and remembers when it was seen",
     async run({ page }) {
-      const seen = Date.parse("2026-12-01T00:00:00Z");
+      const seen = Date.parse("2026-12-17T00:00:00Z");
       const backend = await ready(page, { storage: { "chi.seen": String(seen) } });
       await otherPhone(backend, "addExpense", { expense: { ...SHARED(1), id: "freshline001", title: "Tempura", paidBy: "Izzah", splitMode: "equal", splitVals: [], note: "", kind: "" } });
       await page.evaluate(() => globalThis.__matTest.store.refresh());
@@ -288,7 +288,7 @@ module.exports = [
       assert.equal(await visible(page, "#histN"), true);
       await openTape(page);
       await until(async () => !(await visible(page, "#histN")), "the count clears");
-      assert.equal(await page.evaluate(() => localStorage.getItem("chi.seen")), String(NOON12));
+      assert.equal(await page.evaluate(() => localStorage.getItem("chi.seen")), String(NOON28));
     },
   },
   {

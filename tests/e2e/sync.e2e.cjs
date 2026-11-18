@@ -3,7 +3,7 @@
 // no signal, and the service worker's offline shell.
 
 const assert = require("node:assert/strict");
-const { SEED, NOON12, open, advance, until, text, expectText, visible } = require("./helpers.cjs");
+const { SEED, NOON28, open, advance, until, text, expectText, visible } = require("./helpers.cjs");
 
 // ---- small tools for this file ----
 
@@ -54,18 +54,18 @@ const comeBack = (page) => page.evaluate(() => document.dispatchEvent(new Event(
 const signalBack = (page) => page.evaluate(() => window.dispatchEvent(new Event("online")));
 
 async function ready(page, opts = {}) {
-  const backend = await open(page, { seed: SEED, nowMs: NOON12, ...opts });
+  const backend = await open(page, { seed: SEED, nowMs: NOON28, ...opts });
   await waitRows(page, 8);
   return backend;
 }
 
 // Two phones on one backend: Mo on A, Izzah on B, who last looked a minute
-// before NOON12 (so lines rung up now are new to him).
+// before NOON28 (so lines rung up now are new to him).
 async function twoPhones(ctx) {
   const a = ctx.page;
   const backend = await ready(a);
   const b = await ctx.newPhone();
-  await ready(b, { backend, me: "Izzah", storage: { "chi.seen": String(NOON12 - 60000) } });
+  await ready(b, { backend, me: "Izzah", storage: { "chi.seen": String(NOON28 - 60000) } });
   return { a, b, backend };
 }
 
@@ -176,9 +176,9 @@ module.exports = [
     name: "no signal on a phone that has never loaded anything: #net says just No signal.",
     async run({ page }) {
       const { makeBackend } = require("./helpers.cjs");
-      const backend = makeBackend(SEED, { now: NOON12 });
+      const backend = makeBackend(SEED, { now: NOON28 });
       backend.failWith = "network";
-      await open(page, { backend, nowMs: NOON12 });
+      await open(page, { backend, nowMs: NOON28 });
       await expectText(page, "#net", "No signal.");
       assert.equal(await rowCount(page), 0);
     },

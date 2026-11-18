@@ -1,22 +1,22 @@
 /* Copyright (c) 2026 moissmart1. All rights reserved. No licence is granted: do not copy, adapt or reuse this code or design, and do not use it to train or prompt an AI system to reproduce it. See LICENSE. */
-// The stamp book on the phone: the way in from Days, twelve rings, pressing,
+// The stamp book on the phone: the way in from Days, eight rings, pressing,
 // the refusals, holding a stamp up, History and undo, an older Sheet with no
 // stamp tabs, a phone on another time zone, and no sideways scroll. The
 // fake backend runs the real backend code. Every name and drawing here is
-// invented; the dates are the fixture trip's own (the eleven days of the seed).
+// invented; the dates are the fixture trip's own (the seven days of the seed).
 
 const assert = require("node:assert/strict");
-const { WITH_PLAN, NOON12, makeBackend, open, advance, until, text, expectText, visible } = require("./helpers.cjs");
+const { WITH_PLAN, NOON28, makeBackend, open, advance, until, text, expectText, visible } = require("./helpers.cjs");
 
 const HOUR = 3600000;
 const KEY = "test-key";
-const FIRST = Date.parse("2026-12-10T00:00:00-06:00");
-// An arbitrary spread of drawings and inks over the eleven days (invented).
-const MOTIF = ["record", "sake", "tower", "lamp", "books", "snow", "mountain", "lantern", "onsen", "temple", "plane"];
+const FIRST = Date.parse("2026-12-26T00:00:00-06:00");
+// An arbitrary spread of drawings and inks over the seven days (invented).
+const MOTIF = ["record", "sake", "tower", "lamp", "books", "snow", "mountain"];
 const INK = ["ai", "shu", "matsu"];
-const NAME = ["Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Golf", "Hotel", "India", "Juliet", "Kilo"];
+const NAME = ["Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Golf"];
 
-// Eleven day stamps (s01 on Dec 10, s03 on Dec 12 ...) and the issue stamp.
+// Seven day stamps (s01 on Dec 26, s03 on Dec 28 ... s07 on Jan 1) and the issue stamp.
 const DEFS = [
   ...MOTIF.map((motif, i) => ({
     id: "s" + String(i + 1).padStart(2, "0"),
@@ -30,15 +30,15 @@ const DEFS = [
   })),
   { id: "iss", date: "", name_ja: "発行", name_en: "Issued", place: "", motif: "crest", ink: "shu", shape: "round" },
 ];
-const TODAY = "s03"; // Dec 12, the fixture clock's day
+const TODAY = "s03"; // Dec 28, the fixture clock's day
 
-async function backendWith(defs = DEFS, seed = WITH_PLAN, nowMs = NOON12) {
+async function backendWith(defs = DEFS, seed = WITH_PLAN, nowMs = NOON28) {
   const backend = makeBackend(seed, { now: nowMs });
   for (const d of defs) backend.fake.tables.StampDefs.push({ ...d });
   return backend;
 }
 
-async function ready(page, { defs = DEFS, backend, nowMs = NOON12, seed } = {}) {
+async function ready(page, { defs = DEFS, backend, nowMs = NOON28, seed } = {}) {
   const be = backend || (await backendWith(defs, seed || WITH_PLAN, nowMs));
   await open(page, { backend: be, nowMs, tab: "days" });
   await until(() => page.evaluate(() => document.querySelectorAll("#rail .tk").length > 0), "the tickets draw");
@@ -96,17 +96,17 @@ module.exports = [
     },
   },
   {
-    name: "the Days bar button reads the count and opens the book: twelve cells, today's ring open, the rest not",
+    name: "the Days bar button reads the count and opens the book: eight cells, today's ring open, the rest not",
     async run({ page }) {
       await ready(page);
       await until(() => visible(page, "#stampBtn"), "the stamp button shows");
-      assert.equal(await page.getAttribute("#stampBtn", "aria-label"), "Stamp book, 0 of 12");
-      assert.equal(await text(page, "#stampBtn"), "0/12");
+      assert.equal(await page.getAttribute("#stampBtn", "aria-label"), "Stamp book, 0 of 8");
+      assert.equal(await text(page, "#stampBtn"), "0/8");
       assert.equal((await page.locator("#stampBtn").boundingBox()).height >= 44, true, "a 44 px tap target");
       await openBook(page);
-      assert.equal(await page.locator("#bookGrid .bk-cell").count(), 12);
-      assert.equal(await text(page, "#bookN"), "0 of 12");
-      assert.equal(await text(page, "#bookSpan"), "2026.12.10 → 12.20");
+      assert.equal(await page.locator("#bookGrid .bk-cell").count(), 8);
+      assert.equal(await text(page, "#bookN"), "0 of 8");
+      assert.equal(await text(page, "#bookSpan"), "2026.12.26 → 01.01");
       assert.equal(await text(page, ".bk-rule"), "One stamp a day, pressed on the day, in the place.");
       assert.equal(await text(page, ".bk-title"), "スタンプ帳 Stamp book");
       assert.equal(await text(page, ".bk-h b"), "MAT 記念スタンプ帳");
@@ -115,8 +115,8 @@ module.exports = [
       assert.match(await cellClass(page, "s04"), /is-soon/);
       assert.match(await cellClass(page, "iss"), /is-open/, "the issue stamp is open from the start");
       // an open ring: the day number over PRESS; a ring not open: the day number over the weekday
-      assert.equal(await text(page, cell(TODAY) + " .bk-ghost"), "12PRESS");
-      assert.equal(await text(page, cell("s04") + " .bk-ghost"), "13Sun");
+      assert.equal(await text(page, cell(TODAY) + " .bk-ghost"), "28PRESS");
+      assert.equal(await text(page, cell("s04") + " .bk-ghost"), "29Tue");
       assert.equal(await stampsDrawn(page), 0, "nothing is drawn until it is pressed");
       assert.equal(await page.locator("#bookGrid .bk-cell").evaluateAll((els) => els.every((e) => e.getBoundingClientRect().height >= 44)), true);
     },
@@ -133,8 +133,8 @@ module.exports = [
       await idle(page);
       assert.equal(press(be).length, 1, "one pressStamp for two taps");
       assert.equal(await text(page, "#bookSay"), "Stamped.");
-      assert.equal(await text(page, "#bookN"), "1 of 12");
-      assert.equal(await page.getAttribute("#stampBtn", "aria-label"), "Stamp book, 1 of 12");
+      assert.equal(await text(page, "#bookN"), "1 of 8");
+      assert.equal(await page.getAttribute("#stampBtn", "aria-label"), "Stamp book, 1 of 8");
       assert.equal(await isOpen(page), true);
       assert.equal(await page.locator("#book .bk-look").count(), 0, "the second tap did not hold the stamp up");
       assert.match(await cellClass(page, TODAY), /is-have/);
@@ -146,11 +146,11 @@ module.exports = [
       // one row, one History line, in the backend
       assert.equal(be.fake.tables.Stamps.length, 1);
       assert.deepEqual([be.fake.tables.Stamps[0].id, be.fake.tables.Stamps[0].who], [TODAY + "|Mo", "Mo"]);
-      assert.equal(be.fake.tables.Log.filter((r) => r.kind === "stamp").map((r) => r.summary)[0], "stamped Dec 12");
+      assert.equal(be.fake.tables.Log.filter((r) => r.kind === "stamp").map((r) => r.summary)[0], "stamped Dec 28");
       // it stays across a reload
       await page.reload();
       await until(() => visible(page, "#stampBtn"), "the button again");
-      assert.equal(await text(page, "#stampBtn"), "1/12");
+      assert.equal(await text(page, "#stampBtn"), "1/8");
     },
   },
   {
@@ -159,21 +159,21 @@ module.exports = [
       const be = await ready(page);
       await openBook(page);
       await page.click(cell("s04"));
-      assert.equal(await text(page, "#bookSay"), "Dec 13 opens on the day.");
+      assert.equal(await text(page, "#bookSay"), "Dec 29 opens on the day.");
       await until(() => page.evaluate((s) => document.querySelector(s).classList.contains("nope"), cell("s04")), "the small shake");
       await page.click(cell("s02"));
-      assert.equal(await text(page, "#bookSay"), "Dec 11 has closed.");
+      assert.equal(await text(page, "#bookSay"), "Dec 27 has closed.");
       assert.equal(press(be).length, 0);
       assert.equal(await stampsDrawn(page), 0);
       assert.equal(be.fake.tables.Stamps.length, 0);
-      assert.equal(await text(page, "#bookN"), "0 of 12");
+      assert.equal(await text(page, "#bookN"), "0 of 8");
     },
   },
   {
     name: "the issue stamp can be pressed before any day (and shows the book's year); the Today row then follows it",
     async run({ page }) {
-      // Dec 1 in Chicago: before the trip
-      const nowMs = Date.parse("2026-12-01T12:00:00-06:00");
+      // Dec 17 in Chicago: before the trip
+      const nowMs = Date.parse("2026-12-17T12:00:00-06:00");
       const be = await ready(page, { nowMs });
       await openBook(page);
       assert.equal(await text(page, "#bookTH"), "発行 The book");
@@ -191,7 +191,7 @@ module.exports = [
     name: "a held stamp opens on tap, shows its name, place, day and time, and closes on tap and on Escape with focus back on its ring",
     async run({ page }) {
       const be = await backendWith();
-      assert.equal((await be.fake({ key: KEY, actor: "Mo", action: "pressStamp", args: { def: TODAY, at: new Date(NOON12 - HOUR).toISOString(), seed: 4242 } })).ok, true);
+      assert.equal((await be.fake({ key: KEY, actor: "Mo", action: "pressStamp", args: { def: TODAY, at: new Date(NOON28 - HOUR).toISOString(), seed: 4242 } })).ok, true);
       await ready(page, { backend: be });
       await openBook(page);
       assert.equal(await stampsDrawn(page), 1);
@@ -200,7 +200,7 @@ module.exports = [
       const t = await text(page, ".bk-lt");
       assert.match(t, /試3 Testville Charlie/);
       assert.match(t, /Place Charlie/);
-      assert.match(t, /Sat Dec 12 · stamped 12:20/);
+      assert.match(t, /Mon Dec 28 · stamped 12:20/);
       assert.equal(await text(page, ".bk-lx"), "Tap to put it back");
       assert.equal(await page.evaluate(() => document.activeElement.className), "bk-look");
       assert.equal(await page.evaluate(() => document.getElementById("bookScroll").inert), true, "the page behind is not reachable");
@@ -251,7 +251,7 @@ module.exports = [
       assert.equal(await page.locator("#bookPage.thump").count(), 0);
       await page.click(cell("s04"));
       assert.equal(await page.locator(cell("s04") + ".nope").count(), 0, "no shake");
-      assert.equal(await text(page, "#bookSay"), "Dec 13 opens on the day.");
+      assert.equal(await text(page, "#bookSay"), "Dec 29 opens on the day.");
     },
   },
   {
@@ -268,7 +268,7 @@ module.exports = [
       await page.click("#bookDone");
       await until(async () => !(await isOpen(page)), "the book closes");
       await until(() => page.locator(".tk-stampline").count().then((n) => n === 0), "the line goes");
-      assert.equal(await text(page, "#stampBtn"), "1/12");
+      assert.equal(await text(page, "#stampBtn"), "1/8");
     },
   },
   {
@@ -284,7 +284,7 @@ module.exports = [
       await page.click("#youBtn");
       await page.click("#setHist");
       await until(() => page.locator("#tape .tp-row").count().then((n) => n >= 1), "the tape shows");
-      assert.match(await text(page, "#tape .tp-row .tp-s"), /^Mo stamped Dec 12$/);
+      assert.match(await text(page, "#tape .tp-row .tp-s"), /^Mo stamped Dec 28$/);
       await page.click("#tape .tp-row button.tp-undo");
       await until(() => page.locator("#tape .tp-row.is-undone").count().then((n) => n === 1), "undone");
       await page.click("#histDone");
@@ -292,7 +292,7 @@ module.exports = [
       await waitBook(page);
       assert.equal(await stampsDrawn(page), 0, "the ring is empty");
       assert.match(await cellClass(page, TODAY), /is-open/);
-      assert.equal(await text(page, "#bookN"), "0 of 12");
+      assert.equal(await text(page, "#bookN"), "0 of 8");
       assert.equal(be.fake.tables.Stamps[0].gone, "yes");
       // while the window is open it can be pressed again
       await advance(page, be, 60000);
@@ -314,7 +314,7 @@ module.exports = [
       await idle(page);
       await page.click("#bookDone");
       await until(async () => !(await isOpen(page)), "closed");
-      // 03:20 on Dec 13 in Chicago: Dec 12's window closed at 03:00
+      // 03:20 on Dec 29 in Chicago: Dec 28's window closed at 03:00
       await advance(page, be, 14 * HOUR);
       await page.click("#youBtn");
       await page.click("#setHist");
@@ -326,13 +326,13 @@ module.exports = [
       await waitBook(page);
       assert.equal(await stampsDrawn(page), 0);
       assert.match(await cellClass(page, TODAY), /is-missed/, "an empty ring, no PRESS");
-      assert.equal(await text(page, cell(TODAY) + " .bk-ghost"), "12Sat");
+      assert.equal(await text(page, cell(TODAY) + " .bk-ghost"), "28Mon");
       const before = press(be).length;
       await page.click(cell(TODAY));
-      assert.equal(await text(page, "#bookSay"), "Dec 12 has closed.");
+      assert.equal(await text(page, "#bookSay"), "Dec 28 has closed.");
       assert.equal(press(be).length, before, "nothing sent");
       assert.equal(be.fake.tables.Stamps[0].gone, "yes");
-      assert.equal(await text(page, "#bookN"), "0 of 12");
+      assert.equal(await text(page, "#bookN"), "0 of 8");
     },
   },
   {
@@ -352,7 +352,7 @@ module.exports = [
       await page.evaluate(() => globalThis.__matTest.store.flush());
       await idle(page);
       assert.equal(be.fake.tables.Stamps.length, 1);
-      assert.equal(be.fake.tables.Stamps[0].at, new Date(NOON12).toISOString(), "stamped with the time it was pressed, not when it arrived");
+      assert.equal(be.fake.tables.Stamps[0].at, new Date(NOON28).toISOString(), "stamped with the time it was pressed, not when it arrived");
       assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("chi.queue")).length), 0);
     },
   },
@@ -361,13 +361,13 @@ module.exports = [
     async run({ page }) {
       const be = await ready(page);
       await openBook(page);
-      const r = await be.fake({ key: KEY, actor: "Izzah", action: "pressStamp", args: { def: TODAY, at: new Date(NOON12 - 2 * 60000).toISOString() } });
+      const r = await be.fake({ key: KEY, actor: "Izzah", action: "pressStamp", args: { def: TODAY, at: new Date(NOON28 - 2 * 60000).toISOString() } });
       assert.equal(r.ok, true);
       await page.evaluate(() => globalThis.__matTest.store.checkRev());
       await until(async () => (await who(page, 2)) === "Izzah|13:18", "Izzah's time shows");
       assert.equal(await page.locator("#bookWho .bk-p.is-in").count(), 1);
       assert.equal(await stampsDrawn(page), 0, "Izzah's drawing is not on my page");
-      assert.equal(await text(page, "#bookN"), "0 of 12");
+      assert.equal(await text(page, "#bookN"), "0 of 8");
     },
   },
   {
@@ -375,7 +375,7 @@ module.exports = [
     async run({ page }) {
       const odd = DEFS.map((d) => (d.id === TODAY ? { ...d, name_en: "<img src=x onerror=window.__pwn=1>", name_ja: "<b>x</b>", place: "<i>p</i>", motif: "no-such-drawing" } : d));
       const be = await backendWith(odd);
-      assert.equal((await be.fake({ key: KEY, actor: "Mo", action: "pressStamp", args: { def: TODAY, at: new Date(NOON12).toISOString(), seed: 99 } })).ok, true);
+      assert.equal((await be.fake({ key: KEY, actor: "Mo", action: "pressStamp", args: { def: TODAY, at: new Date(NOON28).toISOString(), seed: 99 } })).ok, true);
       await ready(page, { backend: be });
       await openBook(page);
       assert.equal(await stampsDrawn(page), 1, "the ring is drawn");
@@ -395,17 +395,17 @@ module.exports = [
     name: "a phone still on Tokyo time: today's stamp is the Chicago day's, not the phone's",
     timezoneId: "Asia/Tokyo",
     async run({ page }) {
-      // 20:00Z Dec 12 is 14:00 on Dec 12 in Chicago and 05:00 on Dec 13 in Tokyo.
-      const nowMs = Date.parse("2026-12-12T20:00:00Z");
+      // 20:00Z Dec 28 is 14:00 on Dec 28 in Chicago and 05:00 on Dec 29 in Tokyo.
+      const nowMs = Date.parse("2026-12-28T20:00:00Z");
       const be = await ready(page, { nowMs });
       await openBook(page);
-      assert.match(await cellClass(page, TODAY), /is-open/, "Dec 12 is open in Chicago");
-      assert.match(await cellClass(page, "s04"), /is-soon/, "Dec 13 has not begun in Chicago");
+      assert.match(await cellClass(page, TODAY), /is-open/, "Dec 28 is open in Chicago");
+      assert.match(await cellClass(page, "s04"), /is-soon/, "Dec 29 has not begun in Chicago");
       assert.equal(await text(page, "#bookTH"), "今日 Today");
       await page.click(cell("s04"));
-      assert.equal(await text(page, "#bookSay"), "Dec 13 opens on the day.");
+      assert.equal(await text(page, "#bookSay"), "Dec 29 opens on the day.");
       await page.click(cell(TODAY));
-      await until(() => stampsDrawn(page).then((n) => n === 1), "Dec 12's stamp is pressed");
+      await until(() => stampsDrawn(page).then((n) => n === 1), "Dec 28's stamp is pressed");
       await idle(page);
       assert.equal(be.fake.tables.Stamps[0].id, TODAY + "|Mo");
       // the time shown is Chicago time
@@ -416,7 +416,7 @@ module.exports = [
     name: "History: nobody acts on someone else's stamp: Izzah's line has no Undo for Mo, Mo's own has",
     async run({ page }) {
       const be = await backendWith();
-      const at = new Date(NOON12 - 60000).toISOString();
+      const at = new Date(NOON28 - 60000).toISOString();
       assert.equal((await be.fake({ key: KEY, actor: "Izzah", action: "pressStamp", args: { def: TODAY, at } })).ok, true);
       await ready(page, { backend: be });
       await openBook(page);
@@ -429,7 +429,7 @@ module.exports = [
       await page.click("#setHist");
       await until(() => page.locator("#tape .tp-row").count().then((n) => n >= 2), "the tape shows both");
       const rows = await page.$$eval("#tape .tp-row", (rs) => rs.map((r) => [r.querySelector(".tp-s").textContent, r.querySelector("button.tp-undo") !== null]));
-      assert.deepEqual(rows.filter((r) => /stamped/.test(r[0])).sort(), [["Izzah stamped Dec 12", false], ["Mo stamped Dec 12", true]]);
+      assert.deepEqual(rows.filter((r) => /stamped/.test(r[0])).sort(), [["Izzah stamped Dec 28", false], ["Mo stamped Dec 28", true]]);
     },
   },
   {
@@ -443,7 +443,7 @@ module.exports = [
         const days = document.getElementById("vDays");
         const btn = document.getElementById("stampBtn").getBoundingClientRect();
         const sq = [...document.querySelectorAll("#pager .sq")].map((e) => e.getBoundingClientRect());
-        const tk = document.querySelector('#rail .pg[data-date="2026-12-12"] .tk').getBoundingClientRect();
+        const tk = document.querySelector('#rail .pg[data-date="2026-12-28"] .tk').getBoundingClientRect();
         const count = document.getElementById("dayCount").getBoundingClientRect();
         return {
           docScroll: document.documentElement.scrollWidth > innerWidth,
@@ -461,7 +461,7 @@ module.exports = [
       assert.equal(m.daysScroll, false, JSON.stringify(m));
       assert.ok(m.btn[0] >= 43.5 && m.btn[1] >= 43.5, "button size " + JSON.stringify(m));
       assert.equal(m.btnIn && m.countIn, true, JSON.stringify(m));
-      assert.equal(m.squares, 11);
+      assert.equal(m.squares, 7);
       assert.equal(m.squaresIn, true, JSON.stringify(m));
       assert.equal(m.ticketIn, true, JSON.stringify(m));
       await page.screenshot({ path: "/private/tmp/claude-501/mat-shots/chi/stamp-book/7-narrow-320-days.png" });
@@ -476,7 +476,7 @@ module.exports = [
     viewport,
     async run({ page }) {
       const be = await backendWith();
-      assert.equal((await be.fake({ key: KEY, actor: "Mo", action: "pressStamp", args: { def: TODAY, at: new Date(NOON12).toISOString(), seed: 31337 } })).ok, true);
+      assert.equal((await be.fake({ key: KEY, actor: "Mo", action: "pressStamp", args: { def: TODAY, at: new Date(NOON28).toISOString(), seed: 31337 } })).ok, true);
       await ready(page, { backend: be });
       await openBook(page);
       const fit = await page.evaluate(() => {

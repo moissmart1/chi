@@ -32,12 +32,12 @@ const THREE = (() => {
 // A small plan (days, stops, stays) to lay over the seed: WITH_PLAN.
 const PLAN = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "fixtures", "plan.json"), "utf8"));
 const WITH_PLAN = { ...SEED, ...PLAN };
-// 2026-12-12 13:20 in Chicago.
-const NOON12 = Date.parse("2026-12-12T13:20:00-06:00");
+// 2026-12-28 13:20 in Chicago.
+const NOON28 = Date.parse("2026-12-28T13:20:00-06:00");
 // When seed items without an addedAt / stampedAt were made: before the trip,
-// so they are never "new" to a viewer who has looked since. 09:00 on Nov 20
+// so they are never "new" to a viewer who has looked since. 09:00 on Dec 6
 // in Chicago.
-const SEEDED_AT = "2026-11-20T15:00:00.000Z";
+const SEEDED_AT = "2026-12-06T15:00:00.000Z";
 
 const copy = (v) => JSON.parse(JSON.stringify(v));
 
@@ -90,7 +90,7 @@ function makeBackend(seed, { clock, now = Date.now() } = {}) {
 // built here starts its clock (backend.now) at nowMs too. Neither moves on
 // its own: call advance(page, backend, ms) to move both together, so the
 // backend never dates a write ahead of (or behind) what the page shows.
-async function open(page, { seed = SEED, key = "test-key", me = "Mo", how = "1", nowMs = NOON12, storage = {}, backend, hash = "", tab = "money" } = {}) {
+async function open(page, { seed = SEED, key = "test-key", me = "Mo", how = "1", nowMs = NOON28, storage = {}, backend, hash = "", tab = "money" } = {}) {
   const be = backend || makeBackend(seed, { now: nowMs });
 
   await page.exposeFunction("__matBridge", async (body) => {
@@ -180,4 +180,4 @@ function visible(page, selector) {
   }, selector);
 }
 
-module.exports = { PORT, ORIGIN, SEED, THREE, PLAN, WITH_PLAN, NOON12, SEEDED_AT, makeBackend, open, advance, until, text, expectText, visible };
+module.exports = { PORT, ORIGIN, SEED, THREE, PLAN, WITH_PLAN, NOON28, SEEDED_AT, makeBackend, open, advance, until, text, expectText, visible };

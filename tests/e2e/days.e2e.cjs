@@ -1,13 +1,13 @@
-// Days: a rail of eleven day tickets, the day counter and the squares.
+// Days: a rail of seven day tickets, the day counter and the squares.
 // The plan is tests/fixtures/plan.json over the seed; the clock is 13:20 on
-// Dec 12 in Chicago, Day 3.
+// Dec 28 in Chicago, Day 3.
 
 const assert = require("node:assert/strict");
-const { WITH_PLAN, NOON12, makeBackend, open, advance, until, text, expectText } = require("./helpers.cjs");
+const { WITH_PLAN, NOON28, makeBackend, open, advance, until, text, expectText } = require("./helpers.cjs");
 
 async function ready(page, opts = {}) {
   const backend = await open(page, { seed: WITH_PLAN, tab: "days", ...opts });
-  await until(() => page.evaluate(() => document.querySelectorAll("#rail .pg").length === 11), "the tickets draw");
+  await until(() => page.evaluate(() => document.querySelectorAll("#rail .pg").length === 7), "the tickets draw");
   return backend;
 }
 
@@ -35,22 +35,22 @@ const rowText = (page, id) => text(page, '.r[data-id="' + id + '"]');
 
 module.exports = [
   {
-    name: "eleven tickets, opening on today",
+    name: "seven tickets, opening on today",
     async run({ page }) {
       await ready(page);
-      assert.equal(await page.evaluate(() => document.querySelectorAll("#rail .pg").length), 11);
-      await expectText(page, "#dayCount", /^Day 3 of 11/);
+      assert.equal(await page.evaluate(() => document.querySelectorAll("#rail .pg").length), 7);
+      await expectText(page, "#dayCount", /^Day 3 of 7/);
       const cur = await page.evaluate(() => [...document.querySelectorAll("#pager .sq")].map((b) => b.classList.contains("is-cur")));
-      assert.equal(cur.length, 11);
+      assert.equal(cur.length, 7);
       assert.deepEqual(cur.map((c, i) => (c ? i : -1)).filter((i) => i >= 0), [2]);
-      await until(async () => (await inView(page)) === "2026-12-12", "the Dec 12 ticket is in view");
+      await until(async () => (await inView(page)) === "2026-12-28", "the Dec 28 ticket is in view");
     },
   },
   {
     name: "a full header",
     async run({ page }) {
       await ready(page);
-      const t = tk("2026-12-12");
+      const t = tk("2026-12-28");
       await expectText(page, t + " .tk-band", /山手線\s*Yamanote Line/);
       await expectText(page, t + " .num", "D 03");
       assert.equal(await page.evaluate((sel) => getComputedStyle(document.querySelector(sel + " .tk")).getPropertyValue("--line").trim(), t), "#9ACD32");
@@ -58,29 +58,31 @@ module.exports = [
       for (const s of ["新宿", "Shinjuku", "渋谷", "Shibuya"]) assert.ok(route.includes(s), "the route reads " + s + ": " + route);
       assert.equal(await page.evaluate((sel) => !!document.querySelector(sel + " .tk-route .arr"), t), true, "the arrow");
       const date = await text(page, t + " .tk-date");
-      for (const s of ["12月12日(土)", "Sat Dec 12", "当日限り有効"]) assert.ok(date.includes(s), "the date row reads " + s + ": " + date);
-      await expectText(page, t + " .tk-foot", /^2026\.12\.12 MAT発行 00003-01\s*Good for this day only$/);
+      for (const s of ["Mon Dec 28", "当日限り有効"]) assert.ok(date.includes(s), "the date row reads " + s + ": " + date);
+      assert.equal(date.includes("12月"), false, "the date is in English only: " + date);
+      await expectText(page, t + " .tk-foot", /^2026\.12\.28 MI発行 00003-01\s*Good for this day only$/);
     },
   },
   {
     name: "a day title prints when there is one",
     async run({ page }) {
       await ready(page);
-      await expectText(page, tk("2026-12-11") + " .tk-title", "Temples, then the view");
-      assert.equal(await page.evaluate((sel) => document.querySelector(sel + " .tk-title"), tk("2026-12-12")), null);
+      await expectText(page, tk("2026-12-27") + " .tk-title", "Temples, then the view");
+      assert.equal(await page.evaluate((sel) => document.querySelector(sel + " .tk-title"), tk("2026-12-28")), null);
     },
   },
   {
     name: "a sparse day still prints",
     async run({ page }) {
-      await ready(page);
-      const d13 = tk("2026-12-13");
+      // Dec 30 with no city: the ticket falls back to the trip's name.
+      await ready(page, { seed: { ...WITH_PLAN, days: { ...WITH_PLAN.days, "2026-12-30": { city: "" } } } });
+      const d13 = tk("2026-12-29");
       await expectText(page, d13 + " .tk-band", /^Niseko\s*D 04$/);
       await expectText(page, d13 + " .tk-route", "Niseko");
       assert.equal(await page.evaluate((sel) => !!document.querySelector(sel + " .arr"), d13), false, "no arrow");
-      const d14 = tk("2026-12-14");
+      const d14 = tk("2026-12-30");
       await expectText(page, d14 + " .tk-band", "D 05");
-      await expectText(page, d14 + " .tk-route", "Japan 2026");
+      await expectText(page, d14 + " .tk-route", "Chicago 2026");
       for (const t of [d13, d14]) {
         const all = await text(page, t);
         assert.equal(/undefined|null|NaN/.test(all), false, t + ": " + all);
@@ -98,7 +100,7 @@ module.exports = [
     name: "stops in order, the untimed one last",
     async run({ page }) {
       await ready(page);
-      assert.deepEqual(await rowTitles(page, "2026-12-12"), ["Meiji Shrine", "Lunch in Harajuku", "Shibuya Sky", "Dinner", "Buy gloves"]);
+      assert.deepEqual(await rowTitles(page, "2026-12-28"), ["Meiji Shrine", "Lunch in Harajuku", "Shibuya Sky", "Dinner", "Buy gloves"]);
       await expectText(page, '.r[data-id="planstop1203"] .r-t', "14:00");
       await expectText(page, '.r[data-id="planstop1203"] .r-j', "渋谷");
       // On today's ticket the next stop's leave-by line comes first.
@@ -111,10 +113,10 @@ module.exports = [
     name: "the squares jump",
     async run({ page }) {
       await ready(page);
-      await until(async () => (await inView(page)) === "2026-12-12", "today is in view");
+      await until(async () => (await inView(page)) === "2026-12-28", "today is in view");
       await page.click("#pager .sq:nth-child(6)");
-      await expectText(page, "#dayCount", /^Day 6 of 11/);
-      await until(async () => (await inView(page)) === "2026-12-15", "the Dec 15 ticket is in view");
+      await expectText(page, "#dayCount", /^Day 6 of 7/);
+      await until(async () => (await inView(page)) === "2026-12-31", "the Dec 31 ticket is in view");
       assert.equal(await page.evaluate(() => document.querySelector("#pager .sq:nth-child(6)").classList.contains("is-cur")), true);
     },
   },
@@ -122,28 +124,28 @@ module.exports = [
     name: "swiping moves one day",
     async run({ page }) {
       await ready(page);
-      await until(async () => (await inView(page)) === "2026-12-12", "today is in view");
+      await until(async () => (await inView(page)) === "2026-12-28", "today is in view");
       await page.evaluate(() => {
         const rail = document.getElementById("rail");
         rail.scrollBy({ left: rail.querySelector(".pg").offsetWidth, behavior: "instant" });
       });
-      await expectText(page, "#dayCount", /^Day 4 of 11/);
-      await until(async () => (await inView(page)) === "2026-12-13", "the Dec 13 ticket is in view");
+      await expectText(page, "#dayCount", /^Day 4 of 7/);
+      await until(async () => (await inView(page)) === "2026-12-29", "the Dec 29 ticket is in view");
     },
   },
   {
     name: "another phone’s stop appears, and the day in view stays",
     async run({ page }) {
       const backend = await ready(page);
-      await until(async () => (await inView(page)) === "2026-12-12", "today is in view");
+      await until(async () => (await inView(page)) === "2026-12-28", "today is in view");
       await page.click("#pager .sq:nth-child(6)");
-      await until(async () => (await inView(page)) === "2026-12-15", "Day 6 is in view");
-      const env = await backend.handle({ key: "test-key", actor: "Izzah", via: "app", action: "addStop", args: { stop: { id: "ajenstop0001", date: "2026-12-12", time: "16:00", title: "Tower Records" } } });
+      await until(async () => (await inView(page)) === "2026-12-31", "Day 6 is in view");
+      const env = await backend.handle({ key: "test-key", actor: "Izzah", via: "app", action: "addStop", args: { stop: { id: "ajenstop0001", date: "2026-12-28", time: "16:00", title: "Tower Records" } } });
       assert.equal(env.ok, true, JSON.stringify(env));
       await advance(page, backend, 20000);
-      await until(() => page.evaluate((sel) => document.querySelectorAll(sel + " .r[data-id]").length === 6, tk("2026-12-12")), "the new stop is on the Dec 12 ticket");
-      await expectText(page, "#dayCount", /^Day 6 of 11/);
-      assert.equal(await inView(page), "2026-12-15");
+      await until(() => page.evaluate((sel) => document.querySelectorAll(sel + " .r[data-id]").length === 6, tk("2026-12-28")), "the new stop is on the Dec 28 ticket");
+      await expectText(page, "#dayCount", /^Day 6 of 7/);
+      assert.equal(await inView(page), "2026-12-31");
     },
   },
   {
@@ -163,7 +165,7 @@ module.exports = [
   {
     name: "a phone holding the Plan 1 cache: Days paints from it without error, and Money is the same once the load lands (M4)",
     async run({ page }) {
-      const backend = makeBackend(WITH_PLAN, { now: NOON12 });
+      const backend = makeBackend(WITH_PLAN, { now: NOON28 });
       const old = await backend.fake.plan1Load();
       // The load waits, so the first paint is the Plan 1 cache alone.
       const real = backend.handle;
@@ -173,11 +175,11 @@ module.exports = [
         if (body.action === "load") await gate;
         return real(body);
       };
-      await open(page, { backend, tab: "days", storage: { "chi.cache": JSON.stringify({ data: old.data, rev: old.rev, loadedAt: NOON12 }) } });
-      await until(() => page.evaluate(() => document.querySelectorAll("#rail .pg .tk").length === 11), "the tickets draw from the cache");
-      await expectText(page, "#dayCount", /^Day 3 of 11/);
-      assert.ok((await text(page, tk("2026-12-12"))).includes("Shibuya Sky"), "the cached stops are on the ticket");
-      assert.ok((await text(page, tk("2026-12-11") + " .tk-stay")).includes("Asakusa hotel"), "the cached stay is on its night");
+      await open(page, { backend, tab: "days", storage: { "chi.cache": JSON.stringify({ data: old.data, rev: old.rev, loadedAt: NOON28 }) } });
+      await until(() => page.evaluate(() => document.querySelectorAll("#rail .pg .tk").length === 7), "the tickets draw from the cache");
+      await expectText(page, "#dayCount", /^Day 3 of 7/);
+      assert.ok((await text(page, tk("2026-12-28"))).includes("Shibuya Sky"), "the cached stops are on the ticket");
+      assert.ok((await text(page, tk("2026-12-27") + " .tk-stay")).includes("Asakusa hotel"), "the cached stay is on its night");
       await page.click('#nav button[data-tab="money"]');
       const money = () => page.evaluate(() => ["say", "slip", "rc", "asideNote"].map((id) => (document.getElementById(id) || { textContent: "" }).textContent.replace(/\s+/g, " ").trim()));
       const before = await money();

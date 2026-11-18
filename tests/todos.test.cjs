@@ -16,20 +16,20 @@ const PLANNER_ID = "fakePlannerSheet_0123456789abcdefXYZ";
 
 const BHEAD = ["#", "Item", "Who", "Book by", "Status", "Notes", "Booking link"];
 const brow = (o) => BHEAD.map((h) => (o[h] === undefined ? "" : o[h]));
-const B1 = { "#": 1, Item: "Rail pass reservation", Who: "Mo", "Book by": "2026-11-25", Status: "Not booked", Notes: "Seats for three", "Booking link": "https://rail.example.test/book" };
-const B2 = { "#": 2, Item: "Tea ceremony class", "Book by": "Dec 1", Status: "Pending", "Booking link": "javascript:alert(1)" };
-const B3 = { "#": 3, Item: "Snow park day trip", "Book by": "5 Dec", Status: "Booked" };
+const B1 = { "#": 1, Item: "Rail pass reservation", Who: "Mo", "Book by": "2026-12-11", Status: "Not booked", Notes: "Seats for three", "Booking link": "https://rail.example.test/book" };
+const B2 = { "#": 2, Item: "Tea ceremony class", "Book by": "Dec 17", Status: "Pending", "Booking link": "javascript:alert(1)" };
+const B3 = { "#": 3, Item: "Snow park day trip", "Book by": "21 Dec", Status: "Booked" };
 // A title row and a blank row above the header (row 3), a row with no item,
 // and a footnote line under the table.
 const bookNow = (...items) => [["Before we go: bookings"], [], BHEAD, ...items.map(brow), brow({ "#": 9, Item: "" }), ["* Prices are estimates", "Ask Mo before booking"]];
 const BOOK = bookNow(B1, B2, B3); // B1 is row 4, B2 row 5, B3 row 6; Status is column E
 
 const CHEAD = ["#", "Date / time", "Agent / session", "Tab", "Cell(s)", "Item", "Old value", "New value", "Why", "Proof / source", "Verified?"];
-const LOG = [["Change log"], CHEAD, [6, "2026-11-01 10:00 ET", "Planner chat", "Book Now", "E5", "Tea ceremony class", "(empty)", "Pending", "Asked the host", "", ""], ["7.0", "2026-11-02 09:00 ET", "Planner chat", "Payments", "C2", "x", "a", "b", "", "", ""]];
+const LOG = [["Change log"], CHEAD, [6, "2026-11-17 10:00 ET", "Planner chat", "Book Now", "E5", "Tea ceremony class", "(empty)", "Pending", "Asked the host", "", ""], ["7.0", "2026-11-18 09:00 ET", "Planner chat", "Payments", "C2", "x", "a", "b", "", "", ""]];
 
 // A fake whose clock can be moved: at.now = ISO string.
 function linked({ book = BOOK, log = LOG, over = {} } = {}) {
-  const at = { now: "2026-11-20T15:00:00.000Z" };
+  const at = { now: "2026-12-06T15:00:00.000Z" };
   // lock.busy(n): whether the app's nth lock taking finds it busy (test-only).
   const lock = { n: 0, busy: () => false };
   const fake = createFakeBackend({ plannerId: PLANNER_ID, plannerTabs: { "Book Now": book, "Change Log": log }, ...over }, { clock: () => at.now, lockFails: () => lock.busy(++lock.n) });
@@ -50,7 +50,7 @@ const forced = (call, actor = "Mo") => { later(call, 1); return call("syncTodos"
 // The Change Log row a tick of B1 by Mo appends (the clock's 15:00Z is 10:00 in Toronto).
 const tickLog = (o = {}) => ({
   kind: "append", tab: "Change Log", headerRow: 2,
-  values: [8, "2026-11-20 10:00 ET", "MAT app (Mo)", "Book Now", "E4", "Rail pass reservation", "Not booked", "Booked", "Ticked off in the MAT app", "MAT app History", "By Mo", ...[]].map((v, i) => (o[i] !== undefined ? o[i] : v)),
+  values: [8, "2026-12-06 10:00 ET", "MAT app (Mo)", "Book Now", "E4", "Rail pass reservation", "Not booked", "Booked", "Ticked off in the MAT app", "MAT app History", "By Mo", ...[]].map((v, i) => (o[i] !== undefined ? o[i] : v)),
 });
 
 // ---------- pure: the Book Now parser ----------
@@ -60,9 +60,9 @@ test("todosFromRows finds the header below a title row and skips the blank item,
   assert.equal(r.missing, null);
   assert.deepEqual(r.problems, []);
   assert.deepEqual(r.items, [
-    { id: "1", item: "Rail pass reservation", bookBy: "2026-11-25", status: "Not booked", note: "Seats for three", link: "https://rail.example.test/book", row: 4, statusCol: 4 },
-    { id: "2", item: "Tea ceremony class", bookBy: "2026-12-01", status: "Pending", note: "", link: "", row: 5, statusCol: 4 },
-    { id: "3", item: "Snow park day trip", bookBy: "2026-12-05", status: "Booked", note: "", link: "", row: 6, statusCol: 4 },
+    { id: "1", item: "Rail pass reservation", bookBy: "2026-12-11", status: "Not booked", note: "Seats for three", link: "https://rail.example.test/book", row: 4, statusCol: 4 },
+    { id: "2", item: "Tea ceremony class", bookBy: "2026-12-17", status: "Pending", note: "", link: "", row: 5, statusCol: 4 },
+    { id: "3", item: "Snow park day trip", bookBy: "2026-12-21", status: "Booked", note: "", link: "", row: 6, statusCol: 4 },
   ]);
 });
 
@@ -92,20 +92,20 @@ test("todosFromRows keeps a link only when it is a plain https address", () => {
 });
 
 test("bookByDay reads ISO text, month-name text (with or without a year) and a serial day number; anything else is no date", () => {
-  assert.equal(P.bookByDay("2026-12-05", 2026), "2026-12-05");
+  assert.equal(P.bookByDay("2026-12-21", 2026), "2026-12-21");
   assert.equal(P.bookByDay(" 2027-01-03 ", 2026), "2027-01-03");
-  assert.equal(P.bookByDay("Dec 5", 2026), "2026-12-05");
-  assert.equal(P.bookByDay("Dec 5, 2027", 2026), "2027-12-05");
-  assert.equal(P.bookByDay("December 15", 2026), "2026-12-15");
+  assert.equal(P.bookByDay("Dec 21", 2026), "2026-12-21");
+  assert.equal(P.bookByDay("Dec 21, 2027", 2026), "2027-12-21");
+  assert.equal(P.bookByDay("December 31", 2026), "2026-12-31");
   assert.equal(P.bookByDay("Sept 30", 2026), "2026-09-30");
-  assert.equal(P.bookByDay("5 Dec", 2026), "2026-12-05");
+  assert.equal(P.bookByDay("21 Dec", 2026), "2026-12-21");
   assert.equal(P.bookByDay("5 Dec 2027", 2026), "2027-12-05");
-  assert.equal(P.bookByDay(46361, 2026), "2026-12-05", "Sheets' day 46361 is 2026-12-05");
-  assert.equal(P.bookByDay(46361.75, 2026), "2026-12-05", "a time of day is dropped");
+  assert.equal(P.bookByDay(46377, 2026), "2026-12-21", "Sheets' day 46377 is 2026-12-21");
+  assert.equal(P.bookByDay(46377.75, 2026), "2026-12-21", "a time of day is dropped");
   for (const bad of ["", "soon", "2026-02-30", "Feb 30", "Dex 5", "12/05", "2026-12-5", 0, -3, NaN, null, undefined, true, "Dec"]) {
     assert.equal(P.bookByDay(bad, 2026), "", String(bad));
   }
-  assert.equal(P.bookByDay("Dec 5", NaN), "", "no trip year: no date");
+  assert.equal(P.bookByDay("Dec 21", NaN), "", "no trip year: no date");
 });
 
 test("a todo is done when its status starts with the word booked, or someone ticked it", () => {
@@ -121,8 +121,8 @@ test("a todo is done when its status starts with the word booked, or someone tic
 });
 
 test("changeLogRow: the header found below a title, # one above the largest whole number, columns it lacks skipped", () => {
-  const fields = { "Date / time": "2026-11-20 10:00 ET", "Agent / session": "MAT app (Mo)", Tab: "Book Now", "Cell(s)": "E4", Item: "x", "Old value": "(empty)", "New value": "Booked", Why: "w", "Proof / source": "MAT app History", "Verified?": "By Mo" };
-  assert.deepEqual(P.changeLogRow(LOG, fields), { headerRow: 2, firstCol: 0, values: [8, "2026-11-20 10:00 ET", "MAT app (Mo)", "Book Now", "E4", "x", "(empty)", "Booked", "w", "MAT app History", "By Mo"] });
+  const fields = { "Date / time": "2026-12-06 10:00 ET", "Agent / session": "MAT app (Mo)", Tab: "Book Now", "Cell(s)": "E4", Item: "x", "Old value": "(empty)", "New value": "Booked", Why: "w", "Proof / source": "MAT app History", "Verified?": "By Mo" };
+  assert.deepEqual(P.changeLogRow(LOG, fields), { headerRow: 2, firstCol: 0, values: [8, "2026-12-06 10:00 ET", "MAT app (Mo)", "Book Now", "E4", "x", "(empty)", "Booked", "w", "MAT app History", "By Mo"] });
   const small = P.changeLogRow([["Old value", "#", "New value", " TAB ", "Extra"]], fields);
   assert.deepEqual(small, { headerRow: 1, firstCol: 0, values: ["(empty)", "", "Booked", "Book Now", ""] }, "no number in the column: # left blank, never a guessed 1");
   assert.equal(P.changeLogRow([["#", "Tab", "Old value"]], fields), null);
@@ -166,20 +166,20 @@ test("a first pull adds every item, writes no History, bumps rev and answers the
   assert.ok(r.rev > rev0);
   assert.deepEqual(r.data, {
     todos: [
-      { id: "1", item: "Rail pass reservation", bookBy: "2026-11-25", status: "Not booked", note: "Seats for three", link: "https://rail.example.test/book", claimedBy: "", tickedBy: "", tickedAt: "", done: false, plannerComputes: false },
-      { id: "2", item: "Tea ceremony class", bookBy: "2026-12-01", status: "Pending", note: "", link: "", claimedBy: "", tickedBy: "", tickedAt: "", done: false, plannerComputes: false },
-      { id: "3", item: "Snow park day trip", bookBy: "2026-12-05", status: "Booked", note: "", link: "", claimedBy: "", tickedBy: "", tickedAt: "", done: true, plannerComputes: false },
+      { id: "1", item: "Rail pass reservation", bookBy: "2026-12-11", status: "Not booked", note: "Seats for three", link: "https://rail.example.test/book", claimedBy: "", tickedBy: "", tickedAt: "", done: false, plannerComputes: false },
+      { id: "2", item: "Tea ceremony class", bookBy: "2026-12-17", status: "Pending", note: "", link: "", claimedBy: "", tickedBy: "", tickedAt: "", done: false, plannerComputes: false },
+      { id: "3", item: "Snow park day trip", bookBy: "2026-12-21", status: "Booked", note: "", link: "", claimedBy: "", tickedBy: "", tickedAt: "", done: true, plannerComputes: false },
     ],
-    pulledAt: "2026-11-20T15:00:00.000Z",
+    pulledAt: "2026-12-06T15:00:00.000Z",
     more: false,
     problems: [],
   });
-  assert.deepEqual(stored(call, "1"), { id: "1", item: "Rail pass reservation", book_by: "2026-11-25", status: "Not booked", note: "Seats for three", link: "https://rail.example.test/book", claimed_by: "", ticked_by: "", ticked_at: "", ticked_item: "", planner_written: "", planner_was: "", gone: "" });
+  assert.deepEqual(stored(call, "1"), { id: "1", item: "Rail pass reservation", book_by: "2026-12-11", status: "Not booked", note: "Seats for three", link: "https://rail.example.test/book", claimed_by: "", ticked_by: "", ticked_at: "", ticked_item: "", planner_written: "", planner_was: "", gone: "" });
   assert.equal(logRows(call).length, logs, "a pull writes no History");
   assert.deepEqual(writes(call), [], "a pull with nothing ticked writes nothing to the planner");
   const load = (await call("load")).data;
   assert.deepEqual(load.todos, r.data.todos);
-  assert.equal(load.todosPulledAt, "2026-11-20T15:00:00.000Z");
+  assert.equal(load.todosPulledAt, "2026-12-06T15:00:00.000Z");
 });
 
 test("a second pull within 10 minutes reads nothing and answers the stored list; force or 10 minutes later reads again", async () => {
@@ -189,7 +189,7 @@ test("a second pull within 10 minutes reads nothing and answers the stored list;
   later(call, 9);
   const again = await call("syncTodos");
   assert.equal(call.fake.planner.reads, reads, "no planner read");
-  assert.deepEqual([again.data.pulledAt, again.data.more, again.data.todos.length], ["2026-11-20T15:00:00.000Z", false, 3]);
+  assert.deepEqual([again.data.pulledAt, again.data.more, again.data.todos.length], ["2026-12-06T15:00:00.000Z", false, 3]);
   await call("syncTodos", { force: true });
   assert.equal(call.fake.planner.reads, reads + 1, "forced: read");
   later(call, 10);
@@ -205,7 +205,7 @@ test("M3: a forced pull within 30 seconds of the last answers the stored list wi
   const reads = call.fake.planner.reads;
   later(call, 0.4);
   const soon = await call("syncTodos", { force: true });
-  assert.deepEqual([soon.ok, soon.data.todos.length, soon.data.pulledAt, call.fake.planner.reads], [true, 3, "2026-11-20T15:00:00.000Z", reads]);
+  assert.deepEqual([soon.ok, soon.data.todos.length, soon.data.pulledAt, call.fake.planner.reads], [true, 3, "2026-12-06T15:00:00.000Z", reads]);
   later(call, 0.2);
   await call("syncTodos", { force: true });
   assert.equal(call.fake.planner.reads, reads + 1, "after 30 seconds a forced pull reads");
@@ -248,7 +248,7 @@ test("refusals: no planner, needs migrate, unreadable and missing columns (the s
   call.fake.planner.fails = true;
   const r = await forced(call);
   assert.deepEqual([r.ok, r.error, r.message], [false, "planner_unreadable", "Couldn’t read the planner sheet. Ask Mo to check its permission."]);
-  assert.deepEqual([r.data.todos.length, r.data.pulledAt], [3, "2026-11-20T15:00:00.000Z"]);
+  assert.deepEqual([r.data.todos.length, r.data.pulledAt], [3, "2026-12-06T15:00:00.000Z"]);
   assert.equal(JSON.stringify(r).includes(PLANNER_ID), false);
   call.fake.planner.fails = false;
   call.fake.planner.tabs["Book Now"] = [["#", "Item", "Book by"], [1, "x", ""]];
@@ -274,7 +274,7 @@ test("a tick with the planner writable: saved first, one History entry, then exa
   const r = await call("tickTodo", { id: "1" });
   assert.equal(r.ok, true, JSON.stringify(r));
   assert.equal(r.data.planner, "written");
-  assert.deepEqual(r.data.todo, { id: "1", item: "Rail pass reservation", bookBy: "2026-11-25", status: "Booked", note: "Seats for three", link: "https://rail.example.test/book", claimedBy: "", tickedBy: "Mo", tickedAt: "2026-11-20T15:00:00.000Z", done: true, plannerComputes: false });
+  assert.deepEqual(r.data.todo, { id: "1", item: "Rail pass reservation", bookBy: "2026-12-11", status: "Booked", note: "Seats for three", link: "https://rail.example.test/book", claimedBy: "", tickedBy: "Mo", tickedAt: "2026-12-06T15:00:00.000Z", done: true, plannerComputes: false });
   assert.ok(r.rev > rev0);
   assert.deepEqual(writes(call), [{ kind: "cell", tab: "Book Now", cell: "E4", value: "Booked" }, tickLog()]);
   assert.deepEqual([stored(call, "1").planner_written, stored(call, "1").status], ["yes", "Booked"]);
@@ -324,7 +324,7 @@ test("a tick whose planner write is refused stands in the app, answers pending, 
   const logs = logRows(call).length;
   const p = await forced(call, "Izzah");
   assert.equal(p.ok, true);
-  assert.deepEqual(writes(call), [{ kind: "cell", tab: "Book Now", cell: "E4", value: "Booked" }, tickLog({ 1: "2026-11-20 10:02 ET" })], "written as the one who ticked, once");
+  assert.deepEqual(writes(call), [{ kind: "cell", tab: "Book Now", cell: "E4", value: "Booked" }, tickLog({ 1: "2026-12-06 10:02 ET" })], "written as the one who ticked, once");
   assert.deepEqual([stored(call, "1").planner_written, stored(call, "1").status], ["yes", "Booked"]);
   assert.equal(logRows(call).length, logs, "the retry writes no History");
   await forced(call);
@@ -434,7 +434,7 @@ test("undo of a written tick: cleared in the app, the old Status put back and on
   assert.equal(u.data.entry.summary, "undid: ticked off: Rail pass reservation");
   assert.deepEqual(writes(call).slice(2), [
     { kind: "cell", tab: "Book Now", cell: "E4", value: "Not booked" },
-    { kind: "append", tab: "Change Log", headerRow: 2, values: [9, "2026-11-20 10:02 ET", "MAT app (Izzah)", "Book Now", "E4", "Rail pass reservation", "Booked", "Not booked", "Tick undone in the MAT app", "MAT app History", "By Izzah"] },
+    { kind: "append", tab: "Change Log", headerRow: 2, values: [9, "2026-12-06 10:02 ET", "MAT app (Izzah)", "Book Now", "E4", "Rail pass reservation", "Booked", "Not booked", "Tick undone in the MAT app", "MAT app History", "By Izzah"] },
   ]);
   assert.equal(stored(call, "1").planner_written, "");
   // The next pull agrees and writes nothing.
@@ -602,7 +602,7 @@ test("get_trip lists the open todos (id, item, book_by, claimed_by) and counts t
   await call("tickTodo", { id: "1" });
   const r = call.fake.mcp({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "get_trip", arguments: {} } }, { t: "claude-token" });
   const trip = JSON.parse(r.result.content[0].text);
-  assert.deepEqual(trip.todos, { open: [{ id: "2", item: "Tea ceremony class", book_by: "2026-12-01", claimed_by: "Izzah" }], done: 2 });
+  assert.deepEqual(trip.todos, { open: [{ id: "2", item: "Tea ceremony class", book_by: "2026-12-17", claimed_by: "Izzah" }], done: 2 });
 });
 
 // ---------- fix round 1 (R49): the reviewer's probes P1 to P11, and the new rules ----------
@@ -1161,7 +1161,7 @@ test("round 4: a Change Log row someone adds between the app's read and its appe
   const call = linked();
   await call("syncTodos");
   const realSet = call.fake.world.plannerSetCell_;
-  const human = [9, "2026-11-20 10:01 ET", "By hand", "Payments", "C3", "x", "a", "b", "", "", ""];
+  const human = [9, "2026-12-06 10:01 ET", "By hand", "Payments", "C3", "x", "a", "b", "", "", ""];
   call.fake.world.plannerSetCell_ = (...a) => { call.fake.planner.tabs["Change Log"].push(human.slice()); return realSet(...a); };
   const t = await call("tickTodo", { id: "1" });
   call.fake.world.plannerSetCell_ = realSet;
@@ -1175,12 +1175,12 @@ test("round 4: a Change Log row someone adds between the app's read and its appe
 
 // The real Change Log: its table starts in column B, column A is an empty margin.
 const MHEAD = ["", ...CHEAD, ""];
-const MLOG = [["Change log"], MHEAD, ["", 43, "2026-11-01 10:00 ET", "Planner chat", "Book Now", "E5", "Tea", "(empty)", "Pending", "w", "", ""], ["", 44, "2026-11-02 09:00 ET", "Planner chat", "Payments", "C2", "x", "a", "b", "", "", ""]];
+const MLOG = [["Change log"], MHEAD, ["", 43, "2026-11-17 10:00 ET", "Planner chat", "Book Now", "E5", "Tea", "(empty)", "Pending", "w", "", ""], ["", 44, "2026-11-18 09:00 ET", "Planner chat", "Payments", "C2", "x", "a", "b", "", "", ""]];
 
 function assertAligned(row, n, who, why) {
   assert.equal(row[0] === undefined || row[0] === "", true, "column A stays empty");
   assert.equal(row[1], n, "# in column B");
-  assert.match(row[2], /^2026-11-20 \d\d:\d\d ET$/, "date in column C");
+  assert.match(row[2], /^2026-12-06 \d\d:\d\d ET$/, "date in column C");
   assert.equal(row[3], "MAT app (" + who + ")");
   assert.equal(row[4], "Book Now");
   assert.equal(row[5], "E4");
@@ -1219,7 +1219,7 @@ test("Change Log aligned: a table starting in column A is still aligned", async 
   await call("tickTodo", { id: "1" });
   const row = call.fake.planner.tabs["Change Log"][LOG.length];
   assert.equal(row[0], 8);
-  assert.match(row[1], /^2026-11-20/);
+  assert.match(row[1], /^2026-12-06/);
   assert.equal(row[10], "By Mo");
   assert.equal(row.length, 11);
 });
@@ -1321,7 +1321,7 @@ test("post-deploy 1b: the next pull puts it back: one cell, one Change Log row b
   assert.deepEqual([td.done, td.status, td.tickedBy], [false, "Not booked", ""]);
   assert.deepEqual(writes(call).slice(2), [
     { kind: "cell", tab: "Book Now", cell: "E4", value: "Not booked" },
-    { kind: "append", tab: "Change Log", headerRow: 2, values: [9, "2026-11-20 10:03 ET", "MAT app (Izzah)", "Book Now", "E4", "Rail pass reservation", "Booked", "Not booked", "Tick undone in the MAT app", "MAT app History", "By Izzah"] },
+    { kind: "append", tab: "Change Log", headerRow: 2, values: [9, "2026-12-06 10:03 ET", "MAT app (Izzah)", "Book Now", "E4", "Rail pass reservation", "Booked", "Not booked", "Tick undone in the MAT app", "MAT app History", "By Izzah"] },
   ]);
   assert.deepEqual(owedOf(call), ["", "", "", "Not booked"]);
   await forced(call);

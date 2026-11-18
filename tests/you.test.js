@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { reportText, plannerWord, problemHead, inviteFor } from "../js/views/you.js";
 import { freshText, historySentence, localDay } from "../js/format.js";
 
-const base = { me: "Izzah", screen: "Money", version: "7", when: "Sat Dec 12, 13:20" };
+const base = { me: "Izzah", screen: "Money", version: "7", when: "Mon Dec 28, 13:20" };
 
 test("reportText names who, which screen, the version, the time and the newest history sentences", () => {
   const sentences = ["Mo rang up Ramen US$12.00", "Izzah deleted Taxi US$30.00"];
@@ -13,7 +13,7 @@ test("reportText names who, which screen, the version, the time and the newest h
     "Who: Izzah",
     "Screen: Money",
     "App version: 7",
-    "Time: Sat Dec 12, 13:20",
+    "Time: Mon Dec 28, 13:20",
     "Latest changes, newest first:",
     "- Mo rang up Ramen US$12.00",
     "- Izzah deleted Taxi US$30.00",
@@ -34,14 +34,14 @@ test("reportText says history unavailable with no signal, and none yet for an em
 });
 
 test("freshText and historySentence", () => {
-  assert.equal(freshText(Date.parse("2026-12-12T13:20:00")), "Up to date 13:20");
+  assert.equal(freshText(Date.parse("2026-12-28T13:20:00")), "Up to date 13:20");
   assert.equal(historySentence({ who: "Izzah", summary: "rang up Tempura US$1.01", via: "app" }), "Izzah rang up Tempura US$1.01");
   assert.equal(historySentence({ who: "Izzah", summary: "renamed A to B", via: "claude" }), "Izzah renamed A to B (through Claude)");
   assert.equal(historySentence({ who: "Mo", summary: "rang up Rail pass $221.52", via: "planner" }), "Mo rang up Rail pass $221.52 (from the planner)");
 });
 
 test("localDay is the phone's own day, and empty for no time", () => {
-  assert.equal(localDay(Date.parse("2026-12-12T13:20:00")), "2026-12-12");
+  assert.equal(localDay(Date.parse("2026-12-28T13:20:00")), "2026-12-28");
   assert.equal(localDay(NaN), "");
 });
 

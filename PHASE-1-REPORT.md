@@ -10,7 +10,7 @@ Survey: `triplit/docs/superpowers/specs/2026-11-17-second-trip-survey.md`.
 - [x] 2. Time zone
 - [x] 3. Currency
 - [x] 4. Two people
-- [ ] 5. The trip's own seed
+- [x] 5. The trip's own seed
 - [ ] 6. No planner
 - [ ] 7. Japanese words in the interface
 - [ ] 8. README and PHOTO-CREDITS
@@ -60,6 +60,12 @@ Survey: `triplit/docs/superpowers/specs/2026-11-17-second-trip-survey.md`.
 - Split row `÷2` and the uneven panel's two rows were already dynamic; register e2e now pins ÷2/÷1, parts 1:3, exact amounts over two rows.
 - Three people still work: `tests/e2e/helpers.cjs` `THREE` (the same lines with a third person, Sam) drives the whole stamp suite and the Simplify suite (`slip.e2e`); pure maths tests (money, history rules, routing sentences) use Mo/Izzah/Sam; the fake backend takes `addPeople` for this.
 - Not changed: `js/money.js` loop removal / `routedVia` (harmless with two, needed with three).
+
+### 5. The trip's own seed
+- `setupSeedRows`: Trip `Chicago 2026`, 2026-12-26 to 2027-01-01, CAD/USD, America/Chicago (from the constants); People Mo, Izzah; seven Days rows (Dec 26 … Jan 1), city `Chicago`, empty title.
+- Ticket date row: English only (`Mon Dec 28`); the Japanese date (`12月28日(月)`) is gone from the ticket. No new ornament.
+- Test fixtures moved with the trip: every Nov/Dec 2026 date up to Dec 25 is 16 days later (weekdays two on; the old last days Dec 17–20 map to Dec 31 / Jan 1, the day after to Jan 2), so "today" is Mon Dec 28 13:20 Chicago (`NOON28`, was `NOON12`), Day 3 of 7; counts of eleven days became seven; the stamp book fixtures have seven day stamps and the issue stamp (eight, was twelve); the gate/issue mark is `MI` (Mo + Izzah). A script did the mechanical part; each leftover was fixed by hand.
+- A sparse-day test now blanks one day's city to keep testing the fall-back to the trip's name (every seeded day now has a city).
 
 ## Tests deleted (and why)
 

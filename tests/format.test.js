@@ -22,9 +22,9 @@ test("typed shows the figure as entered", () => {
 
 test("dayHead", () => {
   assert.deepEqual(dayHead("pre", []), { jp: "出発前", en: "Before the trip", city: "" });
-  assert.deepEqual(dayHead("2026-12-11", [{ date: "2026-12-11", city: "Tokyo" }]), { jp: "12月11日(金)", en: "Fri Dec 11", city: "Tokyo" });
-  assert.deepEqual(dayHead("2026-12-10", [{ date: "2026-12-10", city: "" }]), { jp: "12月10日(木)", en: "Thu Dec 10", city: "" });
-  assert.deepEqual(dayHead("2026-12-13", []), { jp: "12月13日(日)", en: "Sun Dec 13", city: "" });
+  assert.deepEqual(dayHead("2026-12-27", [{ date: "2026-12-27", city: "Tokyo" }]), { jp: "12月27日(日)", en: "Sun Dec 27", city: "Tokyo" });
+  assert.deepEqual(dayHead("2026-12-26", [{ date: "2026-12-26", city: "" }]), { jp: "12月26日(土)", en: "Sat Dec 26", city: "" });
+  assert.deepEqual(dayHead("2026-12-29", []), { jp: "12月29日(火)", en: "Tue Dec 29", city: "" });
 });
 
 test("issuer is the first letters of the names in order", () => {
@@ -33,6 +33,7 @@ test("issuer is the first letters of the names in order", () => {
 });
 
 test("tripSpan", () => {
+  assert.equal(tripSpan({ start: "2026-12-26", end: "2027-01-01" }), "Dec 26 to Jan 1");
   assert.equal(tripSpan({ start: "2026-12-10", end: "2026-12-20" }), "Dec 10 to 20");
   assert.equal(tripSpan({ start: "2026-12-28", end: "2027-01-03" }), "Dec 28 to Jan 3");
 });
@@ -77,14 +78,14 @@ test("changeText", () => {
 });
 
 test("dayShort is the register's day: weekday and date, or Before", () => {
-  assert.equal(dayShort("2026-12-12"), "Sat 12");
-  assert.equal(dayShort("2026-12-10"), "Thu 10");
+  assert.equal(dayShort("2026-12-28"), "Mon 28");
+  assert.equal(dayShort("2026-12-26"), "Sat 26");
   assert.equal(dayShort("2027-01-01"), "Fri 1");
   assert.equal(dayShort("pre"), "Before");
 });
 
 test("changeText for a stop", () => {
-  const sky = { title: "Shibuya Sky", date: "2026-12-12" };
+  const sky = { title: "Shibuya Sky", date: "2026-12-28" };
   assert.equal(changeText({ action: "add", kind: "stop", item: sky }), "Added Shibuya Sky.");
   assert.equal(changeText({ action: "edit", kind: "stop", item: sky }), "Changed Shibuya Sky.");
   assert.equal(changeText({ action: "delete", kind: "stop", item: sky }), "Removed Shibuya Sky.");

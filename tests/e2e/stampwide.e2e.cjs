@@ -5,11 +5,11 @@
 
 const assert = require("node:assert/strict");
 const fs = require("fs");
-const { WITH_PLAN, NOON12, makeBackend, open, until } = require("./helpers.cjs");
+const { WITH_PLAN, NOON28, makeBackend, open, until } = require("./helpers.cjs");
 
 const HOUR = 3600000;
-const FIRST = Date.parse("2026-12-10T00:00:00-06:00");
-const MOTIF = ["record", "sake", "tower", "lamp", "books", "snow", "mountain", "lantern", "onsen", "temple", "plane"];
+const FIRST = Date.parse("2026-12-26T00:00:00-06:00");
+const MOTIF = ["record", "sake", "tower", "lamp", "books", "snow", "mountain"];
 const DEFS = [
   ...MOTIF.map((motif, i) => ({
     id: "s" + String(i + 1).padStart(2, "0"),
@@ -22,9 +22,9 @@ const DEFS = [
 const SHOTS = "/private/tmp/claude-501/mat-shots/chi/stamp-book";
 
 async function ready(page) {
-  const backend = makeBackend(WITH_PLAN, { now: NOON12 });
+  const backend = makeBackend(WITH_PLAN, { now: NOON28 });
   for (const d of DEFS) backend.fake.tables.StampDefs.push({ ...d });
-  await open(page, { backend, nowMs: NOON12, tab: "days" });
+  await open(page, { backend, nowMs: NOON28, tab: "days" });
   await until(() => page.evaluate(() => document.querySelectorAll("#rail .tk").length > 0), "the tickets draw");
 }
 const box = (page, sel) => page.evaluate((s) => { const r = document.querySelector(s).getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height, r: r.right, b: r.bottom }; }, sel);
@@ -54,7 +54,7 @@ module.exports = [
       const ring = await page.evaluate(() => Math.max(...[...document.querySelectorAll("#book svg")].map((e) => e.getBoundingClientRect().width)));
       assert.ok(ring <= 180, "a ring is no bigger than on a phone held sideways: " + ring);
       const rings = await page.evaluate(() => [...document.querySelectorAll("#book .sb-ring, #book [data-def]")].filter((e) => e.getBoundingClientRect().width > 0).length);
-      assert.ok(rings >= 12, "twelve rings are drawn: " + rings);
+      assert.ok(rings >= 8, "eight rings are drawn: " + rings);
       const done = await page.evaluate(() => { const d = [...document.querySelectorAll("#book button")].find((b) => b.textContent.trim() === "Done"); if (!d) return null; const r = d.getBoundingClientRect(); const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return { seen: r.width > 0 && r.y >= 0 && r.bottom <= innerHeight, onTop: top === d || d.contains(top) }; });
       assert.deepEqual(done, { seen: true, onTop: true }, "Done is in reach");
       await page.screenshot({ path: SHOTS + "/9-wide-book.png" });

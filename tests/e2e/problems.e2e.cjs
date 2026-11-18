@@ -3,11 +3,11 @@
 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
-const { SEED, NOON12, open, until } = require("./helpers.cjs");
+const { SEED, NOON28, open, until } = require("./helpers.cjs");
 
 const PLANNER_ID = "fakePlannerSheet_0123456789abcdefXYZ";
 const SHOTS = "/private/tmp/claude-501/mat-shots/chi/problems";
-const JUST_PULLED = new Date(NOON12).toISOString();
+const JUST_PULLED = new Date(NOON28).toISOString();
 
 const TWO = {
   at: JUST_PULLED,
@@ -20,7 +20,7 @@ const TWO = {
 
 async function openYou(page, paymentProblems, extra = {}) {
   // paymentsPulledAt: as if a phone pulled a moment ago, so opening does not pull again.
-  await open(page, { seed: { ...SEED, plannerId: PLANNER_ID, paymentsPulledAt: JUST_PULLED, paymentProblems }, nowMs: NOON12, ...extra });
+  await open(page, { seed: { ...SEED, plannerId: PLANNER_ID, paymentsPulledAt: JUST_PULLED, paymentProblems }, nowMs: NOON28, ...extra });
   await until(() => page.evaluate(() => document.querySelectorAll("#rc .rc-row").length > 0), "the receipt draws");
   await page.click("#youBtn");
   await until(
@@ -53,7 +53,7 @@ module.exports = [
       ]);
       const head = await page.textContent("#setPlannerP .set-pp-h");
       assert.ok(head.startsWith("Not brought in from the planner"), head);
-      assert.match(head, /Dec 12/);
+      assert.match(head, /Dec 28/);
       // It sits right under the Planner payments row.
       assert.equal(await page.evaluate(() => document.getElementById("setPlanner").nextElementSibling.id), "setPlannerP");
       fs.mkdirSync(SHOTS, { recursive: true });

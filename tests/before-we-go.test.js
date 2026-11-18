@@ -9,64 +9,64 @@ import { homeToday, dueLine, dueText, openTodos, doneTodos, isDone, plannerPendi
 const item = (o) => ({ id: "1", item: "x", bookBy: "", status: "", note: "", link: "", claimedBy: "", tickedBy: "", tickedAt: "", done: false, ...o });
 
 test("homeToday is the date on the Toronto calendar, whatever the instant's date in Japan", () => {
-  // 2026-11-16 23:30 in Toronto is already Nov 17 in Japan and in UTC.
-  assert.equal(homeToday(Date.parse("2026-11-17T04:30:00Z")), "2026-11-16");
-  assert.equal(homeToday(Date.parse("2026-11-17T05:30:00Z")), "2026-11-17");
+  // 2026-12-02 23:30 in Toronto is already Dec 3 in UTC.
+  assert.equal(homeToday(Date.parse("2026-12-03T04:30:00Z")), "2026-12-02");
+  assert.equal(homeToday(Date.parse("2026-12-03T05:30:00Z")), "2026-12-03");
 });
 
 test("the due line: in N days, tomorrow, today, late; heavier within 3 days", () => {
-  const today = "2026-11-16";
-  assert.equal(dueText(dueLine("2026-12-05", today)), "by Sat Dec 5 · in 19 days");
-  assert.equal(dueLine("2026-12-05", today).state, "later");
-  assert.equal(dueLine("2026-12-05", today).strong, false);
+  const today = "2026-12-02";
+  assert.equal(dueText(dueLine("2026-12-21", today)), "by Mon Dec 21 · in 19 days");
+  assert.equal(dueLine("2026-12-21", today).state, "later");
+  assert.equal(dueLine("2026-12-21", today).strong, false);
 
-  const d4 = dueLine("2026-11-20", today);
-  assert.equal(dueText(d4), "by Fri Nov 20 · in 4 days");
+  const d4 = dueLine("2026-12-06", today);
+  assert.equal(dueText(d4), "by Sun Dec 6 · in 4 days");
   assert.equal(d4.strong, false);
-  const d3 = dueLine("2026-11-19", today);
-  assert.equal(dueText(d3), "by Thu Nov 19 · in 3 days");
+  const d3 = dueLine("2026-12-05", today);
+  assert.equal(dueText(d3), "by Sat Dec 5 · in 3 days");
   assert.equal(d3.state, "soon");
   assert.equal(d3.strong, true);
 
-  const tomorrow = dueLine("2026-11-17", today);
-  assert.equal(dueText(tomorrow), "by Tue Nov 17 · tomorrow");
+  const tomorrow = dueLine("2026-12-03", today);
+  assert.equal(dueText(tomorrow), "by Thu Dec 3 · tomorrow");
   assert.equal(tomorrow.state, "tomorrow");
   assert.equal(tomorrow.strong, true);
 
-  const now = dueLine("2026-11-16", today);
-  assert.equal(dueText(now), "by Mon Nov 16 · today");
+  const now = dueLine("2026-12-02", today);
+  assert.equal(dueText(now), "by Wed Dec 2 · today");
   assert.equal(now.state, "today");
   assert.equal(now.strong, true);
 
-  const late1 = dueLine("2026-11-15", today);
-  assert.equal(dueText(late1), "was due Sun Nov 15 · 1 day late");
+  const late1 = dueLine("2026-12-01", today);
+  assert.equal(dueText(late1), "was due Tue Dec 1 · 1 day late");
   assert.equal(late1.state, "late");
-  const late2 = dueLine("2026-11-14", today);
-  assert.equal(dueText(late2), "was due Sat Nov 14 · 2 days late");
+  const late2 = dueLine("2026-11-30", today);
+  assert.equal(dueText(late2), "was due Mon Nov 30 · 2 days late");
 });
 
 test("the due line counts whole calendar days across a month and a year end", () => {
-  assert.equal(dueText(dueLine("2026-12-01", "2026-11-30")), "by Tue Dec 1 · tomorrow");
+  assert.equal(dueText(dueLine("2026-12-17", "2026-12-16")), "by Thu Dec 17 · tomorrow");
   assert.equal(dueText(dueLine("2027-01-02", "2026-12-31")), "by Sat Jan 2 · in 2 days");
 });
 
 test("no date, or a date that is not one, gives no due line", () => {
-  for (const v of ["", null, undefined, "Dec 5", "2026-13-01", "2026-02-30", 42]) {
-    assert.equal(dueLine(v, "2026-11-16"), null, String(v));
-    assert.equal(dueText(dueLine(v, "2026-11-16")), "");
+  for (const v of ["", null, undefined, "Dec 21", "2026-13-01", "2026-02-30", 42]) {
+    assert.equal(dueLine(v, "2026-12-02"), null, String(v));
+    assert.equal(dueText(dueLine(v, "2026-12-02")), "");
   }
 });
 
 test("open items: earliest book-by first, undated last, ties and undated in planner order; done ones left out", () => {
   const list = [
     item({ id: "1", bookBy: "" }),
-    item({ id: "2", bookBy: "2026-12-01" }),
-    item({ id: "3", bookBy: "2026-11-20" }),
+    item({ id: "2", bookBy: "2026-12-17" }),
+    item({ id: "3", bookBy: "2026-12-06" }),
     item({ id: "4", bookBy: "", tickedBy: "Mo", done: true }),
     item({ id: "5", bookBy: "" }),
-    item({ id: "6", bookBy: "2026-12-01" }),
-    item({ id: "7", bookBy: "2026-11-01", status: "Booked", done: true }),
-    item({ id: "8", bookBy: "2026-11-02" }),
+    item({ id: "6", bookBy: "2026-12-17" }),
+    item({ id: "7", bookBy: "2026-11-17", status: "Booked", done: true }),
+    item({ id: "8", bookBy: "2026-11-18" }),
   ];
   assert.deepEqual(openTodos(list).map((t) => t.id), ["8", "3", "2", "6", "1", "5"]);
 });
@@ -74,9 +74,9 @@ test("open items: earliest book-by first, undated last, ties and undated in plan
 test("done items: ticked ones newest first, then the planner's own bookings in planner order", () => {
   const list = [
     item({ id: "1", status: "Booked" }),
-    item({ id: "2", tickedBy: "Mo", tickedAt: "2026-11-20T10:00:00.000Z", status: "Booked" }),
+    item({ id: "2", tickedBy: "Mo", tickedAt: "2026-12-06T10:00:00.000Z", status: "Booked" }),
     item({ id: "3" }),
-    item({ id: "4", tickedBy: "Izzah", tickedAt: "2026-11-21T09:00:00.000Z" }),
+    item({ id: "4", tickedBy: "Izzah", tickedAt: "2026-12-07T09:00:00.000Z" }),
     item({ id: "5", status: "booked (paid)" }),
   ];
   assert.deepEqual(doneTodos(list).map((t) => t.id), ["4", "2", "1", "5"]);
@@ -95,7 +95,7 @@ test("done is a tick or the planner saying booked; the planner is pending when a
 });
 
 test("a tick on a Status the planner computes is done and never pending, and its line says the planner works it out", () => {
-  const t = item({ tickedBy: "Mo", tickedAt: new Date(2026, 11, 3, 9, 30).toISOString(), status: "Not booked", plannerComputes: true });
+  const t = item({ tickedBy: "Mo", tickedAt: new Date(2026, 11, 19, 9, 30).toISOString(), status: "Not booked", plannerComputes: true });
   assert.equal(isDone(t), true);
   assert.equal(plannerPending(t), false);
   assert.equal(tickedLine(t), "Ticked by Mo. The planner works this one out itself.");
@@ -103,19 +103,19 @@ test("a tick on a Status the planner computes is done and never pending, and its
 });
 
 test("the done line: who ticked it and the day (the phone's own calendar), or booked in the planner", () => {
-  const at = new Date(2026, 11, 3, 9, 30).toISOString(); // Dec 3, 09:30 on this machine's clock
-  assert.equal(tickedLine(item({ tickedBy: "Mo", tickedAt: at })), "済 Mo · Dec 3");
+  const at = new Date(2026, 11, 19, 9, 30).toISOString(); // Dec 19, 09:30 on this machine's clock
+  assert.equal(tickedLine(item({ tickedBy: "Mo", tickedAt: at })), "済 Mo · Dec 19");
   assert.equal(tickedLine(item({ tickedBy: "Mo", tickedAt: "" })), "済 Mo");
   assert.equal(tickedLine(item({ status: "Booked" })), "Booked in the planner");
 });
 
 test("stale: never fetched, or fetched 60 minutes ago or more", () => {
-  const now = Date.parse("2026-11-16T15:00:00Z");
+  const now = Date.parse("2026-12-02T15:00:00Z");
   assert.equal(isStale("", now), true);
   assert.equal(isStale(undefined, now), true);
   assert.equal(isStale("not a time", now), true);
-  assert.equal(isStale("2026-11-16T14:01:00Z", now), false);
-  assert.equal(isStale("2026-11-16T14:00:00Z", now), true);
+  assert.equal(isStale("2026-12-02T14:01:00Z", now), false);
+  assert.equal(isStale("2026-12-02T14:00:00Z", now), true);
 });
 
 test("the Before tab shows: always before the trip once the list has loaded, from the first day only while something is open, never before the list has loaded", () => {

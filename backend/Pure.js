@@ -617,13 +617,20 @@ function dayToRow(d) {
   return o;
 }
 
-// The rows setup() writes into an empty Sheet (also used by the test backend).
+// The rows setup() writes into an empty Sheet (also used by the test backend):
+// the trip, its two people, and one Days row per date from the first day to
+// the last, each in Chicago with no title yet.
 function setupSeedRows() {
   var days = [];
-  for (var d = 10; d <= 20; d++) days.push({ date: "2026-12-" + d });
+  var first = TRIP_FIRST_DAY_, last = TRIP_LAST_DAY_;
+  var t = Date.UTC(Number(first.slice(0, 4)), Number(first.slice(5, 7)) - 1, Number(first.slice(8, 10)));
+  for (var date = first; date <= last; date = new Date(t).toISOString().slice(0, 10)) {
+    days.push({ date: date, city: "Chicago", title: "" });
+    t += 86400000;
+  }
   return {
     Trip: [
-      { key: "name", value: "Japan 2026" }, { key: "start", value: "2026-12-10" }, { key: "end", value: "2026-12-20" },
+      { key: "name", value: "Chicago 2026" }, { key: "start", value: TRIP_FIRST_DAY_ }, { key: "end", value: TRIP_LAST_DAY_ },
       { key: "home", value: HOME_CURRENCY_ }, { key: "currency", value: TRIP_CURRENCY_ }, { key: "tz", value: TRIP_TZ_ },
     ],
     People: [

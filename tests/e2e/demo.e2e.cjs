@@ -3,12 +3,12 @@
 // 23:30). Only Days follows it: Money, the register's day, History times and
 // everything sent to the backend use the real time (R28). Nothing is stored,
 // so a reload ends it. The plan is tests/fixtures/plan.json over the seed; the
-// real time is Nov 15, 12:00 in Chicago, before the trip.
+// real time is Dec 1, 12:00 in Chicago, before the trip.
 
 const assert = require("node:assert/strict");
 const { WITH_PLAN, open, advance, until, text, expectText, visible } = require("./helpers.cjs");
 
-const NOV15 = Date.parse("2026-11-15T12:00:00-06:00");
+const NOV15 = Date.parse("2026-12-01T12:00:00-06:00");
 const row = (id) => '.r[data-id="' + id + '"]';
 const MEIJI = "planstop1201";
 const SKY = "planstop1203";
@@ -17,7 +17,7 @@ const READS = ["load", "rev", "history"];
 
 async function ready(page, opts = {}) {
   const backend = await open(page, { seed: WITH_PLAN, tab: "days", nowMs: NOV15, ...opts });
-  await until(() => page.evaluate(() => document.querySelectorAll("#rail .pg .tk").length === 11), "the tickets draw");
+  await until(() => page.evaluate(() => document.querySelectorAll("#rail .pg .tk").length === 7), "the tickets draw");
   return backend;
 }
 
@@ -27,8 +27,8 @@ const setHidden = (page, hidden) => page.evaluate((h) => {
   document.dispatchEvent(new Event("visibilitychange"));
 }, hidden);
 const demoDay = (page) => page.evaluate(() => globalThis.__matTest.clock.demoDay());
-// A plan whose Dec 12 ticket is taller than the screen.
-const LONG = { ...WITH_PLAN, stops: [...WITH_PLAN.stops, ...Array.from({ length: 16 }, (_, i) => ({ id: "longstop" + String(i).padStart(2, "0"), date: "2026-12-12", time: String(10 + (i % 12)).padStart(2, "0") + ":" + (i < 12 ? "10" : "40"), title: "Extra stop " + i }))] };
+// A plan whose Dec 28 ticket is taller than the screen.
+const LONG = { ...WITH_PLAN, stops: [...WITH_PLAN.stops, ...Array.from({ length: 16 }, (_, i) => ({ id: "longstop" + String(i).padStart(2, "0"), date: "2026-12-28", time: String(10 + (i % 12)).padStart(2, "0") + ":" + (i < 12 ? "10" : "40"), title: "Extra stop " + i }))] };
 
 const waitYou = (page) =>
   until(() => page.evaluate(() => {
@@ -36,7 +36,7 @@ const waitYou = (page) =>
     return s.classList.contains("is-open") && Math.abs(s.getBoundingClientRect().bottom - innerHeight) < 1;
   }), "Settings opens");
 
-// Settings, Try another day, then the day's button ("Sat 12").
+// Settings, Try another day, then the day's button ("Mon 28").
 async function tryDay(page, label) {
   await page.click("#youBtn");
   await waitYou(page);
@@ -67,7 +67,7 @@ module.exports = [
     name: "try a day: Settings closes, Days shows that day at 07:00",
     async run({ page }) {
       await ready(page);
-      await expectText(page, "#dayCount", /^Day 1 of 11 in 25 days/);
+      await expectText(page, "#dayCount", /^Day 1 of 7 in 25 days/);
       assert.equal(await visible(page, "#demo"), false);
       await page.click("#youBtn");
       await waitYou(page);
@@ -75,13 +75,13 @@ module.exports = [
       assert.equal(await visible(page, "#setDemoDays"), false, "the days are folded away");
       await page.click("#setDemo");
       const labels = await page.$$eval("#setDemoDays button[data-date]", (bs) => bs.map((b) => b.textContent));
-      assert.equal(labels.length, 11);
-      assert.equal(labels[2], "Sat 12");
-      await page.click('#setDemoDays button[data-date="2026-12-12"]');
+      assert.equal(labels.length, 7);
+      assert.equal(labels[2], "Mon 28");
+      await page.click('#setDemoDays button[data-date="2026-12-28"]');
       await until(() => page.evaluate(() => !document.getElementById("you").classList.contains("is-open")), "Settings closes");
-      await expectText(page, "#demo", "Pretending it’s Sat Dec 12, 07:00Stop");
-      await expectText(page, "#dayCount", /^Day 3 of 11 today/);
-      await until(async () => (await inView(page)) === "2026-12-12", "Dec 12 is in view");
+      await expectText(page, "#demo", "Pretending it’s Mon Dec 28, 07:00Stop");
+      await expectText(page, "#dayCount", /^Day 3 of 7 today/);
+      await until(async () => (await inView(page)) === "2026-12-28", "Dec 28 is in view");
       assert.ok((await klass(page, row(MEIJI))).includes("is-next"), "Meiji Shrine is next");
       await expectText(page, row(MEIJI) + " .r-s", /^Next, in 2 h\./);
       assert.equal(await visible(page, "#demo"), true);
@@ -91,7 +91,7 @@ module.exports = [
     name: "it runs fast, and Shibuya Sky is done by 15:00",
     async run({ page }) {
       const backend = await ready(page);
-      await tryDay(page, "Sat 12");
+      await tryDay(page, "Mon 28");
       await advance(page, backend, 60000);
       await expectText(page, "#demo", /09:00/);
       await expectText(page, row(MEIJI) + " .r-s", /^Now\./);
@@ -104,20 +104,20 @@ module.exports = [
     name: "it holds at the end of the day",
     async run({ page }) {
       const backend = await ready(page);
-      await tryDay(page, "Sat 12");
+      await tryDay(page, "Mon 28");
       await advance(page, backend, 600000);
-      await expectText(page, "#demo", /Sat Dec 12, 23:30/);
-      await expectText(page, "#dayCount", /^Day 3 of 11 today/);
+      await expectText(page, "#demo", /Mon Dec 28, 23:30/);
+      await expectText(page, "#dayCount", /^Day 3 of 7 today/);
       await advance(page, backend, 600000);
-      await expectText(page, "#demo", /Sat Dec 12, 23:30/);
+      await expectText(page, "#demo", /Mon Dec 28, 23:30/);
     },
   },
   {
     name: "it touches nothing real: Ring up is dated with the real day, History times are real",
     async run({ page }) {
       const backend = await ready(page);
-      await tryDay(page, "Sat 12");
-      await advance(page, backend, 60000); // the demo says 09:00; the real time is 12:01 on Nov 15
+      await tryDay(page, "Mon 28");
+      await advance(page, backend, 60000); // the demo says 09:00; the real time is 12:01 on Dec 1
       await page.click("#ring");
       await until(() => page.evaluate(() => {
         const r = document.getElementById("reg");
@@ -134,7 +134,7 @@ module.exports = [
       assert.equal(add.args.expense.day, "pre", "dated with the real day");
       assert.equal(writes(backend).length, 1);
       await page.click("#regDone");
-      await expectText(page, "#demo", /Pretending it’s Sat Dec 12, 09:/);
+      await expectText(page, "#demo", /Pretending it’s Mon Dec 28, 09:/);
       // History: the line was added at the real 12:01, not at the demo's time.
       await page.click("#youBtn");
       await waitYou(page);
@@ -149,12 +149,12 @@ module.exports = [
     name: "Stop ends it, with no signal too",
     async run({ page }) {
       const backend = await ready(page);
-      await tryDay(page, "Sat 12");
+      await tryDay(page, "Mon 28");
       backend.failWith = "network";
       await page.click("#demoStop");
       await until(async () => !(await visible(page, "#demo")), "the banner goes");
-      await expectText(page, "#dayCount", /^Day 1 of 11 in 25 days/);
-      await until(async () => (await inView(page)) === "2026-12-10", "the rail is back on Day 1");
+      await expectText(page, "#dayCount", /^Day 1 of 7 in 25 days/);
+      await until(async () => (await inView(page)) === "2026-12-26", "the rail is back on Day 1");
       assert.equal(await visible(page, "#demoStop"), false);
     },
   },
@@ -162,21 +162,21 @@ module.exports = [
     name: "a day browsed while the demo runs is left alone, then Stop goes back to the real today",
     async run({ page }) {
       const backend = await ready(page);
-      await tryDay(page, "Sat 12");
+      await tryDay(page, "Mon 28");
       await page.click("#pager .sq:nth-child(6)");
-      await until(async () => (await inView(page)) === "2026-12-15", "Dec 15 is in view");
+      await until(async () => (await inView(page)) === "2026-12-31", "Dec 31 is in view");
       await advance(page, backend, 120000);
       await expectText(page, "#demo", /11:00/);
-      assert.equal(await inView(page), "2026-12-15", "the rail stays where it was put");
+      assert.equal(await inView(page), "2026-12-31", "the rail stays where it was put");
       await page.click("#demoStop");
-      await until(async () => (await inView(page)) === "2026-12-10", "Stop returns to Day 1");
+      await until(async () => (await inView(page)) === "2026-12-26", "Stop returns to Day 1");
     },
   },
   {
     name: "the all-days list follows the demo",
     async run({ page }) {
       const backend = await ready(page);
-      await tryDay(page, "Sat 12");
+      await tryDay(page, "Mon 28");
       await page.click("#dayCount");
       await until(() => page.evaluate(() => document.getElementById("allDays").classList.contains("is-open")), "the list opens");
       const stamps = () => page.$$eval("#allDaysList .ad-row", (rows) => rows.map((r) => (r.querySelector(".ad-st") || {}).textContent || ""));
@@ -193,11 +193,11 @@ module.exports = [
     name: "a reload ends it",
     async run({ page }) {
       await ready(page);
-      await tryDay(page, "Sat 12");
+      await tryDay(page, "Mon 28");
       await page.reload();
-      await until(() => page.evaluate(() => document.querySelectorAll("#rail .pg .tk").length === 11), "the tickets draw again");
+      await until(() => page.evaluate(() => document.querySelectorAll("#rail .pg .tk").length === 7), "the tickets draw again");
       assert.equal(await visible(page, "#demo"), false);
-      await expectText(page, "#dayCount", /^Day 1 of 11 in 25 days/);
+      await expectText(page, "#dayCount", /^Day 1 of 7 in 25 days/);
       assert.equal(await page.evaluate(() => JSON.stringify(Object.keys(localStorage).filter((k) => /demo|pretend/i.test(k)))), "[]", "nothing stored");
     },
   },
@@ -208,18 +208,18 @@ module.exports = [
       await page.click("#youBtn");
       await waitYou(page);
       await page.click("#setDemo");
-      await page.click('#setDemoDays button[data-date="2026-12-12"]');
-      await expectText(page, "#demo", /Pretending it’s Sat Dec 12, 07:/);
+      await page.click('#setDemoDays button[data-date="2026-12-28"]');
+      await expectText(page, "#demo", /Pretending it’s Mon Dec 28, 07:/);
       assert.equal(await page.evaluate(() => document.getElementById("vDays").classList.contains("is-active")), true);
-      await expectText(page, "#dayCount", /^Day 3 of 11 today/);
-      await until(async () => (await inView(page)) === "2026-12-12", "Dec 12 is in view");
+      await expectText(page, "#dayCount", /^Day 3 of 7 today/);
+      await until(async () => (await inView(page)) === "2026-12-28", "Dec 28 is in view");
       assert.equal(await page.evaluate(() => localStorage.getItem("chi.tab")), "money", "the remembered screen is untouched");
-      assert.equal(await page.evaluate(() => localStorage.getItem("chi.tabDay")), "2026-11-15", "and so is the day it was remembered on (the real one)");
+      assert.equal(await page.evaluate(() => localStorage.getItem("chi.tabDay")), "2026-12-01", "and so is the day it was remembered on (the real one)");
       await page.click('[data-tab="days"]');
       await page.click("#demoStop");
       await until(async () => !(await visible(page, "#demo")), "Stop works");
       assert.equal(await page.evaluate(() => localStorage.getItem("chi.tab")), "days", "going to Days by hand remembers Days");
-      assert.equal(await page.evaluate(() => localStorage.getItem("chi.tabDay")), "2026-11-15", "after Stop the remembered day is still the real one");
+      assert.equal(await page.evaluate(() => localStorage.getItem("chi.tabDay")), "2026-12-01", "after Stop the remembered day is still the real one");
     },
   },
   {
@@ -231,8 +231,8 @@ module.exports = [
         return [...rail.querySelectorAll(".pg")].map((p) => p.offsetLeft - rail.offsetLeft);
       });
       const without = await snaps();
-      await tryDay(page, "Sat 12");
-      await until(async () => (await inView(page)) === "2026-12-12", "Dec 12 is in view");
+      await tryDay(page, "Mon 28");
+      await until(async () => (await inView(page)) === "2026-12-28", "Dec 28 is in view");
       assert.deepEqual(await snaps(), without, "the rail's snap positions are the same with the banner on");
       const rest = await page.evaluate(() => ({ demo: document.getElementById("demo").getBoundingClientRect().bottom, rail: document.getElementById("rail").getBoundingClientRect().top }));
       assert.ok(rest.demo <= rest.rail, "at rest the banner covers no part of the ticket: " + JSON.stringify(rest));
@@ -255,7 +255,7 @@ module.exports = [
     name: "R34 a: the sticky banner sits under an open sheet",
     async run({ page }) {
       await ready(page, { seed: LONG });
-      await tryDay(page, "Sat 12");
+      await tryDay(page, "Mon 28");
       await page.click("#dayCount");
       await until(() => page.evaluate(() => document.getElementById("allDays").classList.contains("is-open")), "the list opens");
       const hit = await page.evaluate(() => {
@@ -270,35 +270,35 @@ module.exports = [
     name: "R34 b: back after more than 10 minutes, the demo has ended like Stop",
     async run({ page }) {
       const backend = await ready(page);
-      await tryDay(page, "Sat 12");
+      await tryDay(page, "Mon 28");
       await setHidden(page, true);
       await advance(page, backend, 11 * 60000);
       await setHidden(page, false);
       await until(async () => !(await visible(page, "#demo")), "the banner goes");
       assert.equal(await demoDay(page), null);
-      await expectText(page, "#dayCount", /^Day 1 of 11 in 25 days/);
-      await until(async () => (await inView(page)) === "2026-12-10", "the rail is on the real today's ticket");
+      await expectText(page, "#dayCount", /^Day 1 of 7 in 25 days/);
+      await until(async () => (await inView(page)) === "2026-12-26", "the rail is on the real today's ticket");
     },
   },
   {
     name: "R34 b: back after 9 minutes, the demo goes on",
     async run({ page }) {
       const backend = await ready(page);
-      await tryDay(page, "Sat 12");
+      await tryDay(page, "Mon 28");
       await setHidden(page, true);
       await advance(page, backend, 9 * 60000);
       await setHidden(page, false);
-      assert.equal(await demoDay(page), "2026-12-12");
+      assert.equal(await demoDay(page), "2026-12-28");
       assert.equal(await visible(page, "#demo"), true);
     },
   },
   {
     name: "R34 b: back on another real trip-zone day, the demo has ended",
     async run({ page }) {
-      const backend = await ready(page, { nowMs: Date.parse("2026-11-15T23:55:00-06:00") });
-      await tryDay(page, "Sat 12");
+      const backend = await ready(page, { nowMs: Date.parse("2026-12-01T23:55:00-06:00") });
+      await tryDay(page, "Mon 28");
       await setHidden(page, true);
-      await advance(page, backend, 8 * 60000); // 00:03 on Nov 16
+      await advance(page, backend, 8 * 60000); // 00:03 on Dec 2
       await setHidden(page, false);
       await until(async () => !(await visible(page, "#demo")), "the banner goes");
       assert.equal(await demoDay(page), null);
@@ -313,7 +313,7 @@ module.exports = [
         window.__iv = [];
         window.setInterval = (f, d, ...a) => (window.__iv.push(d), orig(f, d, ...a));
       });
-      await tryDay(page, "Sat 12");
+      await tryDay(page, "Mon 28");
       assert.equal((await page.evaluate(() => window.__iv)).pop(), 500, "fast while it runs");
       await advance(page, backend, 600000);
       await expectText(page, "#demo", /23:30/);
@@ -324,7 +324,7 @@ module.exports = [
     name: "the You row says On while a demo runs, even over Money",
     async run({ page }) {
       await ready(page);
-      await tryDay(page, "Sat 12");
+      await tryDay(page, "Mon 28");
       await page.click('[data-tab="money"]');
       await page.click("#youBtn");
       await waitYou(page);
@@ -335,18 +335,18 @@ module.exports = [
     name: "R34 b: exactly 10 minutes away keeps the demo",
     async run({ page }) {
       const backend = await ready(page);
-      await tryDay(page, "Sat 12");
+      await tryDay(page, "Mon 28");
       await setHidden(page, true);
       await advance(page, backend, 10 * 60000);
       await setHidden(page, false);
-      assert.equal(await demoDay(page), "2026-12-12");
+      assert.equal(await demoDay(page), "2026-12-28");
       assert.equal(await visible(page, "#demo"), true);
     },
   },
   {
     name: "R34 b: a visible phone on Days ends the demo when the real day rolls over, and its timers stop",
     async run({ page }) {
-      const backend = await ready(page, { nowMs: Date.parse("2026-11-15T23:55:00-06:00") });
+      const backend = await ready(page, { nowMs: Date.parse("2026-12-01T23:55:00-06:00") });
       // Every interval set from here on, with how often its callback has run.
       await page.evaluate(() => {
         const orig = window.setInterval.bind(window);
@@ -357,12 +357,12 @@ module.exports = [
           return orig((...x) => { rec.fires += 1; return f(...x); }, d, ...a);
         };
       });
-      await tryDay(page, "Sat 12");
-      await advance(page, backend, 600000); // the demo holds at 23:30; the real time is 00:05 on Nov 16
+      await tryDay(page, "Mon 28");
+      await advance(page, backend, 600000); // the demo holds at 23:30; the real time is 00:05 on Dec 2
       await until(async () => !(await visible(page, "#demo")), "the banner goes");
       assert.equal(await demoDay(page), null);
-      await expectText(page, "#dayCount", /^Day 1 of 11 in 24 days/);
-      await until(async () => (await inView(page)) === "2026-12-10", "the rail is on the real today's ticket");
+      await expectText(page, "#dayCount", /^Day 1 of 7 in 24 days/);
+      await until(async () => (await inView(page)) === "2026-12-26", "the rail is on the real today's ticket");
       const ivs = () => page.evaluate(() => window.__iv.map((r) => ({ ...r })));
       assert.equal((await ivs()).pop().d, 15000, "the normal tick");
       const guards = (list) => list.filter((r) => r.d === 30000);
@@ -381,14 +381,14 @@ module.exports = [
   {
     name: "R34 b: with Money showing on a visible page, the demo ends at the date change too",
     async run({ page }) {
-      const backend = await ready(page, { nowMs: Date.parse("2026-11-15T23:55:00-06:00") });
-      await tryDay(page, "Sat 12");
+      const backend = await ready(page, { nowMs: Date.parse("2026-12-01T23:55:00-06:00") });
+      await tryDay(page, "Mon 28");
       await page.click('[data-tab="money"]');
       await advance(page, backend, 600000);
       await until(async () => (await demoDay(page)) === null, "the demo ended under Money");
       await page.click('[data-tab="days"]');
       assert.equal(await visible(page, "#demo"), false, "no banner on Days");
-      await expectText(page, "#dayCount", /^Day 1 of 11 in 24 days/);
+      await expectText(page, "#dayCount", /^Day 1 of 7 in 24 days/);
       await page.click('[data-tab="money"]');
       await page.click("#youBtn");
       await waitYou(page);

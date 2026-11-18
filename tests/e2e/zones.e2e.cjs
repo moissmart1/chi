@@ -15,15 +15,15 @@ const row = (id) => '.r[data-id="' + id + '"]';
 
 // Stops whose leave-by line each instant can read.
 const EXTRA = [
-  { id: "zonestop0001", date: "2026-12-12", time: "16:00", title: "Tower Records", travelMin: 30 },
-  { id: "zonestop0002", date: "2026-12-12", time: "23:58", title: "Last train", travelMin: 5 },
-  { id: "zonestop0003", date: "2026-12-13", time: "00:30", title: "Night bus", travelMin: 10 },
+  { id: "zonestop0001", date: "2026-12-28", time: "16:00", title: "Tower Records", travelMin: 30 },
+  { id: "zonestop0002", date: "2026-12-28", time: "23:58", title: "Last train", travelMin: 5 },
+  { id: "zonestop0003", date: "2026-12-29", time: "00:30", title: "Night bus", travelMin: 10 },
 ];
 const SEED = { ...WITH_PLAN, stops: [...WITH_PLAN.stops, ...EXTRA] };
 
 async function ready(page, nowMs) {
   await open(page, { seed: SEED, tab: "days", nowMs });
-  await until(() => page.evaluate(() => document.querySelectorAll("#rail .pg .tk").length === 11), "the tickets draw");
+  await until(() => page.evaluate(() => document.querySelectorAll("#rail .pg .tk").length === 7), "the tickets draw");
 }
 
 // The squares filled as used, as "1110000…".
@@ -43,14 +43,14 @@ const inView = (page) =>
   });
 
 const TRIP = [
-  { at: "2026-12-12T23:50:00", label: "just before Chicago midnight", day: "2026-12-12", count: /^Day 3 of 11 ?today$/, used: "11000000000", next: "zonestop0002", leave: "Leave by 23:53, in 3 min." },
-  { at: "2026-12-13T00:10:00", label: "just after Chicago midnight", day: "2026-12-13", count: /^Day 4 of 11 ?today$/, used: "11100000000", next: "zonestop0003", leave: "Leave by 00:20, in 10 min." },
-  { at: "2026-12-12T15:00:00", label: "mid-afternoon in Chicago", day: "2026-12-12", count: /^Day 3 of 11 ?today$/, used: "11000000000", next: "zonestop0001", leave: "Leave by 15:30, in 30 min." },
+  { at: "2026-12-28T23:50:00", label: "just before Chicago midnight", day: "2026-12-28", count: /^Day 3 of 7 ?today$/, used: "1100000", next: "zonestop0002", leave: "Leave by 23:53, in 3 min." },
+  { at: "2026-12-29T00:10:00", label: "just after Chicago midnight", day: "2026-12-29", count: /^Day 4 of 7 ?today$/, used: "1110000", next: "zonestop0003", leave: "Leave by 00:20, in 10 min." },
+  { at: "2026-12-28T15:00:00", label: "mid-afternoon in Chicago", day: "2026-12-28", count: /^Day 3 of 7 ?today$/, used: "1100000", next: "zonestop0001", leave: "Leave by 15:30, in 30 min." },
 ];
 const BEFORE = [
-  { at: "2026-12-09T23:50:00", label: "just before Chicago midnight on the eve", count: /^Day 1 of 11 ?tomorrow$/, countdown: "あと1日" },
-  { at: "2026-12-10T00:10:00", label: "just after Chicago midnight on Day 1", count: /^Day 1 of 11 ?today$/, countdown: null },
-  { at: "2026-11-15T15:00:00", label: "mid-afternoon in Chicago, weeks before", count: /^Day 1 of 11 ?in 25 days$/, countdown: "あと25日" },
+  { at: "2026-12-25T23:50:00", label: "just before Chicago midnight on the eve", count: /^Day 1 of 7 ?tomorrow$/, countdown: "あと1日" },
+  { at: "2026-12-26T00:10:00", label: "just after Chicago midnight on Day 1", count: /^Day 1 of 7 ?today$/, countdown: null },
+  { at: "2026-12-01T15:00:00", label: "mid-afternoon in Chicago, weeks before", count: /^Day 1 of 7 ?in 25 days$/, countdown: "あと25日" },
 ];
 
 const cases = [];
@@ -78,8 +78,8 @@ for (const zone of ["America/Toronto", "Asia/Tokyo"]) {
       async run({ page }) {
         await ready(page, chi(t.at));
         await expectText(page, "#dayCount", t.count);
-        assert.equal(await used(page), "00000000000");
-        const d10 = await text(page, tk("2026-12-10") + " .tk-date");
+        assert.equal(await used(page), "0000000");
+        const d10 = await text(page, tk("2026-12-26") + " .tk-date");
         if (t.countdown) assert.ok(d10.includes(t.countdown), d10);
         else assert.equal(/あと\d+日/.test(d10), false, d10);
       },

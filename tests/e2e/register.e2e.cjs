@@ -2,7 +2,7 @@
 
 const assert = require("node:assert/strict");
 const P = require("../../backend/Pure.js");
-const { SEED, NOON12, open, advance, until, text, expectText, visible } = require("./helpers.cjs");
+const { SEED, NOON28, open, advance, until, text, expectText, visible } = require("./helpers.cjs");
 
 // ---- small tools for this file ----
 
@@ -35,7 +35,7 @@ const disabled = (page, sel) => page.evaluate((s) => document.querySelector(s).d
 const waitGo = (page, enabled) => until(async () => (await disabled(page, "#kGo")) === !enabled, "#kGo " + (enabled ? "enabled" : "disabled"));
 
 async function ready(page, opts = {}) {
-  const backend = await open(page, { seed: SEED, nowMs: NOON12, ...opts });
+  const backend = await open(page, { seed: SEED, nowMs: NOON28, ...opts });
   await waitRows(page, 8);
   return backend;
 }
@@ -80,7 +80,7 @@ module.exports = [
       assert.equal(await isOpen(page), false);
       await ringOpen(page);
       await expectText(page, "#regTitle", "Ring up");
-      await expectText(page, "#xDay", "Sat 12");
+      await expectText(page, "#xDay", "Mon 28");
       await expectText(page, "#xAmt", "$0");
       await expectText(page, "#kCur", "$ → US$");
       assert.equal(await isOn(page, seal("xPayer", "Mo")), true, "Mo paid");
@@ -113,14 +113,14 @@ module.exports = [
       });
       assert.equal(printed, true, "the new line prints (class print) as soon as it is rung up");
       const row = await waitRow(page, "Dinner");
-      assert.equal(row.day, "2026-12-12");
+      assert.equal(row.day, "2026-12-28");
       assert.equal(row.amt, "US$94.15");
       assert.equal(await isOpen(page), true, "the register stays open");
       await expectText(page, "#xAmt", "$0");
       await expectText(page, "#kCur", "$ → US$");
       assert.equal(await page.inputValue("#xWhat"), "");
       assert.equal(await isOn(page, seal("xPayer", "Mo")), true, "Mo is still the payer");
-      await expectText(page, "#xDay", "Sat 12");
+      await expectText(page, "#xDay", "Mon 28");
       const stored = await until(() => savedTitled(backend, "Dinner")[0], "the backend has Dinner");
       assert.equal(stored.kind, "food");
       assert.equal(stored.amount, 94.15);
@@ -275,7 +275,7 @@ module.exports = [
   {
     name: "a new expense always opens in dollars; an old chi.cur is cleared; editing keeps the line's own currency",
     async run({ page }) {
-      const backend = await open(page, { seed: SEED, nowMs: NOON12, storage: { "chi.cur": "USD" } });
+      const backend = await open(page, { seed: SEED, nowMs: NOON28, storage: { "chi.cur": "USD" } });
       await waitRows(page, 8);
       assert.equal(await page.evaluate(() => localStorage.getItem("chi.cur")), null, "the old memory is gone");
       await ringOpen(page);
@@ -349,19 +349,19 @@ module.exports = [
       const backend = await ready(page);
       await ringOpen(page);
       await page.click("#dPrev");
-      await expectText(page, "#xDay", "Fri 11");
+      await expectText(page, "#xDay", "Sun 27");
       await page.click("#dPrev");
-      await expectText(page, "#xDay", "Thu 10");
+      await expectText(page, "#xDay", "Sat 26");
       await ringUp(page, { title: "Locker", seq: "7 0 0" });
       const row = await waitRow(page, "Locker");
-      assert.equal(row.day, "2026-12-10");
-      assert.equal((await until(() => savedTitled(backend, "Locker")[0], "Locker saved")).day, "2026-12-10");
-      await expectText(page, "#xDay", "Thu 10", undefined);
+      assert.equal(row.day, "2026-12-26");
+      assert.equal((await until(() => savedTitled(backend, "Locker")[0], "Locker saved")).day, "2026-12-26");
+      await expectText(page, "#xDay", "Sat 26", undefined);
       await page.click("#dPrev");
       await expectText(page, "#xDay", "Before");
       assert.equal(await disabled(page, "#dPrev"), true, "nothing before Before");
       await page.click("#dNext");
-      await expectText(page, "#xDay", "Thu 10");
+      await expectText(page, "#xDay", "Sat 26");
     },
   },
   {
@@ -564,7 +564,7 @@ module.exports = [
       assert.equal(await page.inputValue("#xWhat"), "Shibuya dinner");
       await expectText(page, "#xAmt", "US$94.15");
       await expectText(page, "#kCur", "US$ → $");
-      await expectText(page, "#xDay", "Fri 11");
+      await expectText(page, "#xDay", "Sun 27");
       assert.equal(await isOn(page, seal("xPayer", "Izzah")), true);
       assert.equal(await isOn(page, seal("xPayer", "Mo")), false);
       for (const n of ["Mo", "Izzah"]) assert.equal(await isOn(page, seal("xSplit", n)), true);
@@ -585,7 +585,7 @@ module.exports = [
       await expectText(page, "#regTitle", "Ring up");
       await expectText(page, "#xAmt", "$0");
       assert.equal(await page.inputValue("#xWhat"), "");
-      await expectText(page, "#xDay", "Sat 12");
+      await expectText(page, "#xDay", "Mon 28");
       assert.equal(await isOn(page, seal("xPayer", "Mo")), true);
     },
   },
@@ -594,10 +594,10 @@ module.exports = [
     async run({ page }) {
       const seed = JSON.parse(JSON.stringify(SEED));
       seed.expenses.push({
-        id: "seedexp011", day: "2026-12-11", title: "Izakaya", amount: 90, currency: "USD", rate: 0.72, paidBy: "Izzah",
+        id: "seedexp011", day: "2026-12-27", title: "Izakaya", amount: 90, currency: "USD", rate: 0.72, paidBy: "Izzah",
         split: ["Izzah", "Mo"], splitMode: "parts", splitVals: [1, 2], note: "", kind: "", addedBy: "Izzah", deleted: false,
       });
-      const backend = await open(page, { seed, nowMs: NOON12 });
+      const backend = await open(page, { seed, nowMs: NOON28 });
       await waitRows(page, 9);
       await page.evaluate(() => globalThis.__matTest.register.edit("seedexp011"));
       await waitOpen(page);
@@ -620,9 +620,9 @@ module.exports = [
     name: "an empty day's button opens the register on that day; Done closes it",
     async run({ page }) {
       await ready(page);
-      await page.click('[data-addday="2026-12-12"]');
+      await page.click('[data-addday="2026-12-28"]');
       await waitOpen(page);
-      await expectText(page, "#xDay", "Sat 12");
+      await expectText(page, "#xDay", "Mon 28");
       assert.ok(await page.evaluate(() => document.getElementById("phone").classList.contains("reg-open")));
       await page.click("#regDone");
       await waitClosed(page);

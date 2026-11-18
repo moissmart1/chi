@@ -264,9 +264,8 @@ export function ticketEl(model) {
   kind.append(k, el("span", "fare", total > 0 ? tripMoney(total) : ""));
   head.append(kind, route(h, tripName));
   if (h.title) head.append(el("div", "tk-title", h.title));
-  const dh = dayHead(date);
-  const when = el("span", "", dh.jp);
-  when.append(el("i", "", dh.en));
+  // The date in English only for now ("Mon Dec 28"); the look is chosen later.
+  const when = el("span", "", dayHead(date).en);
   const dateRow = el("div", "tk-date");
   dateRow.append(when, validity(number, toGo));
   head.append(dateRow);

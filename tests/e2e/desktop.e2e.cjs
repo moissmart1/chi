@@ -11,14 +11,14 @@
 // These cases run as a computer: a mouse and a keyboard, no touch.
 
 const assert = require("node:assert/strict");
-const { SEED, WITH_PLAN, NOON12, makeBackend, open, advance, until, visible } = require("./helpers.cjs");
+const { SEED, WITH_PLAN, NOON28, makeBackend, open, advance, until, visible } = require("./helpers.cjs");
 
 const BIG = { width: 1440, height: 900 };
 const LAPTOP = { width: 1280, height: 720 };
 const BETWEEN = { width: 800, height: 900 };
 const PHONE = { width: 390, height: 844 };
 const SIDEWAYS = { width: 844, height: 390 };
-const D12 = "2026-12-12";
+const D12 = "2026-12-28";
 const SKY = "planstop1203";
 
 const isOpen = (page, id) => page.evaluate((i) => {
@@ -37,8 +37,8 @@ const still = (page, id) => until(async () => {
 }, "#" + id + " stands still");
 
 async function both(page, opts = {}) {
-  const backend = await open(page, { seed: WITH_PLAN, nowMs: NOON12, tab: "money", ...opts });
-  await until(() => page.evaluate(() => document.querySelectorAll("#rc .rc-row").length > 0 && document.querySelectorAll("#rail .pg .tk").length === 11), "both panes draw");
+  const backend = await open(page, { seed: WITH_PLAN, nowMs: NOON28, tab: "money", ...opts });
+  await until(() => page.evaluate(() => document.querySelectorAll("#rc .rc-row").length > 0 && document.querySelectorAll("#rail .pg .tk").length === 7), "both panes draw");
   // The views fade in and out over .16 s of real time.
   await until(() => page.evaluate(() => [...document.querySelectorAll(".view")].every((v) => getComputedStyle(v).opacity === (v.classList.contains("is-active") ? "1" : "0"))), "the views have faded");
   return backend;
@@ -236,14 +236,14 @@ for (const size of [BIG, LAPTOP]) {
       async run({ page }) {
         await both(page);
         const day = () => page.textContent("#dayCount span");
-        assert.equal(await day(), "Day 3 of 11");
+        assert.equal(await day(), "Day 3 of 7");
         await page.click("#pager .sq:nth-child(5)");
-        await until(async () => (await day()) === "Day 5 of 11", "a click on the fifth square shows day 5");
+        await until(async () => (await day()) === "Day 5 of 7", "a click on the fifth square shows day 5");
         await page.keyboard.press("ArrowRight");
-        await until(async () => (await day()) === "Day 6 of 11", "the right arrow shows the next day");
+        await until(async () => (await day()) === "Day 6 of 7", "the right arrow shows the next day");
         await page.keyboard.press("ArrowLeft");
         await page.keyboard.press("ArrowLeft");
-        await until(async () => (await day()) === "Day 4 of 11", "the left arrow shows the day before");
+        await until(async () => (await day()) === "Day 4 of 7", "the left arrow shows the day before");
         // The rail follows: the ticket in view is day 4's.
         await until(() => page.evaluate(() => {
           const rail = document.getElementById("rail");
@@ -296,8 +296,8 @@ cases.push(
     async run({ page }) {
       const BHEAD = ["#", "Item", "Who", "Book by", "Status", "Notes", "Booking link"];
       const CHEAD = ["#", "Date / time", "Agent / session", "Tab", "Cell(s)", "Item", "Old value", "New value", "Why", "Proof / source", "Verified?"];
-      const items = [{ "#": 1, Item: "Rail pass seat reservations", "Book by": "2026-11-14", Status: "Not booked" }, { "#": 2, Item: "Tea ceremony class", "Book by": "2026-11-18", Status: "Pending" }];
-      const nowMs = Date.parse("2026-11-16T19:00:00Z");
+      const items = [{ "#": 1, Item: "Rail pass seat reservations", "Book by": "2026-11-30", Status: "Not booked" }, { "#": 2, Item: "Tea ceremony class", "Book by": "2026-12-04", Status: "Pending" }];
+      const nowMs = Date.parse("2026-12-02T19:00:00Z");
       const backend = makeBackend({ ...WITH_PLAN, plannerId: "fakePlannerSheet_desk", plannerTabs: { "Book Now": [["Before we go: bookings"], BHEAD, ...items.map((o) => BHEAD.map((h) => (o[h] === undefined ? "" : o[h])))], "Change Log": [CHEAD] } }, { now: nowMs - 300000 });
       assert.equal((await backend.fake({ key: "test-key", actor: "Mo", action: "syncTodos", args: {} })).ok, true);
       backend.now = nowMs;
@@ -517,7 +517,7 @@ cases.push(
       for (const k of ["Meta+3", "Control+3", "Alt+3"]) await page.keyboard.press(k);
       assert.equal(await amt(), "$12", "no digit with a modifier");
       // Enter on a ticket row opens or closes the row, nothing else.
-      await page.evaluate(() => document.querySelector('#rail .pg[data-date="2026-12-12"] .r[data-id="planstop1204"] .r-b').focus());
+      await page.evaluate(() => document.querySelector('#rail .pg[data-date="2026-12-28"] .r[data-id="planstop1204"] .r-b').focus());
       await page.keyboard.press("Enter");
       await page.waitForTimeout(300);
       assert.equal(count(), n, "Enter on a ticket row rings nothing up");
@@ -536,11 +536,11 @@ cases.push(
         return Math.round(rail.scrollLeft / (rail.firstElementChild.offsetWidth + (parseFloat(getComputedStyle(rail).columnGap) || 0))) + 1;
       });
       await page.click("#pager .sq:nth-child(7)");
-      await until(async () => (await day()) === "Day 7 of 11" && (await shown()) === 7, "day 7");
+      await until(async () => (await day()) === "Day 7 of 7" && (await shown()) === 7, "day 7");
       for (const size of [PHONE, SIDEWAYS, PHONE, BIG]) {
         await page.setViewportSize(size);
         await page.waitForTimeout(400);
-        assert.equal(await day(), "Day 7 of 11", "the count at " + size.width + "x" + size.height);
+        assert.equal(await day(), "Day 7 of 7", "the count at " + size.width + "x" + size.height);
         assert.equal(await shown(), 7, "the ticket in view at " + size.width + "x" + size.height);
       }
     },
@@ -552,11 +552,11 @@ cases.push(
     async run({ page }) {
       const BHEAD = ["#", "Item", "Who", "Book by", "Status", "Notes", "Booking link"];
       const CHEAD = ["#", "Date / time", "Agent / session", "Tab", "Cell(s)", "Item", "Old value", "New value", "Why", "Proof / source", "Verified?"];
-      const items = [{ "#": 2, Item: "Tea ceremony class", "Book by": "2026-11-18", Status: "Pending" }, { "#": 5, Item: "Pocket wifi pickup", "Book by": "2026-11-10", Status: "Booked" }];
-      const backend = makeBackend({ ...WITH_PLAN, plannerId: "fakePlannerSheet_desk", plannerTabs: { "Book Now": [["Before we go: bookings"], BHEAD, ...items.map((o) => BHEAD.map((h) => (o[h] === undefined ? "" : o[h])))], "Change Log": [CHEAD] } }, { now: NOON12 - 300000 });
+      const items = [{ "#": 2, Item: "Tea ceremony class", "Book by": "2026-12-04", Status: "Pending" }, { "#": 5, Item: "Pocket wifi pickup", "Book by": "2026-11-26", Status: "Booked" }];
+      const backend = makeBackend({ ...WITH_PLAN, plannerId: "fakePlannerSheet_desk", plannerTabs: { "Book Now": [["Before we go: bookings"], BHEAD, ...items.map((o) => BHEAD.map((h) => (o[h] === undefined ? "" : o[h])))], "Change Log": [CHEAD] } }, { now: NOON28 - 300000 });
       assert.equal((await backend.fake({ key: "test-key", actor: "Mo", action: "syncTodos", args: {} })).ok, true);
-      backend.now = NOON12;
-      await open(page, { backend, nowMs: NOON12, tab: "money" });
+      backend.now = NOON28;
+      await open(page, { backend, nowMs: NOON28, tab: "money" });
       await until(() => visible(page, "#beforeBtn"), "the Before key is in the rail");
       const marked = () => page.evaluate(() => [...document.querySelectorAll("#nav [aria-current]")].map((b) => (b.getBoundingClientRect().width > 0 ? "" : "hidden:") + (b.dataset.tab || b.id)));
       assert.deepEqual(await marked(), [], "nothing hidden is marked");
@@ -588,7 +588,7 @@ for (const [size, want] of [
     name: "a phone at " + size.width + "x" + size.height + " is laid out as before",
     viewport: size,
     async run({ page }) {
-      await open(page, { seed: SEED, nowMs: NOON12 });
+      await open(page, { seed: SEED, nowMs: NOON28 });
       await until(() => page.evaluate(() => document.querySelectorAll("#rc .rc-row").length > 0), "the receipt draws");
       const got = await page.evaluate(() => {
         const R = (e) => {

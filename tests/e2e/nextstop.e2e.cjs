@@ -2,14 +2,14 @@
 // next stop is brought on screen when Days opens and on a deliberate jump,
 // never on a minute tick or a sync; a swipe to a short day after scrolling
 // down a long one shows the new ticket's top, not blank ground.
-// Dec 12 has ten stops; at 13:20 in Chicago the next is the 8th (13:30).
-// Dec 11 has two.
+// Dec 28 has ten stops; at 13:20 in Chicago the next is the 8th (13:30).
+// Dec 27 has two.
 
 const assert = require("node:assert/strict");
 const { WITH_PLAN, open, advance, until, expectText } = require("./helpers.cjs");
 
-const D11 = "2026-12-11";
-const D12 = "2026-12-12";
+const D11 = "2026-12-27";
+const D12 = "2026-12-28";
 const TIMES = ["06:00", "07:00", "08:00", "09:00", "10:00", "11:00", "12:00", "13:30", "15:00", "17:00"];
 const TEN = TIMES.map((time, i) => ({
   id: "tenstop" + String(i + 1).padStart(5, "0"),
@@ -25,7 +25,7 @@ const LONG_DAY = { ...WITH_PLAN, stops: [...WITH_PLAN.stops.filter((s) => s.date
 
 async function ready(page, opts = {}) {
   const backend = await open(page, { seed: LONG_DAY, tab: "days", ...opts });
-  await until(() => page.evaluate(() => document.querySelectorAll("#rail .pg .tk").length === 11), "the tickets draw");
+  await until(() => page.evaluate(() => document.querySelectorAll("#rail .pg .tk").length === 7), "the tickets draw");
   return backend;
 }
 
@@ -57,7 +57,7 @@ module.exports = [
     name: "on open, the next stop (the 8th of ten) is on screen and open",
     async run({ page }) {
       await ready(page);
-      await expectText(page, "#dayCount", /^Day 3 of 11 ?today$/);
+      await expectText(page, "#dayCount", /^Day 3 of 7 ?today$/);
       await until(() => page.evaluate((i) => document.querySelector('.r[data-id="' + i + '"]').classList.contains("is-open"), NEXT), "the next stop is open");
       await still(page);
       let got;
@@ -86,10 +86,10 @@ module.exports = [
       await ready(page);
       await still(page);
       await page.click('#pager .sq[data-i="1"]');
-      await expectText(page, "#dayCount", /^Day 2 of 11/);
+      await expectText(page, "#dayCount", /^Day 2 of 7/);
       await setScroll(page, 0);
       await page.click('#pager .sq[data-i="2"]');
-      await expectText(page, "#dayCount", /^Day 3 of 11/);
+      await expectText(page, "#dayCount", /^Day 3 of 7/);
       await still(page);
       let got;
       await until(async () => (got = await readable(page, NEXT)) === "ok", "").catch(() => { throw new Error("the next stop is not on screen: " + got); });
@@ -105,7 +105,7 @@ module.exports = [
         const rail = document.getElementById("rail");
         rail.scrollBy({ left: -rail.querySelector(".pg").offsetWidth, behavior: "instant" });
       });
-      await expectText(page, "#dayCount", /^Day 2 of 11/);
+      await expectText(page, "#dayCount", /^Day 2 of 7/);
       await until(() => page.evaluate((d) => {
         const v = document.getElementById("vDays");
         const tk = document.querySelector('#rail .pg[data-date="' + d + '"] .tk').getBoundingClientRect();
@@ -117,7 +117,7 @@ module.exports = [
         const rail = document.getElementById("rail");
         rail.scrollBy({ left: rail.querySelector(".pg").offsetWidth, behavior: "instant" });
       });
-      await expectText(page, "#dayCount", /^Day 3 of 11/);
+      await expectText(page, "#dayCount", /^Day 3 of 7/);
       await still(page);
       let got;
       await until(async () => (got = await readable(page, NEXT)) === "ok", "").catch(() => { throw new Error("the next stop is not on screen: " + got); });
@@ -134,7 +134,7 @@ module.exports = [
       }), "Settings opens");
       await page.click("#setDemo");
       await page.click('#setDemoDays button[data-date="' + D12 + '"]');
-      await expectText(page, "#demo", /^Pretending it’s Sat Dec 12, 07:00/);
+      await expectText(page, "#demo", /^Pretending it’s Mon Dec 28, 07:00/);
       await advance(page, backend, 190000); // 380 trip minutes: 13:20
       await expectText(page, "#demo", /13:20/);
       await still(page);

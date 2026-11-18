@@ -2,7 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const P = require("../backend/Pure.js");
 const NAMES = ["Mo", "Izzah", "Sam"];
-const good = { id: "a1b2c3d4e5", day: "2026-12-11", title: "Ramen", amount: 42, currency: "USD", paidBy: "Mo", split: NAMES };
+const good = { id: "a1b2c3d4e5", day: "2026-12-27", title: "Ramen", amount: 42, currency: "USD", paidBy: "Mo", split: NAMES };
 
 test("cells that look like formulas are neutralised", () => {
   assert.equal(P.sanitizeCell("=1+1"), "'=1+1");
@@ -180,23 +180,23 @@ test("the People row keeps the picture, after email, as text", () => {
 });
 
 test("rows coped with as Sheets really hands them back", () => {
-  const e = P.expenseFromRow({ id: "x", day: new Date(Date.UTC(2026, 11, 11, 12)), title: "T", amount: "80.5", currency: "CAD", rate: "0.7234", paid_by: "Mo", split: "Mo", split_mode: "parts", split_vals: 3, note: "", kind: "", added_by: "Mo", added_at: new Date(Date.UTC(2026, 11, 11, 3, 4, 5)), deleted_at: new Date(Date.UTC(2026, 11, 12)) });
+  const e = P.expenseFromRow({ id: "x", day: new Date(Date.UTC(2026, 11, 27, 12)), title: "T", amount: "80.5", currency: "CAD", rate: "0.7234", paid_by: "Mo", split: "Mo", split_mode: "parts", split_vals: 3, note: "", kind: "", added_by: "Mo", added_at: new Date(Date.UTC(2026, 11, 27, 3, 4, 5)), deleted_at: new Date(Date.UTC(2026, 11, 28)) });
   assert.deepEqual(e.splitVals, [3]);
   assert.equal(e.amount, 80.5);
   assert.equal(e.rate, 0.7234);
-  assert.equal(e.day, "2026-12-11");
-  assert.equal(e.addedAt, "2026-12-11T03:04:05.000Z");
+  assert.equal(e.day, "2026-12-27");
+  assert.equal(e.addedAt, "2026-12-27T03:04:05.000Z");
   assert.equal(e.deleted, true);
   assert.equal(P.personFromRow({ name: "A", simplify: "FALSE" }).simplify, false);
   assert.equal(P.personFromRow({ name: "A", simplify: "TRUE" }).simplify, true);
   assert.equal(P.personFromRow({ name: "A", simplify: true }).simplify, true);
-  const p = P.paymentFromRow({ id: "p", from: "Izzah", to: "Mo", cad: "250.3", stamped_by: "Izzah", stamped_at: new Date(Date.UTC(2026, 11, 13)), seed: "7", rot: "-4.2", removed_at: "" });
-  assert.deepEqual(p, { id: "p", from: "Izzah", to: "Mo", cad: 250.3, stampedBy: "Izzah", stampedAt: "2026-12-13T00:00:00.000Z", seed: 7, rot: -4.2, removed: false });
-  assert.equal(P.paymentFromRow({ id: "q", removed_at: "2026-12-14T00:00:00.000Z" }).removed, true);
+  const p = P.paymentFromRow({ id: "p", from: "Izzah", to: "Mo", cad: "250.3", stamped_by: "Izzah", stamped_at: new Date(Date.UTC(2026, 11, 29)), seed: "7", rot: "-4.2", removed_at: "" });
+  assert.deepEqual(p, { id: "p", from: "Izzah", to: "Mo", cad: 250.3, stampedBy: "Izzah", stampedAt: "2026-12-29T00:00:00.000Z", seed: 7, rot: -4.2, removed: false });
+  assert.equal(P.paymentFromRow({ id: "q", removed_at: "2026-12-30T00:00:00.000Z" }).removed, true);
 });
 
 test("expense and payment rows round-trip from the API shape", () => {
-  const x = { id: "a1b2c3d4e5", day: "2026-12-11", title: "Taxi", amount: 23.4, currency: "USD", rate: 0.72, paidBy: "Izzah", split: ["Izzah", "Sam"], splitMode: "parts", splitVals: [1, 2], note: "late", kind: "transport", addedBy: "Izzah", addedAt: "2026-12-11T01:00:00.000Z", deleted: true };
+  const x = { id: "a1b2c3d4e5", day: "2026-12-27", title: "Taxi", amount: 23.4, currency: "USD", rate: 0.72, paidBy: "Izzah", split: ["Izzah", "Sam"], splitMode: "parts", splitVals: [1, 2], note: "late", kind: "transport", addedBy: "Izzah", addedAt: "2026-12-27T01:00:00.000Z", deleted: true };
   const row = P.expenseToRow(x);
   assert.equal(row.paid_by, "Izzah");
   assert.equal(row.split, "Izzah,Sam");
@@ -210,7 +210,7 @@ test("expense and payment rows round-trip from the API shape", () => {
   assert.equal("rate" in noExtras, false);
   assert.equal("added_by" in noExtras, false);
 
-  const pay = { id: "p1p2p3p4p5", from: "Izzah", to: "Mo", cad: 250.3, stampedBy: "Izzah", stampedAt: "2026-12-13T00:00:00.000Z", seed: 7, rot: -4.2, removed: true };
+  const pay = { id: "p1p2p3p4p5", from: "Izzah", to: "Mo", cad: 250.3, stampedBy: "Izzah", stampedAt: "2026-12-29T00:00:00.000Z", seed: 7, rot: -4.2, removed: true };
   const prow = P.paymentToRow(pay);
   assert.equal(prow.stamped_by, "Izzah");
   for (const k of ["stamped_at", "removed_at", "removed"]) assert.equal(k in prow, false, k);
@@ -222,9 +222,8 @@ test("the setup seed rows are the trip, two people (Mo and Izzah) and one day pe
   const s = P.setupSeedRows();
   assert.deepEqual(s.Trip.map((r) => r.key), ["name", "start", "end", "home", "currency", "tz"]);
   assert.deepEqual(s.People.map((r) => [r.name, r.initials, r.order, r.simplify]), [["Mo", "MO", 1, true], ["Izzah", "IZ", 2, true]]);
-  assert.equal(s.Days.length, 11);
-  assert.equal(s.Days[0].date, "2026-12-10");
-  assert.equal(s.Days[10].date, "2026-12-20");
+  assert.deepEqual(Object.fromEntries(s.Trip.map((r) => [r.key, r.value])), { name: "Chicago 2026", start: "2026-12-26", end: "2027-01-01", home: "CAD", currency: "USD", tz: "America/Chicago" });
+  assert.deepEqual(s.Days, ["2026-12-26", "2026-12-27", "2026-12-28", "2026-12-29", "2026-12-30", "2026-12-31", "2027-01-01"].map((date) => ({ date, city: "Chicago", title: "" })));
   assert.notEqual(P.setupSeedRows().People[0], s.People[0]);
 });
 
@@ -244,7 +243,7 @@ test("every column is plain text except the numbers and the on/off flags", () =>
 });
 
 test("rows read back from text columns still give numbers where the API wants them", () => {
-  const e = P.expenseFromRow({ id: "x", day: "2026-12-11", title: "0012", amount: 42, currency: "USD", rate: 0.72, paid_by: "Mo", split: "Mo,Izzah", split_mode: "parts", split_vals: "1,3", note: "3-4", kind: "", added_by: "Mo", added_at: "t", deleted_at: "" });
+  const e = P.expenseFromRow({ id: "x", day: "2026-12-27", title: "0012", amount: 42, currency: "USD", rate: 0.72, paid_by: "Mo", split: "Mo,Izzah", split_mode: "parts", split_vals: "1,3", note: "3-4", kind: "", added_by: "Mo", added_at: "t", deleted_at: "" });
   assert.deepEqual(e.splitVals, [1, 3]);
   assert.equal(P.expenseFromRow({ id: "x", split: "Mo", split_mode: "parts", split_vals: "3" }).splitVals[0], 3);
   assert.equal(e.title, "0012");
@@ -269,19 +268,19 @@ test("rowToObj reads escaped cells back as typed", () => {
 });
 
 test("the rate is fetched only when today's is missing and no failure in the last hour", () => {
-  const now = "2026-12-10T12:00:00.000Z";
+  const now = "2026-12-26T12:00:00.000Z";
   assert.equal(P.shouldFetchRate(null, null, now), true);
   assert.equal(P.shouldFetchRate("", "", now), true);
   assert.equal(P.shouldFetchRate("108.4", null, now), false);
-  assert.equal(P.shouldFetchRate("108.4", "2026-12-10T11:59:00.000Z", now), false);
-  assert.equal(P.shouldFetchRate(null, "2026-12-10T11:30:00.000Z", now), false);
-  assert.equal(P.shouldFetchRate(null, "2026-12-10T11:00:00.001Z", now), false);
-  assert.equal(P.shouldFetchRate(null, "2026-12-10T11:00:00.000Z", now), true);
-  assert.equal(P.shouldFetchRate(null, "2026-12-09T12:00:00.000Z", now), true);
+  assert.equal(P.shouldFetchRate("108.4", "2026-12-26T11:59:00.000Z", now), false);
+  assert.equal(P.shouldFetchRate(null, "2026-12-26T11:30:00.000Z", now), false);
+  assert.equal(P.shouldFetchRate(null, "2026-12-26T11:00:00.001Z", now), false);
+  assert.equal(P.shouldFetchRate(null, "2026-12-26T11:00:00.000Z", now), true);
+  assert.equal(P.shouldFetchRate(null, "2026-12-25T12:00:00.000Z", now), true);
   assert.equal(P.shouldFetchRate("0", null, now), true);
   assert.equal(P.shouldFetchRate("junk", null, now), true);
   assert.equal(P.shouldFetchRate(null, "junk", now), true);
-  assert.equal(P.shouldFetchRate(null, "2026-12-10T13:00:00.000Z", now), true);
+  assert.equal(P.shouldFetchRate(null, "2026-12-26T13:00:00.000Z", now), true);
 });
 
 test("rateSource: today's stored rate is live, an earlier day's is last, none is the stand-in (F7)", () => {
@@ -314,16 +313,16 @@ test("every message the backend can show uses the curly apostrophe (R20, F10)", 
   }
 });
 
-const DATES = ["2026-12-10", "2026-12-11", "2026-12-12"];
-const STOP = { id: "stopAAAA0001", date: "2026-12-12", title: " Shibuya Sky ", time: "14:00" };
+const DATES = ["2026-12-26", "2026-12-27", "2026-12-28"];
+const STOP = { id: "stopAAAA0001", date: "2026-12-28", title: " Shibuya Sky ", time: "14:00" };
 
 test("validateStop fills the blanks and trims", () => {
   const v = P.validateStop(STOP, DATES);
-  assert.deepEqual(v.value, { id: "stopAAAA0001", date: "2026-12-12", time: "14:00", title: "Shibuya Sky", detail: "", gettingThere: "", travelMin: 0, fixed: false, place: "", signJp: "", booked: false, link: "", photo: "", note: "" });
+  assert.deepEqual(v.value, { id: "stopAAAA0001", date: "2026-12-28", time: "14:00", title: "Shibuya Sky", detail: "", gettingThere: "", travelMin: 0, fixed: false, place: "", signJp: "", booked: false, link: "", photo: "", note: "" });
 });
 test("validateStop refuses what it must", () => {
   const bad = (patch, message) => assert.deepEqual(P.validateStop({ ...STOP, ...patch }, DATES), { ok: false, message });
-  bad({ date: "2026-12-25" }, "Pick a day of the trip.");
+  bad({ date: "2027-01-05" }, "Pick a day of the trip.");
   bad({ title: "  " }, "Say what it is.");
   bad({ title: "x".repeat(81) }, "Keep the name under 80 letters.");
   bad({ time: "9:5" }, "Use a time like 14:30.");
@@ -355,11 +354,11 @@ test("stop rows round-trip, and a hand-typed row reads safely", () => {
   const back = P.stopFromRow(P.stopToRow(s));
   assert.deepEqual(back, { ...s, deleted: false });
   assert.equal("deleted_at" in P.stopToRow(s), false);
-  const hand = P.stopFromRow({ id: "h1", date: new Date(Date.UTC(2026, 11, 12)), time: "9:5", title: 7, travel_min: "abc", fixed: "TRUE", link: "javascript:x", photo: "ftp://x", deleted_at: "2026-12-01T00:00:00Z" });
+  const hand = P.stopFromRow({ id: "h1", date: new Date(Date.UTC(2026, 11, 28)), time: "9:5", title: 7, travel_min: "abc", fixed: "TRUE", link: "javascript:x", photo: "ftp://x", deleted_at: "2026-12-17T00:00:00Z" });
   assert.deepEqual([hand.time, hand.title, hand.travelMin, hand.fixed, hand.link, hand.photo, hand.deleted], ["", "7", 0, true, "", "", true]);
 });
 test("hand-typed stop times and minutes read as the app writes them (I5)", () => {
-  const read = (cells) => P.stopFromRow({ id: "h1", date: "2026-12-12", title: "x", ...cells });
+  const read = (cells) => P.stopFromRow({ id: "h1", date: "2026-12-28", title: "x", ...cells });
   assert.equal(read({ time: "9:30" }).time, "09:30");
   assert.equal(read({ time: "9:05" }).time, "09:05");
   assert.equal(read({ time: " 7:45 " }).time, "07:45");
@@ -401,9 +400,9 @@ test("a Date time cell on Apps Script is read in the script's zone, and a second
 });
 
 test("validateStay", () => {
-  const stay = { id: "stayAAAA0001", name: "Asakusa hotel", firstNight: "2026-12-10", lastNight: "2026-12-12" };
+  const stay = { id: "stayAAAA0001", name: "Asakusa hotel", firstNight: "2026-12-26", lastNight: "2026-12-28" };
   assert.deepEqual(P.validateStay(stay).value, { ...stay, nameJp: "", addressJp: "", note: "", place: "", link: "", photo: "" });
-  assert.equal(P.validateStay({ ...stay, lastNight: "2026-12-09" }).message, "The last night can’t be before the first.");
+  assert.equal(P.validateStay({ ...stay, lastNight: "2026-12-25" }).message, "The last night can’t be before the first.");
   assert.equal(P.validateStay({ ...stay, name: "" }).message, "Say where you’re staying.");
   assert.equal(P.validateStay({ ...stay, link: "javascript:x" }).message, "That link has to start with https://.");
   assert.equal(P.validateStay({ ...stay, id: "x" }).message, "That stay has a bad id.");
@@ -413,7 +412,7 @@ test("validateStay", () => {
   assert.equal(P.validateStay({ ...stay, addressJp: "x".repeat(201) }).message, "Keep the address under 200 letters.");
 });
 test("validateStay: an optional https photo, like a stop's", () => {
-  const stay = { id: "stayAAAA0001", name: "Asakusa hotel", firstNight: "2026-12-10", lastNight: "2026-12-12" };
+  const stay = { id: "stayAAAA0001", name: "Asakusa hotel", firstNight: "2026-12-26", lastNight: "2026-12-28" };
   assert.equal(P.validateStay({ ...stay, photo: "https://example.org/a.jpg" }).value.photo, "https://example.org/a.jpg");
   assert.equal(P.validateStay(stay).value.photo, "");
   const msg = "That photo link has to start with https://.";
@@ -435,7 +434,7 @@ test("stay photo: column after link, read through safeUrl, written by stayToRow"
   assert.equal(P.stayToRow({ id: "s", photo: "https://example.org/a.jpg" }).photo, "https://example.org/a.jpg");
 });
 test("stay rows round-trip and read safely", () => {
-  const stay = P.validateStay({ id: "stayAAAA0001", name: "Asakusa hotel", firstNight: "2026-12-10", lastNight: "2026-12-12", link: "https://x.test" }).value;
+  const stay = P.validateStay({ id: "stayAAAA0001", name: "Asakusa hotel", firstNight: "2026-12-26", lastNight: "2026-12-28", link: "https://x.test" }).value;
   assert.deepEqual(P.stayFromRow(P.stayToRow(stay)), { ...stay, deleted: false });
   assert.equal("deleted_at" in P.stayToRow(stay), false);
   assert.equal(P.stayFromRow({ id: "s", name: "N", link: "javascript:x", deleted_at: "x" }).link, "");
@@ -445,7 +444,7 @@ test("stay rows round-trip and read safely", () => {
 test("validateDayPatch", () => {
   assert.deepEqual(P.validateDayPatch({ city: " Tokyo ", lineColour: "#2fb6e8" }).value, { city: "Tokyo", lineColour: "#2fb6e8" });
   assert.equal(P.validateDayPatch({ lineColour: "blue" }).message, "Use a colour like #2FB6E8.");
-  assert.equal(P.validateDayPatch({ date: "2026-12-11" }).message, "Only a day’s city, title, line and places can be changed.");
+  assert.equal(P.validateDayPatch({ date: "2026-12-27" }).message, "Only a day’s city, title, line and places can be changed.");
   assert.equal(P.validateDayPatch({}).message, "Nothing to change.");
   assert.equal(P.validateDayPatch({ city: "x".repeat(61) }).message, "Keep each line, city and place under 60 letters.");
   assert.equal(P.validateDayPatch({ title: "x".repeat(81) }).message, "Keep the title under 80 letters.");
@@ -453,10 +452,10 @@ test("validateDayPatch", () => {
   assert.deepEqual(P.validateDayPatch({ lineColour: "" }).value, { lineColour: "" });
 });
 test("day rows, labels and links", () => {
-  const d = { date: "2026-12-12", city: "Tokyo", title: "", lineJp: "山手線", lineEn: "Yamanote", lineColour: "#9ACD32", fromJp: "", fromEn: "", toJp: "", toEn: "" };
+  const d = { date: "2026-12-28", city: "Tokyo", title: "", lineJp: "山手線", lineEn: "Yamanote", lineColour: "#9ACD32", fromJp: "", fromEn: "", toJp: "", toEn: "" };
   assert.deepEqual(P.dayFromRow(P.dayToRow(d)), d);
-  assert.equal(P.dayFromRow({ date: "2026-12-12", line_colour: "not a colour" }).lineColour, "");
-  assert.equal(P.dayLabel("2026-12-12"), "Sat Dec 12");
+  assert.equal(P.dayFromRow({ date: "2026-12-28", line_colour: "not a colour" }).lineColour, "");
+  assert.equal(P.dayLabel("2026-12-28"), "Mon Dec 28");
   assert.equal(P.safeUrl("  https://a.test/x "), "https://a.test/x");
   assert.equal(P.safeUrl("javascript:alert(1)"), "");
   assert.equal(P.safeUrl("https://a b"), "");
@@ -470,9 +469,9 @@ test("day rows, labels and links", () => {
 const PLAN_HEAD = ["payment_id", "date_paid", "payer", "description", "category", "vendor", "booking_ref", "amount", "currency", "amount_cad", "cad_is_exact", "split_between", "split_type", "status", "include_in_split", "source", "added_by", "notes"];
 // One planner row from named fields; the rest blank.
 const planRow = (o, head = PLAN_HEAD) => head.map((h) => (o[h] === undefined ? "" : o[h]));
-const X7 = { payment_id: "X7", date_paid: "2026-12-11", payer: "Mo", description: "Rail pass", category: "transport", vendor: "North Rail", booking_ref: "AB12", amount: 160.5, currency: "USD", amount_cad: 221.52, cad_is_exact: "yes", split_between: "Mo, Izzah, Sam", split_type: "equal", include_in_split: "yes" };
-const X9 = { payment_id: "X9", date_paid: "2026-11-02", payer: "Izzah", description: "Flight north", category: "flight", vendor: "Sky Air", booking_ref: "ZZ9", amount: 204.25, currency: "USD", amount_cad: 274.05, cad_is_exact: "no — est.", split_between: "Mo,Izzah,Sam", split_type: "equal", include_in_split: "yes" };
-const PLAN_DATES = ["2026-12-10", "2026-12-11", "2026-12-12", "2026-12-13"];
+const X7 = { payment_id: "X7", date_paid: "2026-12-27", payer: "Mo", description: "Rail pass", category: "transport", vendor: "North Rail", booking_ref: "AB12", amount: 160.5, currency: "USD", amount_cad: 221.52, cad_is_exact: "yes", split_between: "Mo, Izzah, Sam", split_type: "equal", include_in_split: "yes" };
+const X9 = { payment_id: "X9", date_paid: "2026-11-18", payer: "Izzah", description: "Flight north", category: "flight", vendor: "Sky Air", booking_ref: "ZZ9", amount: 204.25, currency: "USD", amount_cad: 274.05, cad_is_exact: "no — est.", split_between: "Mo,Izzah,Sam", split_type: "equal", include_in_split: "yes" };
+const PLAN_DATES = ["2026-12-26", "2026-12-27", "2026-12-28", "2026-12-29"];
 const payOf = (o) => {
   const r = P.paymentsFromRows([PLAN_HEAD, planRow(o)]);
   assert.equal(r.payments.length, 1, JSON.stringify(r.problems));
@@ -484,7 +483,7 @@ test("paymentsFromRows reads each payment by column name, trimmed, numbers as nu
   const r = P.paymentsFromRows([PLAN_HEAD, planRow({ ...X7, payer: "  Mo ", vendor: " North Rail ", notes: "x" })]);
   assert.deepEqual(r.problems, []);
   assert.deepEqual(r.payments, [{
-    id: "X7", row: 2, datePaid: "2026-12-11", payer: "Mo", description: "Rail pass", category: "transport", vendor: "North Rail", bookingRef: "AB12",
+    id: "X7", row: 2, datePaid: "2026-12-27", payer: "Mo", description: "Rail pass", category: "transport", vendor: "North Rail", bookingRef: "AB12",
     amount: 160.5, currency: "USD", amountCad: 221.52, cadExact: "yes", splitBetween: ["Mo", "Izzah", "Sam"], splitType: "equal", include: true,
   }]);
 });
@@ -591,7 +590,7 @@ test("paymentsFromRows skips blank rows, leaves out unusable and repeated ids, a
 
 test("expenseFromPayment: the two note examples, word for word", () => {
   const a = P.expenseFromPayment(payOf(X7), NAMES, PLAN_DATES);
-  assert.deepEqual(a, { ok: true, value: { title: "Rail pass", amount: 221.52, currency: "CAD", paidBy: "Mo", split: ["Mo", "Izzah", "Sam"], day: "2026-12-11", kind: "transport", note: "X7 · North Rail · ref AB12 · US$160.50 charged" } });
+  assert.deepEqual(a, { ok: true, value: { title: "Rail pass", amount: 221.52, currency: "CAD", paidBy: "Mo", split: ["Mo", "Izzah", "Sam"], day: "2026-12-27", kind: "transport", note: "X7 · North Rail · ref AB12 · US$160.50 charged" } });
   const b = P.expenseFromPayment(payOf(X9), NAMES, PLAN_DATES);
   assert.equal(b.value.note, "X9 · Sky Air · ref ZZ9 · US$204.25 charged · CAD amount is an estimate");
   assert.deepEqual([b.value.amount, b.value.currency, b.value.day, b.value.kind, b.value.paidBy], [274.05, "CAD", "pre", "transport", "Izzah"]);
@@ -637,9 +636,9 @@ test("expenseFromPayment: the title is the description, whitespace collapsed, at
 });
 
 test("expenseFromPayment: the day, the kind and the note's other parts", () => {
-  assert.equal(convert({ date_paid: "2026-12-13" }).value.day, "2026-12-13");
-  for (const d of ["", "soon", "2026-11-30", "12/11/2026"]) assert.equal(convert({ date_paid: d }).value.day, "pre", d);
-  assert.equal(convert({ date_paid: "2026-12-25" }).value.day, "2026-12-13");
+  assert.equal(convert({ date_paid: "2026-12-29" }).value.day, "2026-12-29");
+  for (const d of ["", "soon", "2026-12-16", "12/11/2026"]) assert.equal(convert({ date_paid: d }).value.day, "pre", d);
+  assert.equal(convert({ date_paid: "2027-01-05" }).value.day, "2026-12-29");
   const kinds = { lodging: "stay", Transport: "transport", flight: "transport", food: "food", shopping: "shopping", tickets: "activity", "": "activity" };
   for (const [c, k] of Object.entries(kinds)) assert.equal(convert({ category: c }).value.kind, k, c);
   assert.equal(convert({ vendor: "", booking_ref: "" }).value.note, "X7 · US$160.50 charged");

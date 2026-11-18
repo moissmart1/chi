@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const P = require("../backend/Pure.js");
-const taxi = { id: "e1", title: "Taxi back", amount: 23.4, currency: "USD", paidBy: "Izzah", split: ["Izzah", "Sam"], day: "2026-12-11", note: "", deleted: false };
+const taxi = { id: "e1", title: "Taxi back", amount: 23.4, currency: "USD", paidBy: "Izzah", split: ["Izzah", "Sam"], day: "2026-12-27", note: "", deleted: false };
 const stamp = { id: "p1", from: "Izzah", to: "Mo", cad: 250, removed: false };
 
 test("every kind of change reads as one plain sentence", () => {
@@ -10,7 +10,7 @@ test("every kind of change reads as one plain sentence", () => {
   assert.equal(P.summarize("edit", "expense", { ...taxi, amount: 1350 }, { ...taxi, amount: 1450 }), "changed Taxi back US$1,350.00 → US$1,450.00");
   assert.equal(P.summarize("edit", "expense", taxi, { ...taxi, title: "Taxi home" }), "renamed Taxi back to Taxi home");
   assert.equal(P.summarize("edit", "expense", taxi, { ...taxi, paidBy: "Mo", note: "late" }), "changed Taxi back: payer, note");
-  assert.equal(P.summarize("edit", "expense", taxi, { ...taxi, split: ["Izzah"], day: "2026-12-12" }), "changed Taxi back: split, day");
+  assert.equal(P.summarize("edit", "expense", taxi, { ...taxi, split: ["Izzah"], day: "2026-12-28" }), "changed Taxi back: split, day");
   assert.equal(P.summarize("delete", "expense", taxi, { ...taxi, deleted: true }), "deleted Taxi back US$23.40");
   assert.equal(P.summarize("restore", "expense", { ...taxi, deleted: true }, taxi), "brought back Taxi back US$23.40");
   assert.equal(P.summarize("stamp", "payment", null, stamp), "stamped Izzah → Mo $250.00");
@@ -73,13 +73,13 @@ test("only the newest change to an item can be undone, and only once", () => {
 test("a raw Log row becomes the API entry, with no snapshots", () => {
   const raw = (o) => ({ id: "", at: "", who: "", via: "", action: "", kind: "", ref: "", summary: "", before: "", after: "", undoes: "", undone_by: "", ...o });
   const rows = [
-    raw({ id: "1", at: "2026-12-11T01:00:00.000Z", who: "Izzah", via: "claude", action: "add", kind: "expense", ref: "e1", summary: "rang up Taxi back US$23.40", after: JSON.stringify(taxi) }),
-    raw({ id: 2, at: "2026-12-11T02:00:00.000Z", who: "Mo", via: "", action: "edit", kind: "expense", ref: "e1", summary: "x", before: JSON.stringify(taxi), after: JSON.stringify({ ...taxi, note: "n" }), undoes: "", undone_by: "" }),
+    raw({ id: "1", at: "2026-12-27T01:00:00.000Z", who: "Izzah", via: "claude", action: "add", kind: "expense", ref: "e1", summary: "rang up Taxi back US$23.40", after: JSON.stringify(taxi) }),
+    raw({ id: 2, at: "2026-12-27T02:00:00.000Z", who: "Mo", via: "", action: "edit", kind: "expense", ref: "e1", summary: "x", before: JSON.stringify(taxi), after: JSON.stringify({ ...taxi, note: "n" }), undoes: "", undone_by: "" }),
     raw({ id: 3, who: "Mo", via: "web", action: "add", kind: "payment", ref: "p1", undoes: "2", undone_by: 4 }),
     raw({ id: "4", kind: "payment", ref: "p1" }),
   ];
   const e1 = P.entryFromRow(rows[0], rows);
-  assert.deepEqual(e1, { id: 1, at: "2026-12-11T01:00:00.000Z", who: "Izzah", via: "claude", action: "add", kind: "expense", ref: "e1", summary: "rang up Taxi back US$23.40", undoes: null, undoneBy: null, canUndo: false });
+  assert.deepEqual(e1, { id: 1, at: "2026-12-27T01:00:00.000Z", who: "Izzah", via: "claude", action: "add", kind: "expense", ref: "e1", summary: "rang up Taxi back US$23.40", undoes: null, undoneBy: null, canUndo: false });
   assert.equal("before" in e1, false);
   assert.equal("after" in e1, false);
   const e2 = P.entryFromRow(rows[1], rows);
@@ -135,14 +135,14 @@ test("a picture change reads as a sentence with no pronoun and no picture in it,
   }
 });
 
-const A = { id: "s1", date: "2026-12-12", time: "14:00", title: "Shibuya Sky", detail: "", gettingThere: "", travelMin: 0, fixed: false, place: "", signJp: "", booked: false, link: "", photo: "", note: "", deleted: false };
+const A = { id: "s1", date: "2026-12-28", time: "14:00", title: "Shibuya Sky", detail: "", gettingThere: "", travelMin: 0, fixed: false, place: "", signJp: "", booked: false, link: "", photo: "", note: "", deleted: false };
 test("stop sentences", () => {
-  assert.equal(P.summarize("add", "stop", null, A), "added Shibuya Sky to Sat Dec 12");
-  assert.equal(P.summarize("delete", "stop", A, { ...A, deleted: true }), "removed Shibuya Sky from Sat Dec 12");
-  assert.equal(P.summarize("restore", "stop", { ...A, deleted: true }, A), "put back Shibuya Sky on Sat Dec 12");
+  assert.equal(P.summarize("add", "stop", null, A), "added Shibuya Sky to Mon Dec 28");
+  assert.equal(P.summarize("delete", "stop", A, { ...A, deleted: true }), "removed Shibuya Sky from Mon Dec 28");
+  assert.equal(P.summarize("restore", "stop", { ...A, deleted: true }, A), "put back Shibuya Sky on Mon Dec 28");
   assert.equal(P.summarize("edit", "stop", A, { ...A, title: "Sky deck" }), "renamed Shibuya Sky to Sky deck");
-  assert.equal(P.summarize("edit", "stop", A, { ...A, time: "15:30" }), "moved Shibuya Sky to Sat Dec 12 15:30");
-  assert.equal(P.summarize("edit", "stop", A, { ...A, date: "2026-12-13", time: "" }), "moved Shibuya Sky to Sun Dec 13");
+  assert.equal(P.summarize("edit", "stop", A, { ...A, time: "15:30" }), "moved Shibuya Sky to Mon Dec 28 15:30");
+  assert.equal(P.summarize("edit", "stop", A, { ...A, date: "2026-12-29", time: "" }), "moved Shibuya Sky to Tue Dec 29");
   assert.equal(P.summarize("edit", "stop", A, { ...A, gettingThere: "Walk", travelMin: 5, link: "https://x.test" }), "changed Shibuya Sky: directions, travel time, link");
 });
 test("stay and day sentences", () => {
@@ -151,7 +151,7 @@ test("stay and day sentences", () => {
   assert.equal(P.summarize("edit", "stay", stay, stay), "changed the stay Asakusa hotel");
   assert.equal(P.summarize("delete", "stay", stay, stay), "removed the stay Asakusa hotel");
   assert.equal(P.summarize("restore", "stay", stay, stay), "put back the stay Asakusa hotel");
-  assert.equal(P.summarize("edit", "day", { date: "2026-12-12" }, { date: "2026-12-12" }), "changed the ticket for Sat Dec 12");
+  assert.equal(P.summarize("edit", "day", { date: "2026-12-28" }, { date: "2026-12-28" }), "changed the ticket for Mon Dec 28");
 });
 test("undo rules hold for the new kinds", () => {
   const add = { id: 5, kind: "stop", ref: "s1", before: null, after: A, undoneBy: null };

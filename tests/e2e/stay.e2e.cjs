@@ -1,7 +1,7 @@
 // Where you sleep, and the shape of the trip: the stay row at the foot of a
 // ticket, the hotel card it opens (#stay), and the list of every day (#allDays)
 // opened from the day counter. The plan is tests/fixtures/plan.json over the
-// seed; the clock is 13:20 on Dec 12 in Chicago, Day 3.
+// seed; the clock is 13:20 on Dec 28 in Chicago, Day 3.
 
 const assert = require("node:assert/strict");
 const { WITH_PLAN, open, advance, until, text, expectText } = require("./helpers.cjs");
@@ -18,7 +18,7 @@ function seedWithPhoto(photo) {
 
 async function ready(page, opts = {}) {
   const backend = await open(page, { seed: WITH_PLAN, tab: "days", ...opts });
-  await until(() => page.evaluate(() => document.querySelectorAll("#rail .pg .tk").length === 11), "the tickets draw");
+  await until(() => page.evaluate(() => document.querySelectorAll("#rail .pg .tk").length === 7), "the tickets draw");
   return backend;
 }
 
@@ -104,59 +104,59 @@ module.exports = [
     name: "tonight's stay is on the ticket",
     async run({ page }) {
       await ready(page);
-      const d12 = await lastPart(page, "2026-12-12");
-      assert.ok(d12 && d12.cls.split(" ").includes("tk-stay"), "Dec 12 ends with the stay: " + JSON.stringify(d12));
-      for (const s of ["宿泊", "Tonight", "Asakusa hotel"]) assert.ok(d12.text.includes(s), "Dec 12's stay reads " + s + ": " + d12.text);
-      assert.equal(await page.evaluate((sel) => document.querySelector(sel + " .tk-stay").tagName, tk("2026-12-12")), "BUTTON");
-      assert.equal(await page.evaluate((sel) => document.querySelector(sel + " .tk-stay").dataset.stay, tk("2026-12-12")), "planstay0001");
-      const d13 = await lastPart(page, "2026-12-13");
-      assert.ok(d13 && d13.cls.split(" ").includes("tk-stay"), "Dec 13 ends with the stay");
+      const d12 = await lastPart(page, "2026-12-28");
+      assert.ok(d12 && d12.cls.split(" ").includes("tk-stay"), "Dec 28 ends with the stay: " + JSON.stringify(d12));
+      for (const s of ["宿泊", "Tonight", "Asakusa hotel"]) assert.ok(d12.text.includes(s), "Dec 28's stay reads " + s + ": " + d12.text);
+      assert.equal(await page.evaluate((sel) => document.querySelector(sel + " .tk-stay").tagName, tk("2026-12-28")), "BUTTON");
+      assert.equal(await page.evaluate((sel) => document.querySelector(sel + " .tk-stay").dataset.stay, tk("2026-12-28")), "planstay0001");
+      const d13 = await lastPart(page, "2026-12-29");
+      assert.ok(d13 && d13.cls.split(" ").includes("tk-stay"), "Dec 29 ends with the stay");
       assert.ok(d13.text.includes("Niseko lodge"), d13.text);
-      assert.equal(await page.evaluate((sel) => document.querySelectorAll(sel + " .tk-stay").length, tk("2026-12-20")), 0, "no stay on Dec 20");
-      assert.equal((await text(page, tk("2026-12-20") + " .tk")).includes("undefined"), false);
+      assert.equal(await page.evaluate((sel) => document.querySelectorAll(sel + " .tk-stay").length, tk("2027-01-01")), 0, "no stay on Jan 1");
+      assert.equal((await text(page, tk("2027-01-01") + " .tk")).includes("undefined"), false);
     },
   },
   {
     name: "after midnight on a hotel-change day, last night's stay (R37)",
     async run({ page }) {
-      const backend = await ready(page, { nowMs: Date.parse("2026-12-13T00:30:00-06:00") });
-      await expectText(page, "#dayCount", /^Day 4 of 11 ?today$/);
+      const backend = await ready(page, { nowMs: Date.parse("2026-12-29T00:30:00-06:00") });
+      await expectText(page, "#dayCount", /^Day 4 of 7 ?today$/);
       const stayOf = (date) => page.evaluate((sel) => {
         const b = document.querySelector(sel + " .tk-stay");
         return b ? { id: b.dataset.stay, text: b.textContent } : null;
       }, tk(date));
-      const d13 = await stayOf("2026-12-13");
+      const d13 = await stayOf("2026-12-29");
       assert.equal(d13.id, "planstay0001");
       for (const s of ["宿泊", "Tonight", "Asakusa hotel"]) assert.ok(d13.text.includes(s), d13.text);
       // Other tickets are as they were.
-      assert.equal((await stayOf("2026-12-14")).id, "planstay0002");
-      assert.equal((await stayOf("2026-12-12")).id, "planstay0001");
-      await openCard(page, "2026-12-13");
+      assert.equal((await stayOf("2026-12-30")).id, "planstay0002");
+      assert.equal((await stayOf("2026-12-28")).id, "planstay0001");
+      await openCard(page, "2026-12-29");
       const t = await cardText(page);
       for (const s of ["浅草ホテル", "東京都台東区浅草1-1-1"]) assert.ok(t.includes(s), "the card reads " + s + ": " + t);
       await page.click("#stayDone");
       await until(async () => !(await isOpen(page, "stay")), "the card closed");
       await advance(page, backend, 3.5 * 3600000); // 04:00
-      await until(async () => (await stayOf("2026-12-13")).id === "planstay0002", "from 04:00, tonight's stay");
-      assert.ok((await stayOf("2026-12-13")).text.includes("Niseko lodge"));
-      await expectText(page, "#dayCount", /^Day 4 of 11 ?today$/);
+      await until(async () => (await stayOf("2026-12-29")).id === "planstay0002", "from 04:00, tonight's stay");
+      assert.ok((await stayOf("2026-12-29")).text.includes("Niseko lodge"));
+      await expectText(page, "#dayCount", /^Day 4 of 7 ?today$/);
     },
   },
   {
     name: "after midnight on a phone in Toronto, last night's stay (R37)",
     timezoneId: "America/Toronto",
     async run({ page }) {
-      await ready(page, { nowMs: Date.parse("2026-12-13T00:30:00-06:00") });
+      await ready(page, { nowMs: Date.parse("2026-12-29T00:30:00-06:00") });
       assert.equal(await page.evaluate(() => Intl.DateTimeFormat().resolvedOptions().timeZone), "America/Toronto");
-      await expectText(page, "#dayCount", /^Day 4 of 11 ?today$/);
-      assert.equal(await page.evaluate((sel) => document.querySelector(sel + " .tk-stay").dataset.stay, tk("2026-12-13")), "planstay0001");
+      await expectText(page, "#dayCount", /^Day 4 of 7 ?today$/);
+      assert.equal(await page.evaluate((sel) => document.querySelector(sel + " .tk-stay").dataset.stay, tk("2026-12-29")), "planstay0001");
     },
   },
   {
     name: "the hotel card",
     async run({ page }) {
       await ready(page);
-      await openCard(page, "2026-12-12");
+      await openCard(page, "2026-12-28");
       await expectFullCard(page);
       assert.ok((await size(page, "#stay .sy-name")) >= 28, "the Japanese name is large: " + (await size(page, "#stay .sy-name")));
       assert.equal(await text(page, "#stay .sy-name"), "浅草ホテル");
@@ -173,7 +173,7 @@ module.exports = [
     async run({ page, context }) {
       await context.route(PHOTO, (route) => route.fulfill({ status: 200, contentType: "image/png", body: PNG }));
       await ready(page, { seed: seedWithPhoto(PHOTO) });
-      await openCard(page, "2026-12-12");
+      await openCard(page, "2026-12-28");
       await until(() => page.evaluate(() => { const i = document.querySelector("#stay .sy-ph"); return !!i && i.complete && i.naturalWidth > 0; }), "the photo loads");
       const got = await page.evaluate(() => {
         const imgs = [...document.querySelectorAll("#stay .sy-ph")];
@@ -193,7 +193,7 @@ module.exports = [
     name: "a stay with no photo has no picture on the card",
     async run({ page }) {
       await ready(page);
-      await openCard(page, "2026-12-12");
+      await openCard(page, "2026-12-28");
       assert.equal(await page.evaluate(() => document.querySelectorAll("#stay .sy-ph, #stay img").length), 0);
       await expectFullCard(page);
     },
@@ -204,13 +204,13 @@ module.exports = [
       let asked = 0; // nothing serves it: the harness refuses every address it does not know
       page.on("request", (req) => { if (req.url() === BAD_PHOTO) asked++; });
       await ready(page, { seed: seedWithPhoto(BAD_PHOTO) });
-      await openCard(page, "2026-12-12");
+      await openCard(page, "2026-12-28");
       await until(() => page.evaluate(() => !document.querySelector("#stay .sy-ph")), "the broken photo is removed");
       await expectFullCard(page);
       assert.equal(asked, 1);
       await page.click("#stayDone");
       await until(async () => !(await isOpen(page, "stay")), "the card closed");
-      await openCard(page, "2026-12-12");
+      await openCard(page, "2026-12-28");
       await new Promise((r) => setTimeout(r, 200));
       assert.equal(await page.evaluate(() => document.querySelectorAll("#stay .sy-ph").length), 0, "not drawn again");
       assert.equal(asked, 1, "not asked for again");
@@ -223,7 +223,7 @@ module.exports = [
     async run({ page, context }) {
       await context.route(PHOTO, (route) => route.fulfill({ status: 200, contentType: "image/png", body: PNG }));
       await ready(page, { seed: seedWithPhoto(PHOTO) });
-      await openCard(page, "2026-12-12");
+      await openCard(page, "2026-12-28");
       await until(() => page.evaluate(() => { const i = document.querySelector("#stay .sy-ph"); return !!i && i.complete && i.naturalWidth > 0; }), "the photo loads");
       const o = await page.evaluate(() => {
         const sheet = document.getElementById("stay");
@@ -240,7 +240,7 @@ module.exports = [
     async run({ page, context }) {
       await context.route(PHOTO, (route) => route.fulfill({ status: 200, contentType: "image/png", body: PNG }));
       await ready(page, { seed: seedWithPhoto(PHOTO) });
-      await openCard(page, "2026-12-12");
+      await openCard(page, "2026-12-28");
       await until(() => page.evaluate(() => { const i = document.querySelector("#stay .sy-ph"); return !!i && i.complete && i.naturalWidth > 0; }), "the photo loads");
       const h = await page.evaluate(() => document.querySelector("#stay .sy-ph").getBoundingClientRect().height);
       assert.ok(h <= 0.38 * 360 + 1, "the photo is capped at 38vh: " + h);
@@ -252,7 +252,7 @@ module.exports = [
     async run({ page }) {
       await ready(page);
       await page.click("#pager .sq:nth-child(4)");
-      await openCard(page, "2026-12-13");
+      await openCard(page, "2026-12-29");
       assert.equal(await text(page, "#stay .sy-name"), "Niseko lodge");
       assert.ok((await size(page, "#stay .sy-name")) >= 28);
       assert.equal(await page.evaluate(() => document.querySelectorAll("#stay .sy-ad").length), 0, "no empty address line");
@@ -274,8 +274,8 @@ module.exports = [
       const backend = await ready(page);
       backend.failWith = "network";
       await page.reload();
-      await until(() => page.evaluate(() => document.querySelectorAll("#rail .pg .tk").length === 11), "the tickets paint from saved data");
-      await openCard(page, "2026-12-12");
+      await until(() => page.evaluate(() => document.querySelectorAll("#rail .pg .tk").length === 7), "the tickets paint from saved data");
+      await openCard(page, "2026-12-28");
       await expectFullCard(page);
     },
   },
@@ -286,21 +286,21 @@ module.exports = [
       await page.click("#dayCount");
       await until(() => isOpen(page, "allDays"), "the list opens");
       const rows = await dayRows(page);
-      assert.equal(rows.length, 11);
-      for (const s of ["D 03", "Sat Dec 12", "Tokyo", "today"]) assert.ok(rows[2].includes(s), "the third row reads " + s + ": " + rows[2]);
+      assert.equal(rows.length, 7);
+      for (const s of ["D 03", "Mon Dec 28", "Tokyo", "today"]) assert.ok(rows[2].includes(s), "the third row reads " + s + ": " + rows[2]);
       for (const s of ["Temples, then the view", "used"]) assert.ok(rows[1].includes(s), "the second row reads " + s + ": " + rows[1]);
       assert.equal(/today|used/.test(rows[5]), false, "an ahead day is neither: " + rows[5]);
       assert.equal(rows.some((r) => r.includes("undefined")), false);
       assert.equal(await page.evaluate(() => document.querySelector("#allDays .ad-row").tagName), "BUTTON");
       await page.click("#allDays .ad-row:nth-child(6)");
       await until(async () => !(await isOpen(page, "allDays")), "the list closes");
-      await expectText(page, "#dayCount", /^Day 6 of 11/);
+      await expectText(page, "#dayCount", /^Day 6 of 7/);
     },
   },
   {
     name: "the list's today and used follow the clock when it opens",
     async run({ page }) {
-      const backend = await ready(page, { nowMs: Date.parse("2026-12-12T23:40:00-06:00") });
+      const backend = await ready(page, { nowMs: Date.parse("2026-12-28T23:40:00-06:00") });
       await page.click("#dayCount");
       await until(() => isOpen(page, "allDays"), "the list opens");
       assert.ok((await dayRows(page))[2].includes("today"));
@@ -340,10 +340,10 @@ module.exports = [
       await until(() => page.evaluate(() => !document.querySelector("#net:not([hidden])")), "signal is back");
       assert.equal(await kept(), true, "the same node when signal is back");
 
-      const r = await backend.handle({ key: "test-key", actor: "Izzah", via: "app", action: "setDay", args: { date: "2026-12-13", patch: { city: "Sapporo" } } });
+      const r = await backend.handle({ key: "test-key", actor: "Izzah", via: "app", action: "setDay", args: { date: "2026-12-29", patch: { city: "Sapporo" } } });
       assert.equal(r.ok, true, JSON.stringify(r));
       await advance(page, backend, 20000);
-      await expectText(page, "#allDays .ad-row:nth-child(4)", /Sun Dec 13 ?Sapporo/);
+      await expectText(page, "#allDays .ad-row:nth-child(4)", /Tue Dec 29 ?Sapporo/);
     },
   },
   {
@@ -362,7 +362,7 @@ module.exports = [
 
       await page.click("#youDone");
       await until(async () => !(await isOpen(page, "you")), "Settings closed");
-      await openCard(page, "2026-12-12");
+      await openCard(page, "2026-12-28");
       await page.click("#stayDone");
       await until(async () => !(await isOpen(page, "stay")), "the card closed");
       await page.click("#youBtn");
@@ -370,13 +370,13 @@ module.exports = [
       assert.equal(await isOpen(page, "stay"), false);
 
       // Opening the card or the list closes Settings, and each closes the other.
-      await page.evaluate(() => document.querySelector('#rail .pg[data-date="2026-12-12"] .tk-stay').click());
+      await page.evaluate(() => document.querySelector('#rail .pg[data-date="2026-12-28"] .tk-stay').click());
       await until(() => isOpen(page, "stay"), "the card opens");
       await until(async () => !(await isOpen(page, "you")), "Settings closed");
       await page.evaluate(() => document.getElementById("dayCount").click());
       await until(() => isOpen(page, "allDays"), "the list opens");
       await until(async () => !(await isOpen(page, "stay")), "the card closed");
-      await page.evaluate(() => document.querySelector('#rail .pg[data-date="2026-12-12"] .tk-stay').click());
+      await page.evaluate(() => document.querySelector('#rail .pg[data-date="2026-12-28"] .tk-stay').click());
       await until(() => isOpen(page, "stay"), "the card opens");
       await until(async () => !(await isOpen(page, "allDays")), "the list closed");
 
@@ -398,7 +398,7 @@ module.exports = [
     viewport: { width: 390, height: 664 },
     async run({ page }) {
       await ready(page);
-      await openCard(page, "2026-12-12");
+      await openCard(page, "2026-12-28");
       await expectReach(page, "#stayDone");
       await expectReach(page, "#stay .sy-map", true);
       await page.click("#stayDone");

@@ -8,7 +8,7 @@
 
 const assert = require("node:assert/strict");
 const P = require("../../backend/Pure.js");
-const { SEED, WITH_PLAN, NOON12, open, until, visible } = require("./helpers.cjs");
+const { SEED, WITH_PLAN, NOON28, open, until, visible } = require("./helpers.cjs");
 
 const SIZES = [
   { width: 667, height: 375 },
@@ -18,7 +18,7 @@ const SIZES = [
 // A browser tab held sideways: Safari's bars leave 320 px.
 const TAB = { width: 667, height: 320 };
 const PORTRAIT = { width: 390, height: 844 };
-const D12 = "2026-12-12";
+const D12 = "2026-12-28";
 const DINNER = "planstop1204";
 
 // "ok", or why the element is not on screen and tappable. With `scroll`, it
@@ -66,14 +66,14 @@ async function keys(page, seq) {
 }
 
 async function money(page) {
-  const backend = await open(page, { seed: SEED, nowMs: NOON12 });
+  const backend = await open(page, { seed: SEED, nowMs: NOON28 });
   await until(() => page.evaluate(() => document.querySelectorAll("#rc .rc-row").length === 8), "the receipt draws");
   return backend;
 }
 
 async function days(page) {
-  const backend = await open(page, { seed: WITH_PLAN, tab: "days", nowMs: NOON12 });
-  await until(() => page.evaluate(() => document.querySelectorAll("#rail .pg .tk").length === 11), "the tickets draw");
+  const backend = await open(page, { seed: WITH_PLAN, tab: "days", nowMs: NOON28 });
+  await until(() => page.evaluate(() => document.querySelectorAll("#rail .pg .tk").length === 7), "the tickets draw");
   return backend;
 }
 
@@ -131,7 +131,7 @@ for (const size of [...SIZES, TAB]) {
           await until(async () => {
             sky = await page.evaluate(() => {
               const v = document.getElementById("vDays");
-              const r = v.querySelector('#rail .pg[data-date="2026-12-12"] .r[data-id="planstop1203"]').getBoundingClientRect();
+              const r = v.querySelector('#rail .pg[data-date="2026-12-28"] .r[data-id="planstop1203"]').getBoundingClientRect();
               return { top: r.top, bottom: r.bottom, viewBottom: v.getBoundingClientRect().bottom, scrollTop: v.scrollTop };
             });
             return sky.top >= 0 && sky.bottom <= sky.viewBottom && (sky.scrollTop === 0 || sky.viewBottom - sky.bottom <= 40);
@@ -425,8 +425,8 @@ for (const size of [{ width: 667, height: 280 }, { width: 844, height: 220 }]) {
 cases.push({
   name: "the stop sheet under a notch: a notice raised while it is open leaves its Done clear",
   async run({ page }) {
-    await open(page, { seed: WITH_PLAN, tab: "days", nowMs: NOON12 });
-    await until(() => page.evaluate(() => document.querySelectorAll("#rail .pg .tk").length === 11), "the tickets draw");
+    await open(page, { seed: WITH_PLAN, tab: "days", nowMs: NOON28 });
+    await until(() => page.evaluate(() => document.querySelectorAll("#rail .pg .tk").length === 7), "the tickets draw");
     // Chromium has no notch: a 47 px top inset is stood in for, for the sheets'
     // cap (--inset-t) and for where the notice stands while a sheet is open.
     await page.evaluate(() => {

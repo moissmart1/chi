@@ -3,7 +3,7 @@
 // by the other phones, removed, and put back from History.
 
 const assert = require("node:assert/strict");
-const { SEED, NOON12, open, until, text, expectText, visible } = require("./helpers.cjs");
+const { SEED, NOON28, open, until, text, expectText, visible } = require("./helpers.cjs");
 
 // ---- small tools for this file ----
 
@@ -41,7 +41,7 @@ const waitYou = (page) =>
 const waitClosed = (page, id) => until(() => page.evaluate((i) => !document.getElementById(i).classList.contains("is-open"), id), id + " closes");
 
 async function ready(page, opts = {}) {
-  const backend = await open(page, { seed: SEED, nowMs: NOON12, ...opts });
+  const backend = await open(page, { seed: SEED, nowMs: NOON28, ...opts });
   await until(() => page.evaluate(() => document.querySelectorAll("#rc .rc-row").length > 0), "the receipt draws");
   return backend;
 }
@@ -126,7 +126,7 @@ async function checkLine(page) {
   await until(() => page.evaluate(() => document.getElementById("line").classList.contains("is-open")), "the line sheet opens");
   await waitSeal(page, "#line .ln-paid .mini", (s) => s.pic, "the line sheet's payer seal");
   const shared = await page.$$eval("#line .ln-d .mini", (els) => els.map((e) => (e.classList.contains("has-pic") ? "pic" : e.textContent)));
-  assert.deepEqual(shared, ["pic", "IZ", "TR"], "shared by: Mo's picture, the others' initials");
+  assert.deepEqual(shared, ["pic", "IZ"], "shared by: Mo's picture, the others' initials");
   await page.click("#lnDone");
   await waitClosed(page, "line");
 }
@@ -144,13 +144,13 @@ module.exports = [
         paid: document.querySelector("#line .ln-paid .mini").classList.contains("has-pic"),
         shared: [...document.querySelectorAll("#line .ln-d .mini")].map((e) => (e.classList.contains("has-pic") ? "pic" : e.textContent)),
       }));
-      assert.deepEqual(await seals(), { paid: false, shared: ["MO", "IZ", "TR"] });
+      assert.deepEqual(await seals(), { paid: false, shared: ["MO", "IZ"] });
       // Mo (the payer) sets a picture on this phone; Izzah (shares it) on another.
       await page.evaluate((pic) => globalThis.__matTest.store.setPerson("Mo", { photo: pic }), JPEG);
       await until(async () => (await seals()).paid, "the payer's seal shows the picture");
       backend.fake.primitives.updateWhere_("People", "name", "Izzah", { photo: JPEG });
       await page.evaluate(() => globalThis.__matTest.store.refresh());
-      await until(async () => JSON.stringify((await seals()).shared) === JSON.stringify(["pic", "pic", "TR"]), "the sharers' seals show theirs");
+      await until(async () => JSON.stringify((await seals()).shared) === JSON.stringify(["pic", "pic"]), "the sharers' seals show theirs");
       assert.equal(await page.evaluate(() => document.getElementById("line").classList.contains("is-open")), true, "the sheet stayed open");
     },
   },
@@ -241,7 +241,7 @@ module.exports = [
   {
     name: "who are you: a picture replaces the initials on first open, in colour",
     async run({ page }) {
-      const backend = await open(page, { seed: { ...SEED, people: { Izzah: { photo: require("../fixtures/picture.json").jpeg } } }, me: null, nowMs: NOON12 });
+      const backend = await open(page, { seed: { ...SEED, people: { Izzah: { photo: require("../fixtures/picture.json").jpeg } } }, me: null, nowMs: NOON28 });
       await until(() => visible(page, '.who-pick [data-me="Izzah"] .seal'), "the picker shows");
       const sel = '.who-pick [data-me="Izzah"] .seal';
       const s = await waitSeal(page, sel, (x) => x.pic, "Izzah's seal shows the picture");

@@ -3,30 +3,30 @@ import assert from "node:assert/strict";
 import { minutesOf, nowIn, instantOf, openDayIndex, dayState, daysToGo, stopsFor, nextStopId, isPast, nextLine, stayFor, stayShownFor, NEXT_GRACE_MIN, NIGHT_ENDS_MIN, safeHref, originFor, mapsUrl, stayMapsUrl, inkFor, header, dayTotalTrip, gateDate, issueLine } from "../js/plan.js";
 
 const TZ = "America/Chicago";
-const TRIP = { start: "2026-12-10", end: "2026-12-20", tz: TZ };
-const DAYS = Array.from({ length: 11 }, (_, i) => ({ date: "2026-12-" + (10 + i) }));
+const TRIP = { start: "2026-12-26", end: "2027-01-01", tz: TZ };
+const DAYS = ["2026-12-26", "2026-12-27", "2026-12-28", "2026-12-29", "2026-12-30", "2026-12-31", "2027-01-01"].map((date) => ({ date }));
 const at = (iso) => Date.parse(iso);
-const stop = (id, time, more = {}) => ({ id, date: "2026-12-12", time, title: id, place: "", travelMin: 0, deleted: false, ...more });
+const stop = (id, time, more = {}) => ({ id, date: "2026-12-28", time, title: id, place: "", travelMin: 0, deleted: false, ...more });
 
 test("Chicago time, whatever the phone thinks", () => {
-  // 13:20 on Dec 12 in Chicago is 14:20 in Toronto and 04:20 on Dec 13 in Tokyo.
-  assert.deepEqual(nowIn(TZ, at("2026-12-12T13:20:00-06:00")), { date: "2026-12-12", minutes: 800 });
-  assert.equal(instantOf(TZ, "2026-12-12", 800), at("2026-12-12T13:20:00-06:00"));
+  // 13:20 on Dec 28 in Chicago is 14:20 in Toronto and 04:20 on Dec 29 in Tokyo.
+  assert.deepEqual(nowIn(TZ, at("2026-12-28T13:20:00-06:00")), { date: "2026-12-28", minutes: 800 });
+  assert.equal(instantOf(TZ, "2026-12-28", 800), at("2026-12-28T13:20:00-06:00"));
 });
 test("which day opens", () => {
-  assert.equal(openDayIndex(TRIP, DAYS, at("2026-11-15T12:00:00-06:00")), 0);
-  assert.equal(openDayIndex(TRIP, DAYS, at("2026-12-12T13:20:00-06:00")), 2);
-  assert.equal(openDayIndex(TRIP, DAYS, at("2026-12-13T00:30:00-06:00")), 3); // just past midnight
-  assert.equal(openDayIndex(TRIP, DAYS, at("2026-12-25T12:00:00-06:00")), 10);
+  assert.equal(openDayIndex(TRIP, DAYS, at("2026-12-01T12:00:00-06:00")), 0);
+  assert.equal(openDayIndex(TRIP, DAYS, at("2026-12-28T13:20:00-06:00")), 2);
+  assert.equal(openDayIndex(TRIP, DAYS, at("2026-12-29T00:30:00-06:00")), 3); // just past midnight
+  assert.equal(openDayIndex(TRIP, DAYS, at("2027-01-05T12:00:00-06:00")), 6);
 });
 test("days to go", () => {
-  assert.equal(daysToGo(TRIP, at("2026-11-15T12:00:00-06:00")), 25);
-  assert.equal(daysToGo(TRIP, at("2026-12-09T23:59:00-06:00")), 1);
-  assert.equal(daysToGo(TRIP, at("2026-12-10T00:00:00-06:00")), 0);
+  assert.equal(daysToGo(TRIP, at("2026-12-01T12:00:00-06:00")), 25);
+  assert.equal(daysToGo(TRIP, at("2026-12-25T23:59:00-06:00")), 1);
+  assert.equal(daysToGo(TRIP, at("2026-12-26T00:00:00-06:00")), 0);
 });
 test("a day's stops: timed in order, untimed last, deleted and bad times handled", () => {
-  const all = [stop("c", "19:00"), stop("x", ""), stop("a", "09:00"), stop("gone", "10:00", { deleted: true }), stop("odd", "9:5"), stop("other", "08:00", { date: "2026-12-13" })];
-  assert.deepEqual(stopsFor(all, "2026-12-12").map((s) => s.id), ["a", "c", "x", "odd"]);
+  const all = [stop("c", "19:00"), stop("x", ""), stop("a", "09:00"), stop("gone", "10:00", { deleted: true }), stop("odd", "9:5"), stop("other", "08:00", { date: "2026-12-29" })];
+  assert.deepEqual(stopsFor(all, "2026-12-28").map((s) => s.id), ["a", "c", "x", "odd"]);
 });
 test("next and past", () => {
   const day = [stop("a", "09:00"), stop("b", "14:00"), stop("late", "23:50"), stop("x", "")];
@@ -49,18 +49,18 @@ test("the next stop's line", () => {
   assert.equal(nextLine(stop("b", "13:20"), 800), "Now.");
 });
 test("where you sleep", () => {
-  const stays = [{ id: "s1", name: "Asakusa", firstNight: "2026-12-10", lastNight: "2026-12-12", deleted: false }, { id: "s2", name: "Niseko", firstNight: "2026-12-13", lastNight: "2026-12-15", deleted: false }, { id: "s0", name: "Gone", firstNight: "2026-12-10", lastNight: "2026-12-20", deleted: true }];
-  assert.equal(stayFor(stays, "2026-12-12").name, "Asakusa");
-  assert.equal(stayFor(stays, "2026-12-13").name, "Niseko");
-  assert.equal(stayFor(stays, "2026-12-20"), null);
+  const stays = [{ id: "s1", name: "Asakusa", firstNight: "2026-12-26", lastNight: "2026-12-28", deleted: false }, { id: "s2", name: "Niseko", firstNight: "2026-12-29", lastNight: "2026-12-31", deleted: false }, { id: "s0", name: "Gone", firstNight: "2026-12-26", lastNight: "2027-01-01", deleted: true }];
+  assert.equal(stayFor(stays, "2026-12-28").name, "Asakusa");
+  assert.equal(stayFor(stays, "2026-12-29").name, "Niseko");
+  assert.equal(stayFor(stays, "2027-01-01"), null);
 });
 test("directions", () => {
-  const stays = [{ id: "s1", name: "Asakusa hotel", place: "Asakusa hotel Tokyo", firstNight: "2026-12-10", lastNight: "2026-12-12", deleted: false }];
+  const stays = [{ id: "s1", name: "Asakusa hotel", place: "Asakusa hotel Tokyo", firstNight: "2026-12-26", lastNight: "2026-12-28", deleted: false }];
   const day = [stop("Meiji Shrine", "09:00", { place: "Meiji Jingu" }), stop("Lunch", "12:30", { place: "https://maps.app.goo.gl/abc" }), stop("Sky", "14:00", { place: "Shibuya Sky" })];
-  assert.equal(originFor(day, 0, stays, "2026-12-12"), "Asakusa hotel Tokyo");
-  assert.equal(originFor(day, 1, stays, "2026-12-12"), "Meiji Jingu");
-  assert.equal(originFor(day, 2, stays, "2026-12-12"), "Lunch"); // a link cannot be an origin
-  assert.equal(originFor(day, 0, [], "2026-12-12"), "");
+  assert.equal(originFor(day, 0, stays, "2026-12-28"), "Asakusa hotel Tokyo");
+  assert.equal(originFor(day, 1, stays, "2026-12-28"), "Meiji Jingu");
+  assert.equal(originFor(day, 2, stays, "2026-12-28"), "Lunch"); // a link cannot be an origin
+  assert.equal(originFor(day, 0, [], "2026-12-28"), "");
   assert.equal(mapsUrl(day[0], "Asakusa hotel Tokyo"), "https://www.google.com/maps/dir/?api=1&travelmode=transit&origin=Asakusa%20hotel%20Tokyo&destination=Meiji%20Jingu");
   assert.equal(mapsUrl(day[1], "Meiji Jingu"), "https://maps.app.goo.gl/abc");
   assert.equal(mapsUrl(stop("Dinner", "19:00"), ""), "https://www.google.com/maps/dir/?api=1&travelmode=transit&destination=Dinner");
@@ -71,18 +71,19 @@ test("links from the Sheet", () => {
   for (const bad of ["javascript:alert(1)", "data:text/html,x", " https://x.test", "https://x .test", "", null, 7]) assert.equal(safeHref(bad), "");
 });
 test("the header copes with a sparse or hand-edited day", () => {
-  assert.deepEqual(header({ date: "2026-12-13", city: "Niseko" }), { line: null, colour: null, ink: null, route: null, city: "Niseko", title: "" });
-  const full = header({ date: "2026-12-12", city: "Tokyo", title: "", lineJp: "山手線", lineEn: "Yamanote Line", lineColour: "#9ACD32", fromJp: "新宿", fromEn: "Shinjuku", toJp: "渋谷", toEn: "Shibuya" });
+  assert.deepEqual(header({ date: "2026-12-29", city: "Niseko" }), { line: null, colour: null, ink: null, route: null, city: "Niseko", title: "" });
+  const full = header({ date: "2026-12-28", city: "Tokyo", title: "", lineJp: "山手線", lineEn: "Yamanote Line", lineColour: "#9ACD32", fromJp: "新宿", fromEn: "Shinjuku", toJp: "渋谷", toEn: "Shibuya" });
   assert.deepEqual([full.line.jp, full.colour, full.ink, full.route.toJp], ["山手線", "#9ACD32", "#15120F", "渋谷"]);
-  assert.equal(header({ date: "2026-12-12", lineJp: "山手線", lineColour: "green" }).colour, null);
-  assert.equal(header({ date: "2026-12-12", fromJp: "新宿" }).route, null);
+  assert.equal(header({ date: "2026-12-28", lineJp: "山手線", lineColour: "green" }).colour, null);
+  assert.equal(header({ date: "2026-12-28", fromJp: "新宿" }).route, null);
   assert.equal(inkFor("#1A1A6E"), "#FFFFFF");
 });
 test("the fare and the small print", () => {
-  const ex = [{ day: "2026-12-11", amount: 30, currency: "USD", rate: 0.72, deleted: false }, { day: "2026-12-11", amount: 10, currency: "CAD", rate: 0.72, deleted: false }, { day: "2026-12-11", amount: 999, currency: "USD", rate: 0.72, deleted: true }];
-  assert.equal(dayTotalTrip(ex, "2026-12-11"), 3720); // US$30.00 + US$7.20, in cents
-  assert.equal(gateDate("2026-12-11"), "12.11");
-  assert.equal(issueLine("2026-12-11", 2, "MAT"), "2026.12.11 MAT発行 00002-01");
+  const ex = [{ day: "2026-12-27", amount: 30, currency: "USD", rate: 0.72, deleted: false }, { day: "2026-12-27", amount: 10, currency: "CAD", rate: 0.72, deleted: false }, { day: "2026-12-27", amount: 999, currency: "USD", rate: 0.72, deleted: true }];
+  assert.equal(dayTotalTrip(ex, "2026-12-27"), 3720); // US$30.00 + US$7.20, in cents
+  assert.equal(gateDate("2026-12-27"), "12.27");
+  assert.equal(gateDate("2027-01-01"), "01.01");
+  assert.equal(issueLine("2026-12-27", 2, "MI"), "2026.12.27 MI発行 00002-01");
 });
 
 test("a place from the Sheet is only a link when safeHref says so", () => {
@@ -94,7 +95,7 @@ test("a place from the Sheet is only a link when safeHref says so", () => {
   assert.equal(stayMapsUrl({ name: "Inn", place: evil }), "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(evil));
   assert.equal(stayMapsUrl({ name: "Inn", place: spaced }), "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(spaced));
   // a hand-typed place is still text as an origin
-  assert.equal(originFor([stop("a", "09:00", { place: evil }), stop("b", "10:00")], 1, [], "2026-12-12"), evil);
+  assert.equal(originFor([stop("a", "09:00", { place: evil }), stop("b", "10:00")], 1, [], "2026-12-28"), evil);
 });
 test("blank or missing fields never print undefined", () => {
   assert.equal(nextLine({ id: "x", time: "" }, 800), "");
@@ -104,18 +105,18 @@ test("blank or missing fields never print undefined", () => {
   assert.equal(minutesOf(undefined), null);
   assert.equal(mapsUrl({ id: "x" }, ""), "");
   assert.equal(stayMapsUrl({}), "");
-  assert.equal(originFor([{ id: "a" }, { id: "b" }], 1, [], "2026-12-12"), "");
+  assert.equal(originFor([{ id: "a" }, { id: "b" }], 1, [], "2026-12-28"), "");
   assert.deepEqual(header({}), { line: null, colour: null, ink: null, route: null, city: "", title: "" });
-  assert.equal(stayFor([{ id: "s", name: "No dates" }], "2026-12-12"), null);
+  assert.equal(stayFor([{ id: "s", name: "No dates" }], "2026-12-28"), null);
 });
 test("the open day when today is inside the trip but missing from the list", () => {
-  const some = [{ date: "2026-12-10" }, { date: "2026-12-14" }];
-  assert.equal(openDayIndex(TRIP, some, at("2026-12-12T12:00:00-06:00")), 0);
-  assert.equal(openDayIndex(TRIP, some, at("2026-12-16T12:00:00-06:00")), 1);
-  assert.equal(openDayIndex(TRIP, [{ date: "2026-12-15" }], at("2026-12-12T12:00:00-06:00")), 0);
-  assert.equal(dayState("2026-12-11", "2026-12-12"), "used");
-  assert.equal(dayState("2026-12-12", "2026-12-12"), "today");
-  assert.equal(dayState("2026-12-13", "2026-12-12"), "ahead");
+  const some = [{ date: "2026-12-26" }, { date: "2026-12-30" }];
+  assert.equal(openDayIndex(TRIP, some, at("2026-12-28T12:00:00-06:00")), 0);
+  assert.equal(openDayIndex(TRIP, some, at("2027-01-01T12:00:00-06:00")), 1);
+  assert.equal(openDayIndex(TRIP, [{ date: "2026-12-31" }], at("2026-12-28T12:00:00-06:00")), 0);
+  assert.equal(dayState("2026-12-27", "2026-12-28"), "used");
+  assert.equal(dayState("2026-12-28", "2026-12-28"), "today");
+  assert.equal(dayState("2026-12-29", "2026-12-28"), "ahead");
 });
 
 // R38: a late stop stays "next" for a while. One day: A 14:00, B 19:00 with
@@ -171,17 +172,17 @@ test("R38: untimed stops are never next", () => {
   assert.equal(nextStopId(lateDay(), hm(23, 0)), null);
 });
 test("R38: the grace does not cross midnight", () => {
-  const all = [stop("late", "23:50"), stop("bus", "", { date: "2026-12-13" })];
-  // At 00:10 on Dec 13 the 23:50 stop is on yesterday's ticket, not today's.
-  assert.equal(nextStopId(stopsFor(all, "2026-12-13"), hm(0, 10)), null);
+  const all = [stop("late", "23:50"), stop("bus", "", { date: "2026-12-29" })];
+  // At 00:10 on Dec 29 the 23:50 stop is on yesterday's ticket, not today's.
+  assert.equal(nextStopId(stopsFor(all, "2026-12-29"), hm(0, 10)), null);
   // On its own day it is next until midnight.
-  assert.equal(nextStopId(stopsFor(all, "2026-12-12"), hm(23, 59)), "late");
+  assert.equal(nextStopId(stopsFor(all, "2026-12-28"), hm(23, 59)), "late");
 });
 
 // R37: before 04:00, today's ticket shows last night's stay.
-const X = { id: "X", name: "Asakusa", firstNight: "2026-12-11", lastNight: "2026-12-12", deleted: false };
-const Y = { id: "Y", name: "Niseko", firstNight: "2026-12-13", lastNight: "2026-12-14", deleted: false };
-const DEC13 = "2026-12-13";
+const X = { id: "X", name: "Asakusa", firstNight: "2026-12-27", lastNight: "2026-12-28", deleted: false };
+const Y = { id: "Y", name: "Niseko", firstNight: "2026-12-29", lastNight: "2026-12-30", deleted: false };
+const DEC13 = "2026-12-29";
 test("R37: 00:30 on a hotel-change day shows last night's stay; 04:00 today's", () => {
   assert.equal(NIGHT_ENDS_MIN, 240);
   assert.equal(stayShownFor([X, Y], DEC13, { today: DEC13, minutes: hm(0, 30) }).id, "X");
@@ -189,12 +190,12 @@ test("R37: 00:30 on a hotel-change day shows last night's stay; 04:00 today's", 
   assert.equal(stayShownFor([X, Y], DEC13, { today: DEC13, minutes: hm(4, 0) }).id, "Y");
 });
 test("R37: the same stay both nights", () => {
-  const Z = { id: "Z", name: "One", firstNight: "2026-12-11", lastNight: "2026-12-14", deleted: false };
+  const Z = { id: "Z", name: "One", firstNight: "2026-12-27", lastNight: "2026-12-30", deleted: false };
   assert.equal(stayShownFor([Z], DEC13, { today: DEC13, minutes: hm(0, 30) }).id, "Z");
 });
 test("R37: no stay covers last night (first day, or a gap)", () => {
   assert.equal(stayShownFor([Y], DEC13, { today: DEC13, minutes: hm(0, 30) }).id, "Y");
-  assert.equal(stayShownFor([X, Y], "2026-12-11", { today: "2026-12-11", minutes: hm(0, 30) }).id, "X");
+  assert.equal(stayShownFor([X, Y], "2026-12-27", { today: "2026-12-27", minutes: hm(0, 30) }).id, "X");
 });
 test("R37: a stay covers last night but none tonight", () => {
   assert.equal(stayShownFor([X], DEC13, { today: DEC13, minutes: hm(0, 30) }).id, "X");
@@ -205,8 +206,8 @@ test("R37: a deleted stay never shows", () => {
   assert.equal(stayShownFor([{ ...X, deleted: true }], DEC13, { today: DEC13, minutes: hm(0, 30) }), null);
 });
 test("R37: other days' tickets are unchanged", () => {
-  assert.equal(stayShownFor([X, Y], "2026-12-14", { today: DEC13, minutes: hm(0, 30) }).id, "Y");
-  assert.equal(stayShownFor([X, Y], "2026-12-12", { today: DEC13, minutes: hm(0, 30) }).id, "X");
-  assert.equal(stayShownFor([X, Y], DEC13, { today: "2026-12-14", minutes: hm(0, 30) }).id, "Y");
+  assert.equal(stayShownFor([X, Y], "2026-12-30", { today: DEC13, minutes: hm(0, 30) }).id, "Y");
+  assert.equal(stayShownFor([X, Y], "2026-12-28", { today: DEC13, minutes: hm(0, 30) }).id, "X");
+  assert.equal(stayShownFor([X, Y], DEC13, { today: "2026-12-30", minutes: hm(0, 30) }).id, "Y");
   assert.equal(stayShownFor([X, Y], DEC13, {}).id, "Y");
 });

@@ -15,7 +15,7 @@ const SEED = require("./fixtures/seed.json");
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const KEY = "test-key";
 const URL = "https://example.test/exec";
-const NOW = Date.UTC(2026, 11, 11, 3);
+const NOW = Date.UTC(2026, 11, 27, 3);
 const ALL = ["Mo", "Izzah"];
 const UNDO_FAILED = "Couldn’t undo that. Try again from History.";
 const STALE = "That was changed again since. Undo the newer change first.";
@@ -84,7 +84,7 @@ const queueOf = (storage) => JSON.parse(storage.getItem("chi.queue") || "[]");
 const byId = (list, id) => list.find((x) => x.id === id);
 
 function draft(over = {}) {
-  return { day: "2026-12-11", title: "Dinner", amount: 94.15, currency: "USD", paidBy: "Mo", split: ALL.slice(), splitMode: "equal", splitVals: [], note: "", kind: "", ...over };
+  return { day: "2026-12-27", title: "Dinner", amount: 94.15, currency: "USD", paidBy: "Mo", split: ALL.slice(), splitMode: "equal", splitVals: [], note: "", kind: "", ...over };
 }
 
 // The id of the line a write token made.
@@ -177,7 +177,7 @@ test("api uses MAT_FAKE_API in place of fetch, and a rejection from it is a netw
 test("Boot paints from cache first", async () => {
   const p = phone({ seed: SEED });
   const empty = await backend(createFakeBackend());
-  const cached = { id: "cached0001", ...draft({ title: "Cached" }), rate: 0.72, addedBy: "Mo", addedAt: "2026-12-11T01:00:00.000Z", deleted: false };
+  const cached = { id: "cached0001", ...draft({ title: "Cached" }), rate: 0.72, addedBy: "Mo", addedAt: "2026-12-27T01:00:00.000Z", deleted: false };
   p.storage.setItem("chi.cache", JSON.stringify({ data: { ...empty, expenses: [cached] }, rev: 0, loadedAt: 1000 }));
   const release = p.net.hold("load");
   const seen = [];
@@ -924,7 +924,7 @@ test("two overlapping first-page loads: the older request answering last never r
 
 test("an older-page append is ignored when a first-page load started after it", async () => {
   const expenses = [];
-  for (let i = 0; i < 205; i++) expenses.push({ id: "bulk" + String(i).padStart(6, "0"), day: "pre", title: "Line " + i, amount: 100, currency: "USD", paidBy: "Mo", split: ALL.slice(), addedAt: new Date(Date.UTC(2026, 10, 1) + i * 1000).toISOString() });
+  for (let i = 0; i < 205; i++) expenses.push({ id: "bulk" + String(i).padStart(6, "0"), day: "pre", title: "Line " + i, amount: 100, currency: "USD", paidBy: "Mo", split: ALL.slice(), addedAt: new Date(Date.UTC(2026, 10, 17) + i * 1000).toISOString() });
   const p = phone({ seed: { expenses, payments: [] } });
   await p.store.boot();
   await p.store.loadHistory();
@@ -1187,7 +1187,7 @@ test("History", async () => {
 
 test("loadHistory({ older: true }) appends the next page", async () => {
   const expenses = [];
-  for (let i = 0; i < 205; i++) expenses.push({ id: "bulk" + String(i).padStart(6, "0"), day: "pre", title: "Line " + i, amount: 100, currency: "USD", paidBy: "Mo", split: ALL.slice(), addedAt: new Date(Date.UTC(2026, 10, 1) + i * 1000).toISOString() });
+  for (let i = 0; i < 205; i++) expenses.push({ id: "bulk" + String(i).padStart(6, "0"), day: "pre", title: "Line " + i, amount: 100, currency: "USD", paidBy: "Mo", split: ALL.slice(), addedAt: new Date(Date.UTC(2026, 10, 17) + i * 1000).toISOString() });
   const p = phone({ seed: { expenses } });
   await p.store.boot();
   await p.store.loadHistory();
@@ -1365,7 +1365,7 @@ test("outbox counts lines not yet on the backend: sending or waiting, never refu
   const p = phone({ seed: SEED });
   await p.store.boot();
   assert.deepEqual(p.store.outbox(), { unsent: 0, waiting: 0 });
-  const draft = (title) => ({ day: "2026-12-11", title, amount: 500, currency: "USD", paidBy: "Mo", split: ALL.slice() });
+  const draft = (title) => ({ day: "2026-12-27", title, amount: 500, currency: "USD", paidBy: "Mo", split: ALL.slice() });
 
   const release = p.net.hold("addExpense");
   p.store.addExpense(draft("Sending"));
@@ -1897,14 +1897,14 @@ test("an undo from History whose reply is lost says it is checking and reloads o
 
 // ---------- stops (Plan 2, Task 7) ----------
 
-const SKY = { id: "stopAAAA0001", date: "2026-12-12", title: "Shibuya Sky", time: "14:00" };
+const SKY = { id: "stopAAAA0001", date: "2026-12-28", title: "Shibuya Sky", time: "14:00" };
 const stopOf = (store, id) => byId(store.state.stops, id);
 const stopRows = (fake) => fake.tables.Stops.length;
 
 test("a stop: added, shown at once, confirmed, undone", async () => {
   const { store, fake } = phone({ seed: {} });
   await store.boot();
-  const token = store.addStop({ date: "2026-12-12", title: "Shibuya Sky", time: "14:00" });
+  const token = store.addStop({ date: "2026-12-28", title: "Shibuya Sky", time: "14:00" });
   assert.equal(store.state.stops.at(-1).pending, true);
   await store.idle();
   assert.equal(store.state.stops.at(-1).pending, undefined);
@@ -1931,7 +1931,7 @@ test("a stop add whose reply is lost is not sent twice, and the next contact sho
   const { store, fake, net } = phone({ seed: {} });
   await store.boot();
   net.lose.add("addStop"); // the backend saves it; the reply never arrives
-  store.addStop({ date: "2026-12-12", title: "Shibuya Sky" });
+  store.addStop({ date: "2026-12-28", title: "Shibuya Sky" });
   await store.idle();
   assert.equal(store.state.notice, "Couldn’t confirm that. Checking…");
   net.lose.clear();
@@ -1946,21 +1946,21 @@ test("undo from History works on a stop and a day header", async () => {
   const { store, fake } = phone({ seed: { stops: [SKY] } });
   await store.boot();
   await backend(fake, "updateStop", { id: SKY.id, patch: { time: "15:30" } });
-  await backend(fake, "setDay", { date: "2026-12-12", patch: { city: "Tokyo" } });
+  await backend(fake, "setDay", { date: "2026-12-28", patch: { city: "Tokyo" } });
   await store.refresh();
   await store.loadHistory();
   const [day, stop] = store.state.history.entries;
   assert.equal(await store.undoEntry(stop.id), true);
   assert.equal(store.state.stops[0].time, "14:00");
   assert.equal(await store.undoEntry(day.id), true);
-  assert.equal(store.state.days.find((d) => d.date === "2026-12-12").city, "");
+  assert.equal(store.state.days.find((d) => d.date === "2026-12-28").city, "Chicago");
 });
 
 test("a stop add whose reply is lost, then Undo: the backend ends with it removed, sent once, nothing queued", async () => {
   const p = phone({ seed: {} });
   await p.store.boot();
   p.net.lose.add("addStop");
-  const t = p.store.addStop({ date: "2026-12-12", title: "Shibuya Sky" });
+  const t = p.store.addStop({ date: "2026-12-28", title: "Shibuya Sky" });
   const id = idOf(p.store);
   await p.store.idle();
   assert.equal(p.store.state.notice, UNCONFIRMED);
@@ -1984,7 +1984,7 @@ test("a stop add whose reply is lost, then Undo with still no signal: it waits a
   const p = phone({ seed: {} });
   await p.store.boot();
   p.net.lose.add("addStop");
-  const t = p.store.addStop({ date: "2026-12-12", title: "Shibuya Sky" });
+  const t = p.store.addStop({ date: "2026-12-28", title: "Shibuya Sky" });
   const id = idOf(p.store);
   await p.store.idle();
   p.net.lose.clear();
@@ -2007,7 +2007,7 @@ test("a stop add that never reached the backend, then Undo: nothing is sent and 
   const p = phone({ seed: {} });
   await p.store.boot();
   p.net.failing.add("addStop"); // dropped before the backend; the phone cannot know that
-  const t = p.store.addStop({ date: "2026-12-12", title: "Shibuya Sky" });
+  const t = p.store.addStop({ date: "2026-12-28", title: "Shibuya Sky" });
   const id = idOf(p.store);
   await p.store.idle();
   assert.equal(p.store.state.notice, UNCONFIRMED);
@@ -2026,7 +2026,7 @@ test("Undo of a stop add while it is still on its way: one stop on the backend, 
   const p = phone({ seed: {} });
   await p.store.boot();
   const release = p.net.hold("addStop");
-  const t = p.store.addStop({ date: "2026-12-12", title: "Shibuya Sky" });
+  const t = p.store.addStop({ date: "2026-12-28", title: "Shibuya Sky" });
   const id = idOf(p.store);
   const undone = p.store.undo(t);
   assert.equal(stopOf(p.store, id).deleted, true, "shown gone at once");
@@ -2102,7 +2102,7 @@ test("stop writes while the phone knows it has no signal: nothing sent, nothing 
   await p.store.boot();
   p.net.knownOffline = true;
   const before = p.net.sent.length;
-  p.store.addStop({ date: "2026-12-12", title: "Tower Records" });
+  p.store.addStop({ date: "2026-12-28", title: "Tower Records" });
   await p.store.idle();
   assert.equal(p.store.state.notice, NOT_SAVED);
   assert.equal(p.store.state.stops.some((s) => s.title === "Tower Records"), false);
@@ -2124,12 +2124,12 @@ test("stop writes while the phone knows it has no signal: nothing sent, nothing 
 
 test("a stop in a saved queue from before a reload is never sent; the expense beside it still is", async () => {
   const storage = memStorage({ "chi.key": KEY, "chi.me": "Mo" });
-  const stop = { id: "stopBBBB0001", date: "2026-12-12", title: "Tower Records", time: "", detail: "", gettingThere: "", travelMin: 0, fixed: false, place: "", signJp: "", booked: false, link: "", photo: "", note: "" };
+  const stop = { id: "stopBBBB0001", date: "2026-12-28", title: "Tower Records", time: "", detail: "", gettingThere: "", travelMin: 0, fixed: false, place: "", signJp: "", booked: false, link: "", photo: "", note: "" };
   const expense = { id: "expQQQQ0001", ...draft() };
   storage.setItem("chi.queue", JSON.stringify([
     { stop, sent: true },
     { undo: true, kind: "stop", args: { stop }, logId: 1, actor: "Mo" },
-    { expense, addedAt: "2026-12-11T03:00:00.000Z", rate: 0.72, addedBy: "Mo", failed: false, sent: false },
+    { expense, addedAt: "2026-12-27T03:00:00.000Z", rate: 0.72, addedBy: "Mo", failed: false, sent: false },
   ]));
   const p = phone({ seed: { stops: [SKY] }, storage });
   await p.store.boot();
@@ -2174,7 +2174,7 @@ test("a cache in the real Plan 1 shape paints Days and the same money before the
   const booting = p.store.boot();
   await until(() => p.store.state.status === "ready");
   const painted = p.store.state;
-  assert.equal(painted.days.length, 11);
+  assert.equal(painted.days.length, 7);
   assert.deepEqual(painted.stops.map((x) => x.title), plan.stops.map((x) => x.title));
   assert.equal(painted.stays[0].name, plan.stays[0].name);
   const money = (st) => JSON.stringify([balances(st.people.map((x) => x.name), st.expenses, st.payments), st.expenses.length, st.payments.length, st.setAside]);
@@ -2190,7 +2190,7 @@ test("a stop write with no reply asks the backend at once, so the truth is back 
   const p = phone({ seed: {} });
   await p.store.boot();
   p.net.lose.add("addStop");
-  p.store.addStop({ date: "2026-12-12", title: "Shibuya Sky" });
+  p.store.addStop({ date: "2026-12-28", title: "Shibuya Sky" });
   const id = idOf(p.store);
   await p.store.idle();
   assert.equal(p.store.state.notice, UNCONFIRMED);
@@ -2224,7 +2224,7 @@ test("R36: a waited-on stop add says nothing until the reply, then is saved and 
   const p = phone({ seed: {} });
   await p.store.boot();
   const release = p.net.hold("addStop");
-  const t = p.store.addStop({ date: "2026-12-12", title: "Shibuya Sky" }, { ...QUIET, id: "stopWAIT0001" });
+  const t = p.store.addStop({ date: "2026-12-28", title: "Shibuya Sky" }, { ...QUIET, id: "stopWAIT0001" });
   let out = null;
   p.store.outcome(t).then((o) => { out = o; });
   await until(() => p.net.sent.some((b) => b.action === "addStop"));
@@ -2242,8 +2242,8 @@ test("R36: a waited-on stop add says nothing until the reply, then is saved and 
 test("R36: a waited-on stop add refused by the backend comes back with its reason; no notice, nothing stored", async () => {
   const p = phone({ seed: {} });
   await p.store.boot();
-  dropDay(p.fake, "2026-12-12");
-  const t = p.store.addStop({ date: "2026-12-12", title: "Shibuya Sky" }, { ...QUIET, id: "stopWAIT0002" });
+  dropDay(p.fake, "2026-12-28");
+  const t = p.store.addStop({ date: "2026-12-28", title: "Shibuya Sky" }, { ...QUIET, id: "stopWAIT0002" });
   const out = await p.store.outcome(t);
   await p.store.idle();
   assert.deepEqual(out, { saved: false, reason: "refused", message: "Pick a day of the trip." });
@@ -2258,7 +2258,7 @@ test("R36: a waited-on stop add with no reply that did land: unsure first, then 
   await p.store.boot();
   p.net.lose.add("addStop");
   let unsureAt = null;
-  const t = p.store.addStop({ date: "2026-12-12", title: "Shibuya Sky" }, { ...QUIET, id: "stopWAIT0003", onUnsure: () => { unsureAt = sent(p.fake, "load"); } });
+  const t = p.store.addStop({ date: "2026-12-28", title: "Shibuya Sky" }, { ...QUIET, id: "stopWAIT0003", onUnsure: () => { unsureAt = sent(p.fake, "load"); } });
   const out = await p.store.outcome(t);
   await p.store.idle();
   assert.equal(unsureAt, 1, "told it is unsure before the check");
@@ -2275,12 +2275,12 @@ test("R36: a waited-on stop add that never landed is not saved; a retry with the
   const p = phone({ seed: {} });
   await p.store.boot();
   p.net.failing.add("addStop");
-  const first = await p.store.outcome(p.store.addStop({ date: "2026-12-12", title: "Shibuya Sky" }, { ...QUIET, id: "stopWAIT0004" }));
+  const first = await p.store.outcome(p.store.addStop({ date: "2026-12-28", title: "Shibuya Sky" }, { ...QUIET, id: "stopWAIT0004" }));
   assert.deepEqual(first, { saved: false, reason: "notLanded" });
   assert.equal(p.store.state.notice, null);
   assert.equal(stopOf(p.store, "stopWAIT0004"), undefined);
   p.net.failing.clear();
-  const again = await p.store.outcome(p.store.addStop({ date: "2026-12-12", title: "Shibuya Sky" }, { ...QUIET, id: "stopWAIT0004" }));
+  const again = await p.store.outcome(p.store.addStop({ date: "2026-12-28", title: "Shibuya Sky" }, { ...QUIET, id: "stopWAIT0004" }));
   await p.store.idle();
   assert.equal(again.saved, true);
   assert.equal(stopRows(p.fake), 1);
@@ -2290,12 +2290,12 @@ test("R36: a retry after 'not saved' when the first add landed late still makes 
   const p = phone({ seed: {} });
   await p.store.boot();
   p.net.failing.add("addStop");
-  const first = await p.store.outcome(p.store.addStop({ date: "2026-12-12", title: "Shibuya Sky" }, { ...QUIET, id: "stopWAIT0005" }));
+  const first = await p.store.outcome(p.store.addStop({ date: "2026-12-28", title: "Shibuya Sky" }, { ...QUIET, id: "stopWAIT0005" }));
   assert.equal(first.reason, "notLanded");
   // The first request reaches the backend after the check.
-  await backend(p.fake, "addStop", { stop: { id: "stopWAIT0005", date: "2026-12-12", title: "Shibuya Sky" } }, "Mo");
+  await backend(p.fake, "addStop", { stop: { id: "stopWAIT0005", date: "2026-12-28", title: "Shibuya Sky" } }, "Mo");
   p.net.failing.clear();
-  const again = await p.store.outcome(p.store.addStop({ date: "2026-12-12", title: "Shibuya Sky deck" }, { ...QUIET, id: "stopWAIT0005" }));
+  const again = await p.store.outcome(p.store.addStop({ date: "2026-12-28", title: "Shibuya Sky deck" }, { ...QUIET, id: "stopWAIT0005" }));
   await p.store.idle();
   assert.equal(again.saved, true);
   assert.equal(again.item.title, "Shibuya Sky", "the backend's own row, so the caller can see what differs");
@@ -2306,7 +2306,7 @@ test("R36: a waited-on stop add the phone knows never left is not sent; no notic
   const p = phone({ seed: {} });
   await p.store.boot();
   p.net.knownOffline = true;
-  const out = await p.store.outcome(p.store.addStop({ date: "2026-12-12", title: "Shibuya Sky" }, { ...QUIET, id: "stopWAIT0006" }));
+  const out = await p.store.outcome(p.store.addStop({ date: "2026-12-28", title: "Shibuya Sky" }, { ...QUIET, id: "stopWAIT0006" }));
   assert.deepEqual(out, { saved: false, reason: "notSent" });
   assert.equal(p.store.state.notice, null);
   assert.equal(sent(p.fake, "addStop"), 0);
@@ -2320,7 +2320,7 @@ test("R36: when the check itself cannot reach the backend, the outcome waits for
   p.net.failing.add("load");
   let out = null;
   let unsure = false;
-  p.store.outcome(p.store.addStop({ date: "2026-12-12", title: "Shibuya Sky" }, { ...QUIET, id: "stopWAIT0007", onUnsure: () => { unsure = true; } })).then((o) => { out = o; });
+  p.store.outcome(p.store.addStop({ date: "2026-12-28", title: "Shibuya Sky" }, { ...QUIET, id: "stopWAIT0007", onUnsure: () => { unsure = true; } })).then((o) => { out = o; });
   await p.store.idle();
   assert.equal(unsure, true);
   assert.equal(out, null, "still unknown");
@@ -2357,7 +2357,7 @@ test("R36: a waited-on stop edit with no reply: landed is saved, not landed is n
 test("R36: a waited-on stop edit refused by the backend comes back with its reason", async () => {
   const p = phone({ seed: { stops: [SKY] } });
   await p.store.boot();
-  dropDay(p.fake, "2026-12-12");
+  dropDay(p.fake, "2026-12-28");
   const out = await p.store.outcome(p.store.updateStop(SKY.id, { title: "Sky deck" }, QUIET));
   assert.deepEqual(out, { saved: false, reason: "refused", message: "Pick a day of the trip." });
   assert.equal(p.store.state.notice, null);
@@ -2370,7 +2370,7 @@ test("R36: a waited-on stop edit refused by the backend comes back with its reas
 const PLANNER_ID = "fakePlannerSheet_0123456789abcdefXYZ";
 const PHEAD = ["payment_id", "date_paid", "payer", "description", "category", "vendor", "booking_ref", "amount", "currency", "amount_cad", "cad_is_exact", "split_between", "split_type", "status", "include_in_split", "source", "added_by", "notes"];
 const prow = (o) => PHEAD.map((h) => (o[h] === undefined ? "" : o[h]));
-const PX7 = { payment_id: "X7", date_paid: "2026-12-11", payer: "Mo", description: "Rail pass", category: "transport", vendor: "North Rail", booking_ref: "AB12", amount: 24750, currency: "USD", amount_cad: 221.52, cad_is_exact: "yes", split_between: "Mo, Izzah", split_type: "equal", include_in_split: "yes" };
+const PX7 = { payment_id: "X7", date_paid: "2026-12-27", payer: "Mo", description: "Rail pass", category: "transport", vendor: "North Rail", booking_ref: "AB12", amount: 24750, currency: "USD", amount_cad: 221.52, cad_is_exact: "yes", split_between: "Mo, Izzah", split_type: "equal", include_in_split: "yes" };
 const PQ3 = { ...PX7, payment_id: "Q3", description: "Noodle bar", amount_cad: "", amount: 3600, vendor: "Ramen Ya", booking_ref: "" };
 
 test("syncPayments pulls, reloads so the lines are there, says what came in, and resolves with the counts", async () => {
@@ -2587,7 +2587,7 @@ test("syncTodos: when a later call of a long pull fails, what the earlier one br
   assert.equal(p.store.state.notice, "Couldn’t confirm that. Checking…");
 });
 
-// ---------- payments pulled on their own (Mo, 2026-11-17) ----------
+// ---------- payments pulled on their own (Mo, 2026-12-03) ----------
 // autoPayments(): while the app is open, at most once every 10 minutes per
 // phone, the planner's payments are asked for with { auto: true }. Quiet:
 // it says something only when lines came in or changed.
@@ -2614,7 +2614,7 @@ test("paymentProblems arrives in state from load, and is empty when the backend 
   const none = phone({ seed: SEED });
   await none.store.boot();
   assert.deepEqual(none.store.state.paymentProblems, { at: "", list: [], more: 0 });
-  const seeded = { at: "2026-12-12T01:00:00.000Z", list: [{ id: "Q1", message: "Why.", row: 9, what: "Thing" }], more: 2 };
+  const seeded = { at: "2026-12-28T01:00:00.000Z", list: [{ id: "Q1", message: "Why.", row: 9, what: "Thing" }], more: 2 };
   const p = phone({ seed: { ...SEED, paymentProblems: seeded } });
   await p.store.boot();
   assert.deepEqual(p.store.state.paymentProblems, seeded);
@@ -2701,7 +2701,7 @@ test("autoPayments: one at a time", async () => {
   assert.equal(autoCalls(p).length, 1);
 });
 
-test("autoPayments: never replaces a notice already showing (review, 2026-11-17)", async () => {
+test("autoPayments: never replaces a notice already showing (review, 2026-12-03)", async () => {
   const p = autoPhone();
   await p.store.boot();
   p.store.notify("No signal. That wasn’t saved.");
@@ -2711,7 +2711,7 @@ test("autoPayments: never replaces a notice already showing (review, 2026-11-17)
   assert.ok(p.store.state.expenses.some((e) => e.title === "Rail pass"), "the line still came in");
 });
 
-// ---------- busy(): nothing may be dropped by a reload (review, 2026-11-17) ----------
+// ---------- busy(): nothing may be dropped by a reload (review, 2026-12-03) ----------
 
 test("busy: true while an edit is on its way, false once it has landed", async () => {
   const p = phone({ seed: SEED });

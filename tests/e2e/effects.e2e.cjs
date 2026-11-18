@@ -6,20 +6,20 @@
 // filter, no CSS filter inside a list). Every item and name here is made up.
 
 const assert = require("node:assert/strict");
-const { SEED, WITH_PLAN, NOON12, makeBackend, open, advance, until, visible } = require("./helpers.cjs");
+const { SEED, WITH_PLAN, NOON28, makeBackend, open, advance, until, visible } = require("./helpers.cjs");
 
 const PLANNER_ID = "fakePlannerSheet_0123456789abcdefXYZ";
 const BHEAD = ["#", "Item", "Who", "Book by", "Status", "Notes", "Booking link"];
 const brow = (o) => BHEAD.map((h) => (o[h] === undefined ? "" : o[h]));
 const CHEAD = ["#", "Date / time", "Agent / session", "Tab", "Cell(s)", "Item", "Old value", "New value", "Why", "Proof / source", "Verified?"];
 const ITEMS = [
-  { "#": 1, Item: "Rail pass seat reservations", "Book by": "2026-11-14", Status: "Not booked", Notes: "Window seats for three." },
-  { "#": 2, Item: "Tea ceremony class", "Book by": "2026-11-18", Status: "Pending" },
-  { "#": 3, Item: "Snow park day trip", "Book by": "Dec 5", Status: "Not booked" },
-  { "#": 5, Item: "Pocket wifi pickup", "Book by": "2026-11-10", Status: "Booked" },
+  { "#": 1, Item: "Rail pass seat reservations", "Book by": "2026-11-30", Status: "Not booked", Notes: "Window seats for three." },
+  { "#": 2, Item: "Tea ceremony class", "Book by": "2026-12-04", Status: "Pending" },
+  { "#": 3, Item: "Snow park day trip", "Book by": "Dec 21", Status: "Not booked" },
+  { "#": 5, Item: "Pocket wifi pickup", "Book by": "2026-11-26", Status: "Booked" },
 ];
-// 14:00 on Mon Nov 16 in Toronto: before the trip, so the Before tab is there.
-const BEFORE = Date.parse("2026-11-16T19:00:00Z");
+// 14:00 on Wed Dec 2 in Toronto: before the trip, so the Before tab is there.
+const BEFORE = Date.parse("2026-12-02T19:00:00Z");
 
 // The Days screen over a plan, with the planner's list pulled in (3 open, 1 done).
 async function daysReady(page) {
@@ -33,7 +33,7 @@ async function daysReady(page) {
 }
 
 async function moneyReady(page, opts = {}) {
-  const backend = await open(page, { seed: SEED, nowMs: NOON12, ...opts });
+  const backend = await open(page, { seed: SEED, nowMs: NOON28, ...opts });
   await until(() => page.evaluate(() => document.querySelectorAll("#rc .rc-row").length > 0), "the receipt draws");
   await until(() => page.evaluate(() => document.querySelectorAll("#slip .spot").length > 0), "the slip draws");
   return backend;

@@ -1,7 +1,7 @@
 // A Home Screen app on an iPhone takes the whole screen's height (css/base.css).
 
 const assert = require("node:assert/strict");
-const { SEED, NOON12, open, until } = require("./helpers.cjs");
+const { SEED, NOON28, open, until } = require("./helpers.cjs");
 
 const SHORT = { width: 440, height: 878 };
 const SCREEN = { width: 440, height: 956 };
@@ -10,12 +10,12 @@ const drawn = (page) => until(() => page.evaluate(() => document.querySelectorAl
 module.exports = [
   {
     // This browser cannot be put in Home Screen mode, so the rule is read from the stylesheet;
-    // that it works on an iPhone was seen on Mo's (2026-11-17).
+    // that it works on an iPhone was seen on Mo's (2026-12-03).
     name: "the stylesheet gives a Home Screen app the large viewport height, and a browser tab is unchanged",
     viewport: SHORT,
     screen: SCREEN,
     async run({ page }) {
-      await open(page, { seed: SEED, nowMs: NOON12 });
+      await open(page, { seed: SEED, nowMs: NOON28 });
       await drawn(page);
       const seen = await page.evaluate(async () => {
         const css = await (await fetch("css/base.css")).text();

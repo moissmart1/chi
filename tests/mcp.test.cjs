@@ -59,7 +59,7 @@ test("every tool has a name, a description and a schema", () => {
 
 test("Claude adds a stop: validated, logged as Claude, undoable", async () => {
   const fake = createFakeBackend({});
-  const r = fake.mcp(rpc("tools/call", { name: "add_stop", arguments: { date: "2026-12-12", title: "Shibuya Sky", time: "14:00", travel_min: 30, sign_jp: "渋谷" } }), { ...T, as: "Izzah" });
+  const r = fake.mcp(rpc("tools/call", { name: "add_stop", arguments: { date: "2026-12-28", title: "Shibuya Sky", time: "14:00", travel_min: 30, sign_jp: "渋谷" } }), { ...T, as: "Izzah" });
   const stop = body(r).stop;
   assert.deepEqual([stop.title, stop.travelMin, stop.signJp], ["Shibuya Sky", 30, "渋谷"]);
   const log = fake.tables.Log.at(-1);
@@ -70,7 +70,7 @@ test("Claude adds a stop: validated, logged as Claude, undoable", async () => {
 
 test("a refusal comes back in the backend's words, as a tool error", () => {
   const fake = createFakeBackend({});
-  const r = fake.mcp(rpc("tools/call", { name: "add_stop", arguments: { date: "2026-12-12", title: "x", link: "javascript:alert(1)" } }), T);
+  const r = fake.mcp(rpc("tools/call", { name: "add_stop", arguments: { date: "2026-12-28", title: "x", link: "javascript:alert(1)" } }), T);
   assert.equal(r.result.isError, true);
   assert.equal(r.result.content[0].text, "That link has to start with https://.");
   assert.equal(fake.mcp(rpc("tools/call", { name: "nope", arguments: {} }), T).error.code, -32601);
@@ -90,9 +90,9 @@ test("get_trip and explain_debt agree with the app's own maths", () => {
 });
 
 test("add_expense defaults: everyone shares it, and the day is today in Chicago", () => {
-  const fake = createFakeBackend({}, { clock: () => "2026-12-12T19:20:00.000Z" }); // 13:20 in Chicago
+  const fake = createFakeBackend({}, { clock: () => "2026-12-28T19:20:00.000Z" }); // 13:20 in Chicago
   const e = body(fake.mcp(rpc("tools/call", { name: "add_expense", arguments: { title: "Ramen", amount: 30, currency: "USD", paid_by: "Mo" } }), T)).expense;
-  assert.deepEqual([e.day, e.split.length, e.addedBy], ["2026-12-12", 2, "Mo"]);
+  assert.deepEqual([e.day, e.split.length, e.addedBy], ["2026-12-28", 2, "Mo"]);
 });
 
 test("no reply ever holds the trip key or the token", () => {
@@ -196,15 +196,15 @@ test("bad arguments are -32602 and write nothing", () => {
   const stopsBefore = JSON.stringify(fake.tables.Stops);
   const cases = [
     ["add_stop", { title: "x" }],
-    ["add_stop", { date: "2026-12-12", title: "x", time: "9:30" }],
-    ["add_stop", { date: "2026-12-12", title: "x", time: "25:00" }],
-    ["add_stop", { date: "2026-12-12", title: "x", time: 1400 }],
-    ["add_stop", { date: "2026-12-12", title: "x", travel_min: 1.5 }],
-    ["add_stop", { date: "2026-12-12", title: "x", travel_min: -5 }],
-    ["add_stop", { date: "2026-12-12", title: "x", travel_min: "30" }],
-    ["add_stop", { date: "2026-12-12", title: "x", fixed: "yes" }],
-    ["add_stop", { date: "2026-12-12", title: "x", colour: "red" }],
-    ["add_stop", { date: "2026-12-12", title: 5 }],
+    ["add_stop", { date: "2026-12-28", title: "x", time: "9:30" }],
+    ["add_stop", { date: "2026-12-28", title: "x", time: "25:00" }],
+    ["add_stop", { date: "2026-12-28", title: "x", time: 1400 }],
+    ["add_stop", { date: "2026-12-28", title: "x", travel_min: 1.5 }],
+    ["add_stop", { date: "2026-12-28", title: "x", travel_min: -5 }],
+    ["add_stop", { date: "2026-12-28", title: "x", travel_min: "30" }],
+    ["add_stop", { date: "2026-12-28", title: "x", fixed: "yes" }],
+    ["add_stop", { date: "2026-12-28", title: "x", colour: "red" }],
+    ["add_stop", { date: "2026-12-28", title: 5 }],
     ["change_stop", { title: "x" }],
     ["change_stop", { id: "planstop1101", time: "noon" }],
     ["change_stop", { id: "planstop1101", travel_min: 2.5 }],
@@ -212,7 +212,7 @@ test("bad arguments are -32602 and write nothing", () => {
     ["add_expense", { title: "x", amount: "30", currency: "USD", paid_by: "Mo" }],
     ["add_expense", { title: "x", amount: 30, currency: "USD", paid_by: "Mo", split: "Mo" }],
     ["add_expense", { title: "x", amount: 30, currency: "USD", paid_by: "Mo", split: [1] }],
-    ["save_stay", { name: "x", first_night: "2026-12-12" }],
+    ["save_stay", { name: "x", first_night: "2026-12-28" }],
     ["set_day", { city: "Tokyo" }],
     ["undo", {}],
     ["undo", { log_id: "1" }],
@@ -234,10 +234,10 @@ test("bad arguments are -32602 and write nothing", () => {
 
 test("a time is trimmed before it is handed on; an empty one is no time", () => {
   const fake = createFakeBackend({});
-  assert.equal(ok(fake, "add_stop", { date: "2026-12-12", title: "a", time: " 14:00 " }).stop.time, "14:00");
-  assert.equal(ok(fake, "add_stop", { date: "2026-12-12", title: "b", time: "" }).stop.time, "");
+  assert.equal(ok(fake, "add_stop", { date: "2026-12-28", title: "a", time: " 14:00 " }).stop.time, "14:00");
+  assert.equal(ok(fake, "add_stop", { date: "2026-12-28", title: "b", time: "" }).stop.time, "");
   assert.deepEqual(fake.tables.Stops.map((r) => r.time), ["14:00", ""]);
-  assert.match(refusal(fake, "add_stop", { date: "2026-12-12", title: "c", travel_min: 601 }), /^Minutes to get there/);
+  assert.match(refusal(fake, "add_stop", { date: "2026-12-28", title: "c", travel_min: 601 }), /^Minutes to get there/);
 });
 
 // ---------- writes go through the app's own actions ----------
@@ -245,7 +245,7 @@ test("a time is trimmed before it is handed on; an empty one is no time", () => 
 test("writes are made as the person `as` names (any case, spaces trimmed), else the first person, always via claude (R35)", () => {
   const fake = createFakeBackend({});
   for (const [as, who] of [["Izzah", "Izzah"], ["izzah", "Izzah"], [" Izzah ", "Izzah"], [undefined, "Mo"]]) {
-    ok(fake, "add_stop", { date: "2026-12-11", title: "With " + as }, as === undefined ? T : { ...T, as });
+    ok(fake, "add_stop", { date: "2026-12-27", title: "With " + as }, as === undefined ? T : { ...T, as });
     const log = fake.tables.Log.at(-1);
     assert.deepEqual([log.who, log.via], [who, "claude"], String(as));
   }
@@ -255,8 +255,8 @@ test("writes are made as the person `as` names (any case, spaces trimmed), else 
 });
 
 test("the write tools map their arguments to the API and answer { <kind>, log_id }", () => {
-  const fake = createFakeBackend(plan, { clock: () => "2026-12-11T01:00:00.000Z" });
-  const s = ok(fake, "add_stop", { date: "2026-12-12", title: "Tower", getting_there: "Walk", fixed: true, booked: true, place: "Tokyo Tower", link: "https://example.test/t", photo: "https://example.test/p.jpg", note: "n", detail: "d" });
+  const fake = createFakeBackend(plan, { clock: () => "2026-12-27T01:00:00.000Z" });
+  const s = ok(fake, "add_stop", { date: "2026-12-28", title: "Tower", getting_there: "Walk", fixed: true, booked: true, place: "Tokyo Tower", link: "https://example.test/t", photo: "https://example.test/p.jpg", note: "n", detail: "d" });
   assert.deepEqual(Object.keys(s).sort(), ["log_id", "stop"]);
   assert.match(s.stop.id, /^[A-Za-z][A-Za-z0-9]{19}$/);
   assert.deepEqual([s.stop.gettingThere, s.stop.fixed, s.stop.booked, s.stop.place, s.stop.detail], ["Walk", true, true, "Tokyo Tower", "d"]);
@@ -269,21 +269,21 @@ test("the write tools map their arguments to the API and answer { <kind>, log_id
   assert.equal(refusal(fake, "change_stop", { id: s.stop.id, title: "x" }), "Bring it back first.");
   assert.equal(refusal(fake, "remove_stop", { id: "nosuchstop1" }), "That stop isn’t there any more.");
 
-  const stay = ok(fake, "save_stay", { name: "Ryokan", first_night: "2026-12-14", last_night: "2026-12-15", name_jp: "旅館", address_jp: "住所", note: "late check-in" });
+  const stay = ok(fake, "save_stay", { name: "Ryokan", first_night: "2026-12-30", last_night: "2026-12-31", name_jp: "旅館", address_jp: "住所", note: "late check-in" });
   assert.match(stay.stay.id, /^[A-Za-z][A-Za-z0-9]{19}$/);
-  assert.deepEqual([stay.stay.nameJp, stay.stay.addressJp, stay.stay.firstNight], ["旅館", "住所", "2026-12-14"]);
-  const again = ok(fake, "save_stay", { id: stay.stay.id, name: "Ryokan Two", first_night: "2026-12-14", last_night: "2026-12-16" });
-  assert.deepEqual([again.stay.id, again.stay.name, again.stay.lastNight], [stay.stay.id, "Ryokan Two", "2026-12-16"]);
+  assert.deepEqual([stay.stay.nameJp, stay.stay.addressJp, stay.stay.firstNight], ["旅館", "住所", "2026-12-30"]);
+  const again = ok(fake, "save_stay", { id: stay.stay.id, name: "Ryokan Two", first_night: "2026-12-30", last_night: "2027-01-01" });
+  assert.deepEqual([again.stay.id, again.stay.name, again.stay.lastNight], [stay.stay.id, "Ryokan Two", "2027-01-01"]);
   assert.equal(ok(fake, "remove_stay", { id: stay.stay.id }).stay.deleted, true);
-  assert.equal(refusal(fake, "save_stay", { name: "x", first_night: "2026-12-15", last_night: "2026-12-14" }), "The last night can’t be before the first.");
+  assert.equal(refusal(fake, "save_stay", { name: "x", first_night: "2026-12-31", last_night: "2026-12-30" }), "The last night can’t be before the first.");
 
-  const day = ok(fake, "set_day", { date: "2026-12-14", city: "Kyoto", line_jp: "東海道新幹線", line_en: "Tokaido Shinkansen", line_colour: "#0072BC", from_jp: "東京", from_en: "Tokyo", to_jp: "京都", to_en: "Kyoto", title: "West" });
-  assert.deepEqual(day.day, { date: "2026-12-14", city: "Kyoto", title: "West", lineJp: "東海道新幹線", lineEn: "Tokaido Shinkansen", lineColour: "#0072BC", fromJp: "東京", fromEn: "Tokyo", toJp: "京都", toEn: "Kyoto" });
-  assert.equal(refusal(fake, "set_day", { date: "2026-12-14", line_colour: "blue" }), "Use a colour like #2FB6E8.");
-  assert.equal(refusal(fake, "set_day", { date: "2027-01-01", city: "x" }), "That day isn’t on this trip.");
+  const day = ok(fake, "set_day", { date: "2026-12-30", city: "Kyoto", line_jp: "東海道新幹線", line_en: "Tokaido Shinkansen", line_colour: "#0072BC", from_jp: "東京", from_en: "Tokyo", to_jp: "京都", to_en: "Kyoto", title: "West" });
+  assert.deepEqual(day.day, { date: "2026-12-30", city: "Kyoto", title: "West", lineJp: "東海道新幹線", lineEn: "Tokaido Shinkansen", lineColour: "#0072BC", fromJp: "東京", fromEn: "Tokyo", toJp: "京都", toEn: "Kyoto" });
+  assert.equal(refusal(fake, "set_day", { date: "2026-12-30", line_colour: "blue" }), "Use a colour like #2FB6E8.");
+  assert.equal(refusal(fake, "set_day", { date: "2027-01-02", city: "x" }), "That day isn’t on this trip.");
 
-  const e = ok(fake, "add_expense", { title: "Taxi", amount: 12.5, currency: "CAD", paid_by: "Izzah", split: ["Mo", "Izzah"], note: "airport", kind: "transport", day: "2026-12-13" });
-  assert.deepEqual([e.expense.amount, e.expense.currency, e.expense.paidBy, e.expense.split, e.expense.note, e.expense.kind, e.expense.day, e.expense.rate], [12.5, "CAD", "Izzah", ["Mo", "Izzah"], "airport", "transport", "2026-12-13", 0.72]);
+  const e = ok(fake, "add_expense", { title: "Taxi", amount: 12.5, currency: "CAD", paid_by: "Izzah", split: ["Mo", "Izzah"], note: "airport", kind: "transport", day: "2026-12-29" });
+  assert.deepEqual([e.expense.amount, e.expense.currency, e.expense.paidBy, e.expense.split, e.expense.note, e.expense.kind, e.expense.day, e.expense.rate], [12.5, "CAD", "Izzah", ["Mo", "Izzah"], "airport", "transport", "2026-12-29", 0.72]);
   assert.equal(refusal(fake, "add_expense", { title: "x", amount: 1, currency: "JPY", paid_by: "Mo" }), "Use US or Canadian dollars.");
   assert.equal(refusal(fake, "add_expense", { title: "x", amount: 1, currency: "USD", paid_by: "Nobody" }), "Pick who paid.");
 });
@@ -302,15 +302,15 @@ test("change_stop writes only the columns that changed (a hand-typed cell elsewh
 test("add_expense's default day follows the register: pre before the trip, today during, the last day after", () => {
   const at = (iso) => createFakeBackend({}, { clock: () => iso });
   const day = (fake) => ok(fake, "add_expense", { title: "x", amount: 1, currency: "USD", paid_by: "Mo" }).expense.day;
-  assert.equal(day(at("2026-12-10T05:59:00.000Z")), "pre"); // 23:59 on the 9th in Chicago
-  assert.equal(day(at("2026-12-10T06:00:00.000Z")), "2026-12-10"); // midnight in Chicago
-  assert.equal(day(at("2026-12-21T05:59:00.000Z")), "2026-12-20");
-  assert.equal(day(at("2026-12-21T18:00:00.000Z")), "2026-12-20");
+  assert.equal(day(at("2026-12-26T05:59:00.000Z")), "pre"); // 23:59 on the 9th in Chicago
+  assert.equal(day(at("2026-12-26T06:00:00.000Z")), "2026-12-26"); // midnight in Chicago
+  assert.equal(day(at("2027-01-02T05:59:00.000Z")), "2027-01-01");
+  assert.equal(day(at("2027-01-02T18:00:00.000Z")), "2027-01-01");
 });
 
 test("undo through the connector obeys the app's rules", async () => {
   const fake = createFakeBackend({});
-  const a = ok(fake, "add_stop", { date: "2026-12-12", title: "Tea" });
+  const a = ok(fake, "add_stop", { date: "2026-12-28", title: "Tea" });
   const c = ok(fake, "change_stop", { id: a.stop.id, title: "Matcha" });
   assert.equal(refusal(fake, "undo", { log_id: a.log_id }), "That was changed again since. Undo the newer change first.");
   const u = ok(fake, "undo", { log_id: c.log_id });
@@ -323,7 +323,7 @@ test("undo through the connector obeys the app's rules", async () => {
   const personLog = fake.tables.Log.at(-1).id;
   assert.equal(refusal(fake, "undo", { log_id: personLog }), "That change can’t be undone.");
   // An expense added in the app can be undone from Claude, and vice versa.
-  const e = await app(fake, "addExpense", { expense: { id: "exp0000001", day: "2026-12-12", title: "Ramen", amount: 12, currency: "USD", paidBy: "Mo", split: NAMES } });
+  const e = await app(fake, "addExpense", { expense: { id: "exp0000001", day: "2026-12-28", title: "Ramen", amount: 12, currency: "USD", paidBy: "Mo", split: NAMES } });
   assert.equal(ok(fake, "undo", { log_id: e.data.logId }).expense.deleted, true);
 });
 
@@ -337,8 +337,8 @@ test("get_trip gives the trip, names only, the days, and only live stops, stays,
   assert.deepEqual(Object.keys(t), ["trip", "people", "has_picture", "days", "stops", "stays", "expenses", "payments", "owed", "owed_direct", "todos"]);
   assert.deepEqual(t.todos, { open: [], done: 0 }, "no pull yet: nothing to do");
   assert.deepEqual(t.people, NAMES);
-  assert.equal(t.trip.name, "Japan 2026");
-  assert.equal(t.days.length, 11);
+  assert.equal(t.trip.name, "Chicago 2026");
+  assert.equal(t.days.length, 7);
   assert.equal(t.stops.some((s) => s.id === "planstop1102"), false);
   assert.ok(t.stops.length > 0 && t.stops.every((s) => !s.deleted));
   assert.equal(t.expenses.some((e) => e.id === "seedexp004"), false);
@@ -386,11 +386,11 @@ test("explain_debt: each one's working, both readings, the routing and the lines
 
 test("get_history: newest first, 30 by default, at most 200, with id, when, who, the sentence and can_undo", () => {
   const fake = createFakeBackend({});
-  for (let i = 0; i < 205; i++) ok(fake, "add_stop", { date: "2026-12-12", title: "Stop " + i });
+  for (let i = 0; i < 205; i++) ok(fake, "add_stop", { date: "2026-12-28", title: "Stop " + i });
   const h = ok(fake, "get_history", {});
   assert.deepEqual(Object.keys(h), ["entries"]);
   assert.equal(h.entries.length, 30);
-  assert.deepEqual(h.entries[0], { id: 205, when: fake.tables.Log.at(-1).at, who: "Mo", sentence: "Mo added Stop 204 to Sat Dec 12 (through Claude)", can_undo: true });
+  assert.deepEqual(h.entries[0], { id: 205, when: fake.tables.Log.at(-1).at, who: "Mo", sentence: "Mo added Stop 204 to Mon Dec 28 (through Claude)", can_undo: true });
   assert.equal(ok(fake, "get_history", { limit: 5 }).entries.length, 5);
   assert.equal(ok(fake, "get_history", { limit: 500 }).entries.length, 200);
   assert.equal(ok(fake, "get_history", { limit: 0 }).entries.length, 1);
@@ -403,7 +403,7 @@ test("no tool gives out an e-Transfer address or an email; the History entry abo
   await app(fake, "setPerson", { name: "Mo", patch: { etransfer: "mo.pays@example.com" } });
   await app(fake, "setPerson", { name: "Izzah", patch: { etransfer: "416-555-0123" } }, "Izzah");
   fake.tables.People[0].email = "mo.real@example.com";
-  const s = ok(fake, "add_stop", { date: "2026-12-12", title: "Pay back", note: "Izzah takes 416-555-0123, or write to someone@example.org" });
+  const s = ok(fake, "add_stop", { date: "2026-12-28", title: "Pay back", note: "Izzah takes 416-555-0123, or write to someone@example.org" });
   assert.equal(s.stop.note.includes("416-555-0123") || s.stop.note.includes("someone@example.org"), false, s.stop.note);
   const seen = [];
   for (const name of ["get_trip", "get_history"]) seen.push(JSON.stringify(call(fake, name, {})));
@@ -418,7 +418,7 @@ test("no tool gives out an e-Transfer address or an email; the History entry abo
   assert.ok(h.some((e) => e.sentence === "Mo changed Mo’s e-Transfer address"), "the entry is kept, as a sentence only");
   // A map link with an @ in it is not an email.
   const map = "https://www.google.com/maps/place/Tokyo+Tower/@35.6585,139.7454,17z";
-  assert.equal(ok(fake, "add_stop", { date: "2026-12-12", title: "Tower", place: map }).stop.place, map);
+  assert.equal(ok(fake, "add_stop", { date: "2026-12-28", title: "Tower", place: map }).stop.place, map);
 });
 
 test("the trip key and the token never reach a reply, an error, the Log, History or the Sheet", async () => {
@@ -432,14 +432,14 @@ test("the trip key and the token never reach a reply, an error, the Log, History
   r(fake.mcp({ id: 1 }, T));
   for (const name of ["get_trip", "get_history"]) r(call(fake, name, {}));
   r(call(fake, "explain_debt", { from: "Mo", to: "Izzah" }));
-  const added = r(call(fake, "add_stop", { date: "2026-12-12", title: "Tea house" }));
-  r(call(fake, "add_stop", { date: "2026-12-12", title: "x", link: "javascript:1" }));
+  const added = r(call(fake, "add_stop", { date: "2026-12-28", title: "Tea house" }));
+  r(call(fake, "add_stop", { date: "2026-12-28", title: "x", link: "javascript:1" }));
   r(call(fake, "change_stop", { id: body(added).stop.id, note: "n" }));
   r(call(fake, "undo", { log_id: body(added).log_id }));
   r(call(fake, "undo", { log_id: "x" }));
   r(call(fake, "add_expense", { title: "Tea", amount: 5, currency: "USD", paid_by: "Mo" }));
-  r(call(fake, "save_stay", { name: "Inn", first_night: "2026-12-14", last_night: "2026-12-14" }));
-  r(call(fake, "set_day", { date: "2026-12-14", city: "Kyoto" }));
+  r(call(fake, "save_stay", { name: "Inn", first_night: "2026-12-30", last_night: "2026-12-30" }));
+  r(call(fake, "set_day", { date: "2026-12-30", city: "Kyoto" }));
   r(await fake({ key: "test-key", action: "migrate", args: {} }));
   const all = replies.join("");
   assert.equal(all.includes("test-key"), false);
@@ -448,7 +448,7 @@ test("the trip key and the token never reach a reply, an error, the Log, History
   assert.equal(stored.includes("test-key") || stored.includes("claude-token"), false, "never in the Sheet, the Log or History");
 
   // Typed into a stop by someone, they are stored as typed; the reply hides them.
-  const typed = call(fake, "add_stop", { date: "2026-12-12", title: "claude-token", note: "key test-key" });
+  const typed = call(fake, "add_stop", { date: "2026-12-28", title: "claude-token", note: "key test-key" });
   assert.deepEqual([body(typed).stop.title, body(typed).stop.note], ["(hidden)", "key (hidden)"]);
   assert.ok(fake.tables.Stops.some((s) => s.title === "claude-token"));
 });
@@ -456,7 +456,7 @@ test("the trip key and the token never reach a reply, an error, the Log, History
 test("an action that throws is answered with the plain server sentence, and a throw in the connector with Internal error", () => {
   const fake = createFakeBackend(plan);
   delete fake.tables.Stops; // readTable_("Stops") now throws inside the action
-  const text = refusal(fake, "add_stop", { date: "2026-12-12", title: "x" });
+  const text = refusal(fake, "add_stop", { date: "2026-12-28", title: "x" });
   assert.equal(text, "Something went wrong on our side. Try again.");
   delete fake.tables.People; // the connector itself reads People
   assert.deepEqual(call(fake, "get_trip", {}), { jsonrpc: "2.0", id: 1, error: { code: -32603, message: "Internal error" } });
@@ -474,7 +474,7 @@ test("the connector never logs: no console or Logger in Mcp.js, and setup never 
   try {
     const fake = createFakeBackend(plan);
     call(fake, "get_trip", {});
-    call(fake, "add_stop", { date: "2026-12-12", title: "x" });
+    call(fake, "add_stop", { date: "2026-12-28", title: "x" });
     fake.mcp(rpc("tools/list"), {});
   } finally {
     console.log = origLog;
@@ -540,7 +540,7 @@ test("R35: an `as` that names no one refuses every write with -32602 and stores 
   const q = { ...T, as: "nobody" };
   for (const [name, args] of [
     ["add_expense", { title: "Tea", amount: 5, currency: "USD", paid_by: "Mo" }],
-    ["add_stop", { date: "2026-12-12", title: "Tea" }],
+    ["add_stop", { date: "2026-12-28", title: "Tea" }],
     ["remove_stop", { id: "planstop1101" }],
     ["undo", { log_id: 1 }],
     ["sync_payments", {}],
@@ -555,25 +555,25 @@ test("R35: an `as` that names no one refuses every write with -32602 and stores 
   assert.ok(ok(fake, "get_history", {}, q).entries);
   assert.ok(ok(fake, "explain_debt", { from: "Mo", to: "Izzah" }, q).from);
   // An empty as is no as: the first person.
-  ok(fake, "add_stop", { date: "2026-12-12", title: "Tea" }, { ...T, as: " " });
+  ok(fake, "add_stop", { date: "2026-12-28", title: "Tea" }, { ...T, as: " " });
   assert.equal(fake.tables.Log.at(-1).who, "Mo");
 });
 
 test("save_stay with an id changes only the fields given; an empty string clears one", () => {
   const fake = createFakeBackend(plan);
-  const s = ok(fake, "save_stay", { name: "Ryokan", first_night: "2026-12-14", last_night: "2026-12-15", name_jp: "旅館", address_jp: "京都市東山区", note: "late check-in", place: "Gion", link: "https://example.test/r" }).stay;
-  const moved = ok(fake, "save_stay", { id: s.id, last_night: "2026-12-16" }).stay;
-  assert.deepEqual(moved, { ...s, lastNight: "2026-12-16" });
+  const s = ok(fake, "save_stay", { name: "Ryokan", first_night: "2026-12-30", last_night: "2026-12-31", name_jp: "旅館", address_jp: "京都市東山区", note: "late check-in", place: "Gion", link: "https://example.test/r" }).stay;
+  const moved = ok(fake, "save_stay", { id: s.id, last_night: "2027-01-01" }).stay;
+  assert.deepEqual(moved, { ...s, lastNight: "2027-01-01" });
   const row = fake.tables.Stays.find((r) => r.id === s.id);
   assert.deepEqual([row.address_jp, row.note, row.link], ["京都市東山区", "late check-in", "https://example.test/r"]);
   const cleared = ok(fake, "save_stay", { id: s.id, note: "" }).stay;
-  assert.deepEqual([cleared.note, cleared.addressJp, cleared.lastNight], ["", "京都市東山区", "2026-12-16"]);
+  assert.deepEqual([cleared.note, cleared.addressJp, cleared.lastNight], ["", "京都市東山区", "2027-01-01"]);
   assert.equal(fake.tables.Log.at(-1).via, "claude");
 });
 
 test("save_stay takes a photo; a change without it keeps it, an empty string clears it", () => {
   const fake = createFakeBackend(plan);
-  const s = ok(fake, "save_stay", { name: "Inn", first_night: "2026-12-14", last_night: "2026-12-14", photo: "https://example.org/a.jpg" }).stay;
+  const s = ok(fake, "save_stay", { name: "Inn", first_night: "2026-12-30", last_night: "2026-12-30", photo: "https://example.org/a.jpg" }).stay;
   assert.equal(s.photo, "https://example.org/a.jpg");
   assert.equal(ok(fake, "save_stay", { id: s.id, note: "x" }).stay.photo, "https://example.org/a.jpg");
   assert.equal(refusal(fake, "save_stay", { id: s.id, photo: "http://example.org/a.jpg" }), "That photo link has to start with https://.");
@@ -583,14 +583,14 @@ test("save_stay takes a photo; a change without it keeps it, an empty string cle
 test("save_stay: an id that names no stay is refused, a deleted stay is not revived, and without an id the three are needed", () => {
   const fake = createFakeBackend(plan);
   const stays = fake.tables.Stays.length;
-  assert.equal(refusal(fake, "save_stay", { id: "nosuchstay01", name: "x", first_night: "2026-12-14", last_night: "2026-12-14" }), "That stay isn’t there any more.");
+  assert.equal(refusal(fake, "save_stay", { id: "nosuchstay01", name: "x", first_night: "2026-12-30", last_night: "2026-12-30" }), "That stay isn’t there any more.");
   assert.equal(fake.tables.Stays.length, stays, "no stay made with that id");
-  const s = ok(fake, "save_stay", { name: "Inn", first_night: "2026-12-14", last_night: "2026-12-14" }).stay;
+  const s = ok(fake, "save_stay", { name: "Inn", first_night: "2026-12-30", last_night: "2026-12-30" }).stay;
   ok(fake, "remove_stay", { id: s.id });
   assert.equal(refusal(fake, "save_stay", { id: s.id, note: "x" }), "Bring it back first.");
   assert.equal(fake.tables.Stays.find((r) => r.id === s.id).deleted_at !== "", true);
   for (const missing of ["name", "first_night", "last_night"]) {
-    const args = { name: "Inn", first_night: "2026-12-14", last_night: "2026-12-14" };
+    const args = { name: "Inn", first_night: "2026-12-30", last_night: "2026-12-30" };
     delete args[missing];
     assert.equal(badArgs(fake, "save_stay", args), "Invalid params: " + missing + " is missing.");
   }
@@ -598,19 +598,19 @@ test("save_stay: an id that names no stay is refused, a deleted stay is not revi
 
 test("a string argument holding (hidden) is refused, so leaving a field out keeps it, for stops and stays", () => {
   const fake = createFakeBackend(plan);
-  const stop = ok(fake, "add_stop", { date: "2026-12-12", title: "Dinner", note: "confirm with bob@example.com" }).stop;
+  const stop = ok(fake, "add_stop", { date: "2026-12-28", title: "Dinner", note: "confirm with bob@example.com" }).stop;
   assert.equal(stop.note, "confirm with (hidden)");
   const logs = fake.tables.Log.length;
   assert.equal(badArgs(fake, "change_stop", { id: stop.id, note: stop.note + " at 7" }), "Invalid params: note holds (hidden); leave that field out to keep it.");
   assert.equal(badArgs(fake, "add_expense", { title: "x", amount: 1, currency: "USD", paid_by: "Mo", split: ["Mo", "(hidden)"] }), "Invalid params: split holds (hidden); leave that field out to keep it.");
-  assert.equal(badArgs(fake, "add_stop", { date: "2026-12-12", title: "(hidden)" }), "Invalid params: title holds (hidden); leave that field out to keep it.");
+  assert.equal(badArgs(fake, "add_stop", { date: "2026-12-28", title: "(hidden)" }), "Invalid params: title holds (hidden); leave that field out to keep it.");
   assert.equal(fake.tables.Log.length, logs);
   ok(fake, "change_stop", { id: stop.id, time: "19:00" });
   assert.equal(fake.tables.Stops.find((r) => r.id === stop.id).note, "confirm with bob@example.com", "left out, kept");
 
-  const stay = ok(fake, "save_stay", { name: "Inn", first_night: "2026-12-14", last_night: "2026-12-14", note: "keys from ann@example.com" }).stay;
+  const stay = ok(fake, "save_stay", { name: "Inn", first_night: "2026-12-30", last_night: "2026-12-30", note: "keys from ann@example.com" }).stay;
   assert.equal(badArgs(fake, "save_stay", { id: stay.id, note: stay.note }), "Invalid params: note holds (hidden); leave that field out to keep it.");
-  ok(fake, "save_stay", { id: stay.id, last_night: "2026-12-15" });
+  ok(fake, "save_stay", { id: stay.id, last_night: "2026-12-31" });
   assert.equal(fake.tables.Stays.find((r) => r.id === stay.id).note, "keys from ann@example.com", "left out, kept");
 });
 
@@ -620,7 +620,7 @@ test("an e-Transfer address that is an ordinary word hides only a field that is 
   await app(fake, "setPerson", { name: "Mo", patch: { etransfer: "Chicago" } });
   await app(fake, "setPerson", { name: "Izzah", patch: { etransfer: "+1 (416) 555-0123" } }, "Izzah");
   await app(fake, "setPerson", { name: "Sam", patch: { etransfer: "sam@example.net" } }, "Sam");
-  const s = ok(fake, "add_stop", { date: "2026-12-12", title: "Chicago Theatre", detail: "Chicago", note: "Izzah: +1 (416) 555-0123, Sam: sam@example.net" }).stop;
+  const s = ok(fake, "add_stop", { date: "2026-12-28", title: "Chicago Theatre", detail: "Chicago", note: "Izzah: +1 (416) 555-0123, Sam: sam@example.net" }).stop;
   assert.equal(s.title, "Chicago Theatre");
   assert.equal(s.detail, "(hidden)", "a field that is exactly the address");
   assert.equal(s.note, "Izzah: (hidden), Sam: (hidden)");
@@ -639,16 +639,16 @@ test("an e-Transfer address that is an ordinary word hides only a field that is 
 
 test("save_stay never undoes another phone's edit made while Claude's request is on its way", async () => {
   const fake = createFakeBackend(plan);
-  const s = ok(fake, "save_stay", { name: "Ryokan", first_night: "2026-12-14", last_night: "2026-12-15", note: "orig", address_jp: "京都" }).stay;
+  const s = ok(fake, "save_stay", { name: "Ryokan", first_night: "2026-12-30", last_night: "2026-12-31", note: "orig", address_jp: "京都" }).stay;
   fake.beforeConnectorWrite = (body) => {
     if (body.action !== "saveStay") return;
     fake.beforeConnectorWrite = null;
-    fake({ key: "test-key", actor: "Izzah", action: "saveStay", args: { stay: { id: s.id, name: "Ryokan", firstNight: "2026-12-14", lastNight: "2026-12-15", note: "phone B edit", addressJp: "京都" } } });
+    fake({ key: "test-key", actor: "Izzah", action: "saveStay", args: { stay: { id: s.id, name: "Ryokan", firstNight: "2026-12-30", lastNight: "2026-12-31", note: "phone B edit", addressJp: "京都" } } });
   };
-  const moved = ok(fake, "save_stay", { id: s.id, last_night: "2026-12-16" }).stay;
-  assert.deepEqual([moved.note, moved.lastNight, moved.addressJp], ["phone B edit", "2026-12-16", "京都"]);
+  const moved = ok(fake, "save_stay", { id: s.id, last_night: "2027-01-01" }).stay;
+  assert.deepEqual([moved.note, moved.lastNight, moved.addressJp], ["phone B edit", "2027-01-01", "京都"]);
   const loaded = (await app(fake, "load", {})).data.stays.find((x) => x.id === s.id);
-  assert.deepEqual([loaded.note, loaded.lastNight], ["phone B edit", "2026-12-16"]);
+  assert.deepEqual([loaded.note, loaded.lastNight], ["phone B edit", "2027-01-01"]);
   const log = fake.tables.Log.at(-1);
   assert.equal(log.via, "claude");
   const before = JSON.parse(log.before), after = JSON.parse(log.after);
@@ -677,7 +677,7 @@ test("M1: a lock held, then free within the wait: the call is tried again and su
   let held = 1;
   const fake = createFakeBackend(plan, { lockFails: () => held-- > 0 });
   const rows = fake.tables.Stops.length;
-  const got = ok(fake, "add_stop", { date: "2026-12-12", title: "Tokyu Hands" });
+  const got = ok(fake, "add_stop", { date: "2026-12-28", title: "Tokyu Hands" });
   assert.equal(got.stop.title, "Tokyu Hands");
   assert.equal(stopsSent(fake), 2, "busy once, then saved");
   assert.equal(fake.tables.Stops.length, rows + 1, "one stop");
@@ -686,7 +686,7 @@ test("M1: a lock held, then free within the wait: the call is tried again and su
 test("M1: a lock held throughout: about 20 seconds of tries, then the busy sentence", () => {
   const fake = createFakeBackend(plan, { lockFails: () => true });
   const rows = fake.tables.Stops.length;
-  const text = refusal(fake, "add_stop", { date: "2026-12-12", title: "Tokyu Hands" });
+  const text = refusal(fake, "add_stop", { date: "2026-12-28", title: "Tokyu Hands" });
   assert.equal(text, "Someone else is saving right now. Try again in a moment.");
   // Each try waits up to 8 s for the lock (the helper's own timeout); a new
   // try starts only while it can still end within 20 s of the first.
@@ -706,12 +706,12 @@ test("M2: add_expense refuses a day that is neither pre nor a trip day; pre and 
   const fake = createFakeBackend(plan);
   const rows = fake.tables.Expenses.length;
   const base = { title: "Ramen", amount: 12, currency: "USD", paid_by: "Mo" };
-  for (const day of ["2030-01-01", "2026-12-09", "2026-12-21", "tomorrow", ""]) {
+  for (const day of ["2030-01-01", "2026-12-25", "2027-01-02", "tomorrow", ""]) {
     assert.match(badArgs(fake, "add_expense", { ...base, day }), /day/, day);
   }
   assert.equal(fake.tables.Expenses.length, rows, "nothing stored");
   assert.equal(ok(fake, "add_expense", { ...base, day: "pre" }).expense.day, "pre");
-  assert.equal(ok(fake, "add_expense", { ...base, day: "2026-12-12" }).expense.day, "2026-12-12");
+  assert.equal(ok(fake, "add_expense", { ...base, day: "2026-12-28" }).expense.day, "2026-12-28");
   assert.equal(fake.tables.Expenses.length, rows + 2);
 });
 
@@ -721,7 +721,7 @@ test("M2: add_expense refuses a day that is neither pre nor a trip day; pre and 
 const PLANNER_ID = "fakePlannerSheet_0123456789abcdefXYZ";
 const PHEAD = ["payment_id", "date_paid", "payer", "description", "category", "vendor", "booking_ref", "amount", "currency", "amount_cad", "cad_is_exact", "split_between", "split_type", "status", "include_in_split", "source", "added_by", "notes"];
 const prow = (o) => PHEAD.map((h) => (o[h] === undefined ? "" : o[h]));
-const PX7 = { payment_id: "X7", date_paid: "2026-12-11", payer: "Mo", description: "Rail pass", category: "transport", vendor: "North Rail", booking_ref: "AB12", amount: 247.5, currency: "USD", amount_cad: 221.52, cad_is_exact: "yes", split_between: "Mo, Izzah", split_type: "equal", include_in_split: "yes" };
+const PX7 = { payment_id: "X7", date_paid: "2026-12-27", payer: "Mo", description: "Rail pass", category: "transport", vendor: "North Rail", booking_ref: "AB12", amount: 247.5, currency: "USD", amount_cad: 221.52, cad_is_exact: "yes", split_between: "Mo, Izzah", split_type: "equal", include_in_split: "yes" };
 const PLANNER = [PHEAD, prow(PX7), prow({ ...PX7, payment_id: "P5", split_type: "personal" }), prow({ ...PX7, payment_id: "Z1", include_in_split: "no" })];
 
 test("sync_payments brings the planner's payments in, each credited to who paid, logged as from the planner", () => {

@@ -3,7 +3,7 @@
 // at 390x844, the Home Screen app's size.
 
 const assert = require("node:assert/strict");
-const { SEED, NOON12, open, until, visible } = require("./helpers.cjs");
+const { SEED, NOON28, open, until, visible } = require("./helpers.cjs");
 
 const VIEWPORT = { width: 390, height: 664 };
 
@@ -39,7 +39,7 @@ async function expectReach(page, selector, scroll) {
 }
 
 async function ready(page, opts = {}) {
-  const backend = await open(page, { seed: SEED, nowMs: NOON12, ...opts });
+  const backend = await open(page, { seed: SEED, nowMs: NOON28, ...opts });
   await until(() => page.evaluate(() => document.querySelectorAll("#rc .rc-row").length === 8), "the receipt draws");
   return backend;
 }
@@ -137,7 +137,7 @@ module.exports = [
     name: "the no-key screen: the paste field and Open",
     viewport: VIEWPORT,
     async run({ page }) {
-      await open(page, { seed: SEED, nowMs: NOON12, key: null });
+      await open(page, { seed: SEED, nowMs: NOON28, key: null });
       await until(() => visible(page, "#keyPaste"), "the paste field");
       await expectReach(page, "#keyPaste");
       await expectReach(page, "#keyGo");

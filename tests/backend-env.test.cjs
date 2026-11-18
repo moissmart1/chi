@@ -26,7 +26,7 @@ function world({ props = {}, fetch } = {}) {
     }) },
     LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock: () => calls.push("release") }) },
     SpreadsheetApp: { flush: () => calls.push("flush") },
-    Utilities: { formatDate: () => "2026-12-10" },
+    Utilities: { formatDate: () => "2026-12-26" },
     UrlFetchApp: { fetch: (url, opts) => { calls.push("fetch:" + url); return fetch(); } },
   });
   for (const f of ["Pure.js", "Env.js", "Rate.js"]) vm.runInContext(src(f), ctx, { filename: f });
@@ -69,12 +69,12 @@ test("getRateInfo_ says live for a fetched rate, last for an earlier day's, fall
 test("the rate is kept to four decimals, and only between 0.5 and 1.0 US dollars a Canadian dollar", () => {
   const long = world({ fetch: reply(200, { rates: { USD: 0.723456 } }) });
   assert.equal(long.getRate_(), 0.7235);
-  assert.equal(long.props["RATE_2026-12-10"], "0.7235");
+  assert.equal(long.props["RATE_2026-12-26"], "0.7235");
   assert.equal(long.props.RATE_LAST, "0.7235");
   for (const bad of [0.5, 1.0, 1.38, 0.2, 111, "x"]) {
     const w = world({ fetch: reply(200, { rates: { USD: bad } }) });
     assert.deepEqual(JSON.parse(JSON.stringify(w.getRateInfo_())), { rate: 0.72, source: "fallback" }, String(bad));
-    assert.equal(w.props["RATE_2026-12-10"], undefined, String(bad));
+    assert.equal(w.props["RATE_2026-12-26"], undefined, String(bad));
   }
   // a feed that answers yen only has no US dollar rate
   const yenOnly = world({ fetch: reply(200, { rates: { JPY: 108.4 } }) });
@@ -84,7 +84,7 @@ test("the rate is kept to four decimals, and only between 0.5 and 1.0 US dollars
 test("requireLiveRate_ (run by setup) fetches once and fails loudly with the reason (F7)", () => {
   const ok = world({ fetch: reply(200, { rates: { USD: 0.7234 } }) });
   ok.requireLiveRate_();
-  assert.equal(ok.props["RATE_2026-12-10"], "0.7234");
+  assert.equal(ok.props["RATE_2026-12-26"], "0.7234");
 
   const blocked = world({ props: { RATE_FAIL_AT: new Date().toISOString() }, fetch: reply(403, {}) });
   assert.throws(() => blocked.requireLiveRate_(), (e) => e.message === "Couldn’t fetch today’s US dollar rate from open.er-api.com: HTTP 403. The app would fall back to 0.72.");
@@ -96,7 +96,7 @@ test("requireLiveRate_ (run by setup) fetches once and fails loudly with the rea
   const odd = world({ fetch: reply(200, { rates: { USD: 5 } }) });
   assert.throws(() => odd.requireLiveRate_(), /: an unexpected rate \(5\)\./);
 
-  const stored = world({ props: { "RATE_2026-12-10": "0.72" }, fetch: () => { throw new Error("not called"); } });
+  const stored = world({ props: { "RATE_2026-12-26": "0.72" }, fetch: () => { throw new Error("not called"); } });
   stored.requireLiveRate_();
 });
 
@@ -118,7 +118,7 @@ function plannerWorld({ props = {}, get, tabs = ["Payments"], noAccess = false, 
   const asked = [];
   const ctx = vm.createContext({
     PropertiesService: { getScriptProperties: () => ({ getProperty: (k) => (k in props ? props[k] : null), setProperty: (k, v) => { props[k] = String(v); } }) },
-    Utilities: { formatDate: (d, tz, fmt) => { asked.push(["formatDate", tz, fmt]); return "2026-11-20 10:00"; } },
+    Utilities: { formatDate: (d, tz, fmt) => { asked.push(["formatDate", tz, fmt]); return "2026-12-06 10:00"; } },
     Sheets: { Spreadsheets: {
       Values: {
         get: (...a) => { asked.push(a); return get(...a); },
@@ -159,7 +159,7 @@ test("plannerRows_ asks the Sheets service for Payments!A1:R, unformatted, dates
 });
 
 // Book Now and Change Log as the planner holds them (made up), for checkPlanner.
-const BOOK = [["Before we go"], ["#", "Item", "Book by", "Status"], [1, "Secret Tour", "Dec 5", ""], [2, "Hidden Inn", "", "Booked"], ["* footnote"]];
+const BOOK = [["Before we go"], ["#", "Item", "Book by", "Status"], [1, "Secret Tour", "Dec 21", ""], [2, "Hidden Inn", "", "Booked"], ["* footnote"]];
 const CLOG = [["#", "Tab", "Old value", "New value"], [1, "Book Now", "Private old", "Private new"]];
 const byRange = (payments, book = BOOK, log = CLOG) => (id, range) => {
   if (range.startsWith("Payments!")) return { values: payments };
@@ -225,7 +225,7 @@ test("the two planner writers: one cell, RAW; one row appended under the table, 
   const w = plannerWorld({ props: { PLANNER_ID }, get: () => ({}) });
   w.ctx.plannerSetCell_("Book Now", "E4", "Booked");
   w.ctx.plannerAppendRow_("Change Log", 2, 1, [8, "x", "", "y"]);
-  assert.equal(w.ctx.torontoNow_(), "2026-11-20 10:00 ET");
+  assert.equal(w.ctx.torontoNow_(), "2026-12-06 10:00 ET");
   assert.deepEqual(JSON.parse(JSON.stringify(w.asked)), [
     ["update", { values: [["Booked"]] }, PLANNER_ID, "'Book Now'!E4", { valueInputOption: "RAW" }],
     ["append", { values: [[8, "x", "", "y"]] }, PLANNER_ID, "'Change Log'!B2:E2", { valueInputOption: "RAW", insertDataOption: "INSERT_ROWS" }],

@@ -1,18 +1,18 @@
 // Today on the ticket: used days, the faded and the next stop, leave-by,
 // fixed times, the open stop, and the countdown before the trip.
 // The plan is tests/fixtures/plan.json over the seed; the clock is 13:20 on
-// Dec 12 in Chicago (Day 3) unless a case says otherwise.
+// Dec 28 in Chicago (Day 3) unless a case says otherwise.
 
 const assert = require("node:assert/strict");
 const path = require("path");
 const { pathToFileURL } = require("url");
-const { WITH_PLAN, SEED, NOON12, makeBackend, open, advance, until, text, expectText } = require("./helpers.cjs");
+const { WITH_PLAN, SEED, NOON28, makeBackend, open, advance, until, text, expectText } = require("./helpers.cjs");
 
 const chi = (iso) => Date.parse(iso + "-06:00");
 
 async function ready(page, opts = {}) {
   const backend = await open(page, { seed: WITH_PLAN, tab: "days", ...opts });
-  await until(() => page.evaluate(() => document.querySelectorAll("#rail .pg .tk").length === 11), "the tickets draw");
+  await until(() => page.evaluate(() => document.querySelectorAll("#rail .pg .tk").length === 7), "the tickets draw");
   return backend;
 }
 
@@ -209,9 +209,9 @@ module.exports = [
     // closes (the browser itself pulls a page back up that got shorter).
     viewport: { width: 390, height: 600 },
     async run({ page }) {
-      const backend = await ready(page, { nowMs: chi("2026-12-12T13:59:00") });
+      const backend = await ready(page, { nowMs: chi("2026-12-28T13:59:00") });
       await until(async () => (await has(page, row(SKY), "is-next")) && (await has(page, row(SKY), "is-open")), "Sky is next and open");
-      await settled(page, "2026-12-12");
+      await settled(page, "2026-12-28");
       // Scrolled down a little, as someone reading the ticket would be.
       await page.evaluate(() => { document.getElementById("vDays").scrollTop = 120; });
       const mark = () => page.evaluate((ids) => ids.forEach((id) => { document.querySelector('.r[data-id="' + id + '"]').__kept = 1; }), [MEIJI, LUNCH, SKY, GLOVES]);
@@ -237,29 +237,29 @@ module.exports = [
       assert.deepEqual((await kept()).filter((id) => id !== SKY), [MEIJI, LUNCH, GLOVES], "rows that did not change are kept");
       const after = await page.evaluate(() => ({ top: document.getElementById("vDays").scrollTop, left: document.getElementById("rail").scrollLeft }));
       assert.deepEqual(after, before, "the screen did not move");
-      await expectText(page, "#dayCount", /^Day 3 of 11 ?today$/);
+      await expectText(page, "#dayCount", /^Day 3 of 7 ?today$/);
     },
   },
   {
     name: "a stop opened by hand stays open when a late stop stops being next (R38, R32)",
     async run({ page }) {
-      const backend = await ready(page, { nowMs: chi("2026-12-12T14:01:00") });
+      const backend = await ready(page, { nowMs: chi("2026-12-28T14:01:00") });
       await until(async () => (await text(page, row(SKY) + " .r-lv")) === "Now.", "Sky says Now.");
-      await settled(page, "2026-12-12");
+      await settled(page, "2026-12-28");
       await tap(page, MEIJI);
       await until(async () => JSON.stringify(await openRows(page)) === JSON.stringify([MEIJI]), "only Meiji Shrine is open");
-      await settled(page, "2026-12-12");
+      await settled(page, "2026-12-28");
       await advance(page, backend, 29 * 60000); // 14:30
       await until(() => has(page, row(DINNER), "is-next"), "Dinner is next");
       assert.deepEqual(await openRows(page), [MEIJI], "Meiji Shrine stays open");
-      assert.equal(await inView(page), "2026-12-12");
+      assert.equal(await inView(page), "2026-12-28");
     },
   },
   {
     name: "a late stop on a phone in Toronto (R38)",
     timezoneId: "America/Toronto",
     async run({ page }) {
-      await ready(page, { nowMs: chi("2026-12-12T14:20:00") });
+      await ready(page, { nowMs: chi("2026-12-28T14:20:00") });
       assert.equal(await page.evaluate(() => Intl.DateTimeFormat().resolvedOptions().timeZone), "America/Toronto");
       await until(() => has(page, row(SKY), "is-next"), "Sky is next");
       assert.equal(await text(page, row(SKY) + " .r-lv"), "Now.");
@@ -277,9 +277,9 @@ module.exports = [
       await until(() => has(page, row(DINNER), "is-next"), "Dinner is next");
       assert.deepEqual(await openRows(page), [], "Dinner does not open itself");
       await page.click("#pager .sq:nth-child(4)");
-      await until(async () => (await inView(page)) === "2026-12-13", "Dec 13 is in view");
+      await until(async () => (await inView(page)) === "2026-12-29", "Dec 29 is in view");
       await page.click("#pager .sq:nth-child(3)");
-      await until(async () => (await inView(page)) === "2026-12-12", "Dec 12 is back");
+      await until(async () => (await inView(page)) === "2026-12-28", "Dec 28 is back");
       await until(async () => JSON.stringify(await openRows(page)) === JSON.stringify([DINNER]), "Dinner opens itself again");
     },
   },
@@ -291,12 +291,12 @@ module.exports = [
       await until(() => has(page, row(MEIJI), "is-open"), "Meiji Shrine opens");
       await page.focus(row(MEIJI) + ' [role="button"]');
       await advance(page, backend, 20000);
-      const env = await backend.handle({ key: "test-key", actor: "Izzah", via: "app", action: "addStop", args: { stop: { id: "ajenstop0001", date: "2026-12-12", time: "16:00", title: "Tower Records" } } });
+      const env = await backend.handle({ key: "test-key", actor: "Izzah", via: "app", action: "addStop", args: { stop: { id: "ajenstop0001", date: "2026-12-28", time: "16:00", title: "Tower Records" } } });
       assert.equal(env.ok, true, JSON.stringify(env));
       await advance(page, backend, 20000);
       await until(() => page.evaluate(() => !!document.querySelector('.r[data-id="ajenstop0001"]')), "Izzah’s stop is on the ticket");
       assert.deepEqual(await openRows(page), [MEIJI]);
-      await expectText(page, "#dayCount", /^Day 3 of 11/);
+      await expectText(page, "#dayCount", /^Day 3 of 7/);
       assert.equal(await page.evaluate(() => !!document.activeElement.closest('.r[data-id="planstop1201"]')), true, "focus stays on Meiji Shrine");
     },
   },
@@ -304,38 +304,38 @@ module.exports = [
     name: "yesterday is used",
     async run({ page }) {
       await ready(page);
-      const d11 = tk("2026-12-11");
+      const d11 = tk("2026-12-27");
       assert.equal(await count(page, d11 + " .insp"), 1);
       assert.equal(await count(page, d11 + " .punch"), 1);
       const rows = await page.evaluate((sel) => [...document.querySelectorAll(sel + " .r[data-id]")].map((r) => r.classList.contains("is-done")), d11);
       assert.ok(rows.length > 0 && rows.every(Boolean), JSON.stringify(rows));
       const { tripCents } = await import(pathToFileURL(path.join(__dirname, "..", "..", "js", "money.js")).href);
       const { tripMoney } = await import(pathToFileURL(path.join(__dirname, "..", "..", "js", "format.js")).href);
-      const total = SEED.expenses.filter((e) => e.day === "2026-12-11" && !e.deleted).reduce((a, e) => a + tripCents(e), 0);
+      const total = SEED.expenses.filter((e) => e.day === "2026-12-27" && !e.deleted).reduce((a, e) => a + tripCents(e), 0);
       assert.equal(tripMoney(total), "US$182.45");
       await expectText(page, d11 + " .fare", tripMoney(total));
-      await expectText(page, "#dayCount", /^Day 3 of 11 ?today$/);
+      await expectText(page, "#dayCount", /^Day 3 of 7 ?today$/);
       await page.click("#pager .sq:nth-child(2)");
-      await expectText(page, "#dayCount", /^Day 2 of 11 ?used$/);
+      await expectText(page, "#dayCount", /^Day 2 of 7 ?used$/);
       const done = await page.evaluate(() => [...document.querySelectorAll("#pager .sq")].map((b) => b.classList.contains("is-done")));
-      assert.deepEqual(done, [true, true, false, false, false, false, false, false, false, false, false]);
+      assert.deepEqual(done, [true, true, false, false, false, false, false]);
     },
   },
   {
     name: "the gate stamp is kept across redraws",
     async run({ page }) {
       const backend = await ready(page);
-      await page.evaluate(() => { document.querySelector('#rail .pg[data-date="2026-12-11"] .insp').__kept = 1; });
+      await page.evaluate(() => { document.querySelector('#rail .pg[data-date="2026-12-27"] .insp').__kept = 1; });
       await advance(page, backend, 61000);
       await until(async () => (await text(page, row(SKY) + " .r-s")).includes("in 9 min."), "the minute ticks");
-      assert.equal(await page.evaluate(() => document.querySelector('#rail .pg[data-date="2026-12-11"] .insp').__kept), 1);
+      assert.equal(await page.evaluate(() => document.querySelector('#rail .pg[data-date="2026-12-27"] .insp').__kept), 1);
     },
   },
   {
     name: "tomorrow is untouched",
     async run({ page }) {
       await ready(page);
-      const d13 = tk("2026-12-13");
+      const d13 = tk("2026-12-29");
       assert.equal(await count(page, d13 + " .insp"), 0);
       assert.equal(await count(page, d13 + " .is-done"), 0);
       assert.equal((await text(page, d13)).includes("こんど"), false);
@@ -347,9 +347,9 @@ module.exports = [
       const backend = await ready(page);
       const other = await newPhone();
       await ready(other, { backend });
-      const insp = (p) => p.evaluate(() => document.querySelector('#rail .pg[data-date="2026-12-11"] .insp').outerHTML);
+      const insp = (p) => p.evaluate(() => document.querySelector('#rail .pg[data-date="2026-12-27"] .insp').outerHTML);
       const a = await insp(page);
-      assert.ok(a.includes("渋谷") && a.includes("12.11") && a.includes("MAT"), a.slice(0, 200));
+      assert.ok(a.includes("渋谷") && a.includes("12.27") && a.includes("MI"), a.slice(0, 200));
       assert.equal(await insp(other), a);
     },
   },
@@ -358,7 +358,7 @@ module.exports = [
     timezoneId: "Asia/Tokyo",
     async run({ page }) {
       await ready(page);
-      await expectText(page, "#dayCount", /^Day 3 of 11/);
+      await expectText(page, "#dayCount", /^Day 3 of 7/);
       await until(() => has(page, row(SKY), "is-next"), "Sky is next");
       assert.ok((await text(page, row(SKY))).includes("Leave by 13:30, in 10 min."));
     },
@@ -366,58 +366,58 @@ module.exports = [
   {
     name: "midnight",
     async run({ page }) {
-      const backend = await ready(page, { nowMs: chi("2026-12-12T23:40:00") });
+      const backend = await ready(page, { nowMs: chi("2026-12-28T23:40:00") });
       assert.equal(await has(page, row(DINNER), "is-done"), true);
-      await expectText(page, "#dayCount", /^Day 3 of 11/);
-      assert.equal(await count(page, tk("2026-12-12") + " .insp"), 0);
+      await expectText(page, "#dayCount", /^Day 3 of 7/);
+      assert.equal(await count(page, tk("2026-12-28") + " .insp"), 0);
       await advance(page, backend, 50 * 60000);
-      await until(async () => (await count(page, tk("2026-12-12") + " .insp")) === 1, "Dec 12 is used without a reload");
-      await expectText(page, "#dayCount", /^Day 3 of 11 ?used$/);
+      await until(async () => (await count(page, tk("2026-12-28") + " .insp")) === 1, "Dec 28 is used without a reload");
+      await expectText(page, "#dayCount", /^Day 3 of 7 ?used$/);
       assert.equal(await page.evaluate(() => document.querySelector("#pager .sq:nth-child(3)").classList.contains("is-done")), true, "the third square is filled");
       await page.reload();
-      await until(() => page.evaluate(() => document.querySelectorAll("#rail .pg .tk").length === 11), "the tickets draw again");
-      await expectText(page, "#dayCount", /^Day 4 of 11/);
+      await until(() => page.evaluate(() => document.querySelectorAll("#rail .pg .tk").length === 7), "the tickets draw again");
+      await expectText(page, "#dayCount", /^Day 4 of 7/);
     },
   },
   {
     name: "before the trip",
     async run({ page, newPhone }) {
-      await ready(page, { nowMs: chi("2026-11-15T12:00:00") });
-      await expectText(page, "#dayCount", /^Day 1 of 11 ?in 25 days$/);
-      const d10 = await text(page, tk("2026-12-10") + " .tk-date");
+      await ready(page, { nowMs: chi("2026-12-01T12:00:00") });
+      await expectText(page, "#dayCount", /^Day 1 of 7 ?in 25 days$/);
+      const d10 = await text(page, tk("2026-12-26") + " .tk-date");
       assert.ok(d10.includes("あと25日") && d10.includes("Valid in 25 days"), d10);
       assert.equal(d10.includes("当日限り有効"), false, d10);
       assert.equal(await count(page, "#rail .insp"), 0);
       assert.equal(await count(page, "#rail .is-done"), 0);
       assert.equal((await text(page, "#rail")).includes("こんど"), false);
-      assert.ok((await text(page, tk("2026-12-11") + " .tk-date")).includes("当日限り有効"), "later days keep their line");
+      assert.ok((await text(page, tk("2026-12-27") + " .tk-date")).includes("当日限り有効"), "later days keep their line");
 
       const eve = await newPhone();
-      await ready(eve, { nowMs: chi("2026-12-09T12:00:00") });
-      await expectText(eve, "#dayCount", /^Day 1 of 11 ?tomorrow$/);
-      const d10eve = await text(eve, tk("2026-12-10") + " .tk-date");
+      await ready(eve, { nowMs: chi("2026-12-25T12:00:00") });
+      await expectText(eve, "#dayCount", /^Day 1 of 7 ?tomorrow$/);
+      const d10eve = await text(eve, tk("2026-12-26") + " .tk-date");
       assert.ok(d10eve.includes("あと1日"), d10eve);
     },
   },
   {
     name: "after the trip",
     async run({ page }) {
-      await ready(page, { nowMs: chi("2026-12-25T12:00:00") });
-      await expectText(page, "#dayCount", /^Day 11 of 11/);
-      assert.equal(await count(page, "#rail .tk .insp"), 11);
+      await ready(page, { nowMs: chi("2027-01-05T12:00:00") });
+      await expectText(page, "#dayCount", /^Day 7 of 7/);
+      assert.equal(await count(page, "#rail .tk .insp"), 7);
     },
   },
   {
     name: "a hand-edited Sheet",
     async run({ page }) {
-      const backend = makeBackend(WITH_PLAN, { now: NOON12 });
+      const backend = makeBackend(WITH_PLAN, { now: NOON28 });
       const stop = backend.fake.tables.Stops[2];
       assert.equal(stop.id, MEIJI);
       Object.assign(stop, { link: "javascript:alert(1)", photo: "javascript:alert(2)", time: "25:00" });
-      Object.assign(backend.fake.tables.Days.find((d) => d.date === "2026-12-12"), { line_colour: "green" });
+      Object.assign(backend.fake.tables.Days.find((d) => d.date === "2026-12-28"), { line_colour: "green" });
       await ready(page, { backend });
       await page.reload();
-      await until(() => page.evaluate(() => document.querySelectorAll("#rail .pg .tk").length === 11), "the tickets draw again");
+      await until(() => page.evaluate(() => document.querySelectorAll("#rail .pg .tk").length === 7), "the tickets draw again");
       await expectText(page, row(MEIJI) + " .r-t", "—");
       await tap(page, MEIJI);
       await until(() => has(page, row(MEIJI), "is-open"), "Meiji Shrine opens");
@@ -425,12 +425,12 @@ module.exports = [
         .map((n) => n.getAttribute("href") || n.getAttribute("src") || "")
         .filter((v) => /^\s*javascript:/i.test(v)));
       assert.deepEqual(bad, []);
-      const titles = await page.evaluate((sel) => [...document.querySelectorAll(sel + " .r[data-id] .r-n")].map((n) => n.lastChild.textContent), tk("2026-12-12"));
+      const titles = await page.evaluate((sel) => [...document.querySelectorAll(sel + " .r[data-id] .r-n")].map((n) => n.lastChild.textContent), tk("2026-12-28"));
       assert.deepEqual(titles, ["Lunch in Harajuku", "Shibuya Sky", "Dinner", "Meiji Shrine", "Buy gloves"]);
       const band = await page.evaluate((sel) => {
         const css = (el, p) => getComputedStyle(el).getPropertyValue(p).trim();
         return { line: css(document.querySelector(sel + " .tk"), "--line"), keyHi: css(document.documentElement, "--key-hi") };
-      }, tk("2026-12-12"));
+      }, tk("2026-12-28"));
       assert.equal(band.line, band.keyHi, "a neutral band");
     },
   },
@@ -462,7 +462,7 @@ module.exports = [
   {
     name: "the clock rests while Money is showing",
     async run({ page }) {
-      const backend = await ready(page, { nowMs: chi("2026-12-12T13:20:50") });
+      const backend = await ready(page, { nowMs: chi("2026-12-28T13:20:50") });
       await until(async () => (await text(page, row(SKY) + " .r-s")).includes("in 10 min."), "Sky reads 10 min");
       await page.click('[data-tab="money"]');
       await until(() => page.evaluate(() => document.getElementById("vMoney").classList.contains("is-active")), "Money shows");
@@ -523,38 +523,38 @@ module.exports = [
   {
     name: "back after a night away, on today's ticket",
     async run({ page }) {
-      const backend = await ready(page, { nowMs: chi("2026-12-12T23:40:00") });
-      await expectText(page, "#dayCount", /^Day 3 of 11 ?today$/);
+      const backend = await ready(page, { nowMs: chi("2026-12-28T23:40:00") });
+      await expectText(page, "#dayCount", /^Day 3 of 7 ?today$/);
       await setHidden(page, true);
       await advance(page, backend, 50 * 60000);
       await setHidden(page, false);
-      await expectText(page, "#dayCount", /^Day 4 of 11 ?today$/);
-      await until(async () => (await inView(page)) === "2026-12-13", "Dec 13 is in view");
+      await expectText(page, "#dayCount", /^Day 4 of 7 ?today$/);
+      await until(async () => (await inView(page)) === "2026-12-29", "Dec 29 is in view");
     },
   },
   {
     name: "back on Days after a night on Money, on today's ticket",
     async run({ page }) {
-      const backend = await ready(page, { nowMs: chi("2026-12-12T23:40:00") });
-      await expectText(page, "#dayCount", /^Day 3 of 11 ?today$/);
+      const backend = await ready(page, { nowMs: chi("2026-12-28T23:40:00") });
+      await expectText(page, "#dayCount", /^Day 3 of 7 ?today$/);
       await page.click('[data-tab="money"]');
       await until(() => page.evaluate(() => document.getElementById("vMoney").classList.contains("is-active")), "Money shows");
       await advance(page, backend, 50 * 60000);
       await page.click('[data-tab="days"]');
-      await expectText(page, "#dayCount", /^Day 4 of 11 ?today$/);
-      await until(async () => (await inView(page)) === "2026-12-13", "Dec 13 is in view");
+      await expectText(page, "#dayCount", /^Day 4 of 7 ?today$/);
+      await until(async () => (await inView(page)) === "2026-12-29", "Dec 29 is in view");
     },
   },
   {
     name: "opened on Money, Days first tapped the next day, on today's ticket",
     async run({ page }) {
-      const backend = await open(page, { seed: WITH_PLAN, tab: "money", nowMs: chi("2026-12-12T23:40:00") });
+      const backend = await open(page, { seed: WITH_PLAN, tab: "money", nowMs: chi("2026-12-28T23:40:00") });
       await until(() => page.evaluate(() => document.getElementById("vMoney").classList.contains("is-active")), "Money shows");
-      await until(() => page.evaluate(() => document.querySelectorAll("#rail .pg .tk").length === 11), "the tickets draw");
+      await until(() => page.evaluate(() => document.querySelectorAll("#rail .pg .tk").length === 7), "the tickets draw");
       await advance(page, backend, 50 * 60000);
       await page.click('[data-tab="days"]');
-      await expectText(page, "#dayCount", /^Day 4 of 11 ?today$/);
-      await until(async () => (await inView(page)) === "2026-12-13", "Dec 13 is in view");
+      await expectText(page, "#dayCount", /^Day 4 of 7 ?today$/);
+      await until(async () => (await inView(page)) === "2026-12-29", "Dec 29 is in view");
     },
   },
   {
@@ -562,13 +562,13 @@ module.exports = [
     async run({ page }) {
       const backend = await ready(page);
       await page.click("#pager .sq:nth-child(6)");
-      await until(async () => (await inView(page)) === "2026-12-15", "Dec 15 is in view");
+      await until(async () => (await inView(page)) === "2026-12-31", "Dec 31 is in view");
       await setHidden(page, true);
       await advance(page, backend, 60 * 60000);
       await setHidden(page, false);
       await advance(page, backend, 1000);
-      await expectText(page, "#dayCount", /^Day 6 of 11/);
-      assert.equal(await inView(page), "2026-12-15");
+      await expectText(page, "#dayCount", /^Day 6 of 7/);
+      assert.equal(await inView(page), "2026-12-31");
     },
   },
 ];

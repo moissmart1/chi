@@ -34,7 +34,7 @@
     },
     {
       "id": "seedexp003",
-      "day": "2026-12-10",
+      "day": "2026-12-26",
       "title": "Skyliner",
       "amount": 50.25,
       "currency": "USD",
@@ -50,7 +50,7 @@
     },
     {
       "id": "seedexp004",
-      "day": "2026-12-10",
+      "day": "2026-12-26",
       "title": "Ramen",
       "amount": 27.3,
       "currency": "USD",
@@ -66,7 +66,7 @@
     },
     {
       "id": "seedexp005",
-      "day": "2026-12-10",
+      "day": "2026-12-26",
       "title": "Konbini snacks",
       "amount": 7.8,
       "currency": "USD",
@@ -82,7 +82,7 @@
     },
     {
       "id": "seedexp006",
-      "day": "2026-12-11",
+      "day": "2026-12-27",
       "title": "Shibuya dinner",
       "amount": 94.15,
       "currency": "USD",
@@ -98,7 +98,7 @@
     },
     {
       "id": "seedexp007",
-      "day": "2026-12-11",
+      "day": "2026-12-27",
       "title": "Shibuya Sky",
       "amount": 48.7,
       "currency": "USD",
@@ -114,7 +114,7 @@
     },
     {
       "id": "seedexp008",
-      "day": "2026-12-11",
+      "day": "2026-12-27",
       "title": "Taxi back",
       "amount": 23.4,
       "currency": "USD",
@@ -130,7 +130,7 @@
     },
     {
       "id": "seedexp009",
-      "day": "2026-12-11",
+      "day": "2026-12-27",
       "title": "Coffee",
       "amount": 16.2,
       "currency": "USD",

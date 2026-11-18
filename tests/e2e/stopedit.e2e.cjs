@@ -1,18 +1,18 @@
 // Adding, changing and removing stops: the ＋ Add a stop row on each ticket,
 // the Edit button on an open stop, the stop sheet (#stop) they open, the undo
 // bar and History. The plan is tests/fixtures/plan.json over the seed; the
-// clock is 13:20 on Dec 12 in Chicago, Day 3 (Shibuya Sky at 14:00 is next).
+// clock is 13:20 on Dec 28 in Chicago, Day 3 (Shibuya Sky at 14:00 is next).
 
 const assert = require("node:assert/strict");
 const { WITH_PLAN, open, advance, until, text, expectText } = require("./helpers.cjs");
 
-const D12 = "2026-12-12";
+const D12 = "2026-12-28";
 const SKY = "planstop1203";
 const DINNER = "planstop1204";
 
 async function ready(page, opts = {}) {
   const backend = await open(page, { seed: WITH_PLAN, tab: "days", ...opts });
-  await until(() => page.evaluate(() => document.querySelectorAll("#rail .pg .tk").length === 11), "the tickets draw");
+  await until(() => page.evaluate(() => document.querySelectorAll("#rail .pg .tk").length === 7), "the tickets draw");
   return backend;
 }
 
@@ -238,7 +238,7 @@ module.exports = [
       await idle(page);
       await openHistory(page);
       const top = (await tape(page))[0];
-      assert.equal(top.sentence, "Mo removed Dinner from Sat Dec 12");
+      assert.equal(top.sentence, "Mo removed Dinner from Mon Dec 28");
       assert.equal(top.undo, true);
       await page.click('#tape .tp-row[data-id="' + top.id + '"] button.tp-undo');
       await until(async () => (await tape(page)).some((r) => r.sentence.startsWith("Mo undid")), "the undo is on the tape");
@@ -461,7 +461,7 @@ module.exports = [
       assert.equal(await value(page, "#stWhat"), "Half a na");
       assert.equal(await isOpen(page, "stop"), true);
       assert.equal(await page.evaluate(() => document.activeElement && document.activeElement.id), "stWhat", "the field keeps focus");
-      await expectText(page, "#dayCount", /^Day 3 of 11/);
+      await expectText(page, "#dayCount", /^Day 3 of 7/);
     },
   },
   {
@@ -537,22 +537,22 @@ module.exports = [
         edit: document.querySelectorAll(s + " .r-edit").length === 1 && document.querySelector(s + " .r-edit").__kept === 1,
       }), [tk(D12), row(SKY)]);
       assert.deepEqual(kept, { add: true, row: true, edit: true });
-      assert.equal(await page.evaluate(() => document.querySelectorAll("#rail .tk-add").length), 11, "one add row per ticket");
+      assert.equal(await page.evaluate(() => document.querySelectorAll("#rail .tk-add").length), 7, "one add row per ticket");
     },
   },
   {
     name: "back after a night away with the stop sheet open: the rail and the sheet stay (R32)",
     async run({ page }) {
-      const backend = await ready(page, { nowMs: Date.parse("2026-12-12T23:40:00-06:00") });
-      await expectText(page, "#dayCount", /^Day 3 of 11 ?today$/);
+      const backend = await ready(page, { nowMs: Date.parse("2026-12-28T23:40:00-06:00") });
+      await expectText(page, "#dayCount", /^Day 3 of 7 ?today$/);
       await openAdd(page);
       await page.fill("#stWhat", "Late ramen");
       await setHidden(page, true);
       await advance(page, backend, 50 * 60000);
       await setHidden(page, false);
       await advance(page, backend, 1000);
-      await expectText(page, "#dayCount", /^Day 3 of 11 ?used$/);
-      assert.equal(await page.evaluate(() => document.querySelector("#pager .sq.is-cur").dataset.i), "2", "Dec 12 is still the day in view");
+      await expectText(page, "#dayCount", /^Day 3 of 7 ?used$/);
+      assert.equal(await page.evaluate(() => document.querySelector("#pager .sq.is-cur").dataset.i), "2", "Dec 28 is still the day in view");
       assert.equal(await isOpen(page, "stop"), true);
       assert.equal(await value(page, "#stWhat"), "Late ramen");
       await page.click("#stSave");

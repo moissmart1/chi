@@ -6,21 +6,21 @@
 // Every item, note, link and id here is made up.
 
 const assert = require("node:assert/strict");
-const { SEED, NOON12, makeBackend, open, advance, until, text, expectText, visible } = require("./helpers.cjs");
+const { SEED, NOON28, makeBackend, open, advance, until, text, expectText, visible } = require("./helpers.cjs");
 
 const PLANNER_ID = "fakePlannerSheet_0123456789abcdefXYZ";
 const BHEAD = ["#", "Item", "Who", "Book by", "Status", "Notes", "Booking link"];
 const brow = (o) => BHEAD.map((h) => (o[h] === undefined ? "" : o[h]));
 const CHEAD = ["#", "Date / time", "Agent / session", "Tab", "Cell(s)", "Item", "Old value", "New value", "Why", "Proof / source", "Verified?"];
 const ITEMS = [
-  { "#": 1, Item: "Rail pass seat reservations", "Book by": "2026-11-14", Status: "Not booked", Notes: "Window seats for three, both legs.", "Booking link": "https://rail.example.test/book?leg=1" },
-  { "#": 2, Item: "Tea ceremony class", "Book by": "2026-11-18", Status: "Pending" },
-  { "#": 3, Item: "Snow park day trip", "Book by": "Dec 5", Status: "Not booked", Notes: "Buses leave early." },
+  { "#": 1, Item: "Rail pass seat reservations", "Book by": "2026-11-30", Status: "Not booked", Notes: "Window seats for three, both legs.", "Booking link": "https://rail.example.test/book?leg=1" },
+  { "#": 2, Item: "Tea ceremony class", "Book by": "2026-12-04", Status: "Pending" },
+  { "#": 3, Item: "Snow park day trip", "Book by": "Dec 21", Status: "Not booked", Notes: "Buses leave early." },
   { "#": 4, Item: "Airport bus tickets", Status: "" },
-  { "#": 5, Item: "Pocket wifi pickup", "Book by": "2026-11-10", Status: "Booked" },
+  { "#": 5, Item: "Pocket wifi pickup", "Book by": "2026-11-26", Status: "Booked" },
 ];
-// 14:00 on Mon Nov 16 in Toronto (13:00 in Chicago): before the trip.
-const BEFORE = Date.parse("2026-11-16T19:00:00Z");
+// 14:00 on Wed Dec 2 in Toronto (13:00 in Chicago): before the trip.
+const BEFORE = Date.parse("2026-12-02T19:00:00Z");
 const MIN = 60000;
 
 function seedWith(items = ITEMS) {
@@ -66,7 +66,7 @@ const rowIds = (page, box = "#bwOpen") => page.evaluate((b) => [...document.quer
 const row = (id) => '#bwOpen .bw-r[data-id="' + id + '"]';
 const sent = (backend, action) => backend.requests.filter((r) => r.action === action);
 const stored = (backend, id) => backend.fake.tables.Todos.find((r) => r.id === id);
-// The day of an instant in Chicago (the test phone’s own zone), as "Nov 17".
+// The day of an instant in Chicago (the test phone’s own zone), as "Dec 3".
 const phoneDay = (ms) => new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", month: "short", day: "numeric" }).format(new Date(ms));
 
 // The thud's audio, counted: window.__thuds goes up each time it sounds.
@@ -102,13 +102,13 @@ module.exports = [
       await expectText(page, "#bwTitle", "出発前Before we go");
       await expectText(page, "#bwCard .bw-band .num", "4open");
       assert.deepEqual(await rowIds(page), ["1", "2", "3", "4"]);
-      await expectText(page, row(1) + " .bw-due", "was due Sat Nov 14 · 2 days late");
+      await expectText(page, row(1) + " .bw-due", "was due Mon Nov 30 · 2 days late");
       assert.equal(await page.evaluate((s) => document.querySelector(s).classList.contains("is-late"), row(1) + " .bw-due"), true);
       const late = await page.evaluate((s) => getComputedStyle(document.querySelector(s)).color, row(1) + " .bw-due");
       assert.equal(late, "rgb(214, 60, 30)", "late is in the vermilion ink");
-      await expectText(page, row(2) + " .bw-due", "by Wed Nov 18 · in 2 days");
-      await expectText(page, row(2) + " .bw-due b", "Wed Nov 18");
-      await expectText(page, row(3) + " .bw-due", "by Sat Dec 5 · in 19 days");
+      await expectText(page, row(2) + " .bw-due", "by Fri Dec 4 · in 2 days");
+      await expectText(page, row(2) + " .bw-due b", "Fri Dec 4");
+      await expectText(page, row(3) + " .bw-due", "by Mon Dec 21 · in 19 days");
       assert.equal(await page.$(row(3) + " .bw-due b"), null, "not heavier 19 days out");
       assert.equal(await page.$(row(4) + " .bw-due"), null, "no date, no due line");
       // Izzah is on #2: his seal; nobody on the others: an empty ring.
@@ -184,19 +184,19 @@ module.exports = [
       assert.equal(await other.evaluate(() => document.getElementById("beforeBtn").hidden), true);
       // During the trip with nothing open: no tab.
       const third = await newPhone();
-      await ready(third, { nowMs: NOON12, items: [ITEMS[4]], go: false });
+      await ready(third, { nowMs: NOON28, items: [ITEMS[4]], go: false });
       await third.evaluate(() => window.__matTest.store.idle());
       assert.equal(await tabIsIn(third), false, "trip on, 0 open: no tab");
       assert.equal(await third.$("#vDays #todos, #vDays .bw"), null, "and no list in Days");
       // During the trip with one open: the tab is there; Days still shows no list.
       const fourth = await newPhone();
-      const backend = await ready(fourth, { nowMs: NOON12, items: [ITEMS[1], ITEMS[4]], go: false });
+      const backend = await ready(fourth, { nowMs: NOON28, items: [ITEMS[1], ITEMS[4]], go: false });
       await until(() => tabIsIn(fourth), "1 open: the tab is in the bar");
       assert.equal(await fourth.$("#vDays #todos, #vDays .bw"), null, "no list, no folded card, inside Days");
       assert.equal(await fourth.$("#bwFold"), null);
       assert.equal(await fourth.evaluate(() => document.getElementById("beforeN").textContent), "1");
       await goBefore(fourth);
-      await expectText(fourth, row(2) + " .bw-due", /was due Wed Nov 18 · \d+ days late/);
+      await expectText(fourth, row(2) + " .bw-due", /was due Fri Dec 4 · \d+ days late/);
       await openRow(fourth, "2");
       await fourth.click(row(2) + " .bw-tick");
       await until(() => stored(backend, "2").ticked_by === "Mo", "ticked");
@@ -515,7 +515,7 @@ module.exports = [
     name: "sideways (844 × 390 and 667 × 375): with no Before key the rail is Days, Money, You, Ring up, stacked and in view",
     viewport: { width: 667, height: 375 },
     async run({ page }) {
-      await ready(page, { nowMs: NOON12, items: [ITEMS[4]], go: false });
+      await ready(page, { nowMs: NOON28, items: [ITEMS[4]], go: false });
       await page.evaluate(() => window.__matTest.store.idle());
       assert.equal(await tabIsIn(page), false);
       const rail = await railKeys(page);
@@ -545,8 +545,8 @@ module.exports = [
     name: "what the planner says is only ever text: markup is printed as written, a javascript: link is no link, a long word never pushes the page sideways",
     async run({ page }) {
       const items = [
-        { "#": 1, Item: "<img src=x onerror=alert(1)>", "Book by": "2026-11-20", Status: "Not booked", Notes: "<b>bold?</b>", "Booking link": "javascript:alert(1)" },
-        { "#": 2, Item: "A".repeat(300), "Book by": "2026-11-21", Status: "Not booked", "Booking link": "http://plain.example.test/x" },
+        { "#": 1, Item: "<img src=x onerror=alert(1)>", "Book by": "2026-12-06", Status: "Not booked", Notes: "<b>bold?</b>", "Booking link": "javascript:alert(1)" },
+        { "#": 2, Item: "A".repeat(300), "Book by": "2026-12-07", Status: "Not booked", "Booking link": "http://plain.example.test/x" },
       ];
       let dialogs = 0;
       page.on("dialog", (d) => {
@@ -784,7 +784,7 @@ for (const width of [320, 375, 390, 430]) {
     viewport: { width, height: 760 },
     async run({ page }) {
       // The trip is on and nothing is open: no Before key.
-      const backend = await ready(page, { nowMs: NOON12, items: [ITEMS[1], ITEMS[4]], go: false });
+      const backend = await ready(page, { nowMs: NOON28, items: [ITEMS[1], ITEMS[4]], go: false });
       await until(() => tabIsIn(page), "one open: five keys");
       checkBar(await barShape(page), "five keys", true);
       await goBefore(page);
@@ -806,7 +806,7 @@ for (const width of [320, 375, 390, 430]) {
 module.exports.push({
   name: "Ring up keeps focus when the bar re-lays between four and five keys",
   async run({ page }) {
-    const backend = await ready(page, { nowMs: NOON12, items: [ITEMS[1], ITEMS[4]], go: false });
+    const backend = await ready(page, { nowMs: NOON28, items: [ITEMS[1], ITEMS[4]], go: false });
     await until(() => tabIsIn(page), "five keys");
     await page.focus("#ring");
     assert.equal(await page.evaluate(() => document.activeElement.id), "ring");
@@ -976,7 +976,7 @@ module.exports.push({
   name: "the Before tab goes while focus is on it: focus moves to the Days tab",
   async run({ page }) {
     // During the trip the tab is only there while something is open.
-    const backend = await ready(page, { nowMs: NOON12, items: [ITEMS[1], ITEMS[4]] });
+    const backend = await ready(page, { nowMs: NOON28, items: [ITEMS[1], ITEMS[4]] });
     await page.focus('#nav button[data-tab="before"]');
     assert.equal(await page.evaluate(() => document.activeElement.dataset.tab), "before");
     assert.equal((await backend.call("tickTodo", { id: "2" }, "Izzah")).ok, true, "ticked on another phone");

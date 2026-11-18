@@ -3,7 +3,7 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { ORIGIN, SEED, NOON12, makeBackend, open, until, text, expectText, visible } = require("./helpers.cjs");
+const { ORIGIN, SEED, NOON28, makeBackend, open, until, text, expectText, visible } = require("./helpers.cjs");
 
 const NAMES = ["Mo", "Izzah"];
 const lib = async () => ({ ...(await import("../../js/money.js")), ...(await import("../../js/format.js")) });
@@ -29,16 +29,16 @@ module.exports = [
     name: "within a day the newest line is at the top",
     async run({ page }) {
       const mk = (id, title, addedAt) => ({
-        id, day: "2026-12-11", title, amount: 10, currency: "USD", rate: 0.72, paidBy: "Mo", split: NAMES.slice(),
+        id, day: "2026-12-27", title, amount: 10, currency: "USD", rate: 0.72, paidBy: "Mo", split: NAMES.slice(),
         splitMode: "equal", splitVals: [], note: "", kind: "", addedBy: "Mo", addedAt, deleted: false,
       });
-      const seed = withExtras({ expenses: [mk("ordexp001", "Earlier snack", "2026-12-11T09:00:00.000Z"), mk("ordexp002", "Later snack", "2026-12-11T15:00:00.000Z")] });
-      await open(page, { seed, nowMs: NOON12 });
+      const seed = withExtras({ expenses: [mk("ordexp001", "Earlier snack", "2026-12-27T09:00:00.000Z"), mk("ordexp002", "Later snack", "2026-12-27T15:00:00.000Z")] });
+      await open(page, { seed, nowMs: NOON28 });
       await waitRows(page, 10);
-      const ids = await page.$$eval('.rc-group[data-day="2026-12-11"] .rc-row[data-id]', (els) => els.map((e) => e.dataset.id));
+      const ids = await page.$$eval('.rc-group[data-day="2026-12-27"] .rc-row[data-id]', (els) => els.map((e) => e.dataset.id));
       assert.deepEqual(ids.slice(0, 2), ["ordexp002", "ordexp001"], "the later one, then the earlier one, above the older lines");
       // Lines with the same time keep the Sheet's order, flipped: a later row is higher.
-      const was = seed.expenses.filter((e) => !e.deleted && e.day === "2026-12-11" && !e.id.startsWith("ord")).map((e) => e.id);
+      const was = seed.expenses.filter((e) => !e.deleted && e.day === "2026-12-27" && !e.id.startsWith("ord")).map((e) => e.id);
       assert.deepEqual(ids.slice(2), was.slice().reverse());
       // The total stays at the foot of the receipt.
       const below = await page.evaluate(() => {
@@ -52,7 +52,7 @@ module.exports = [
     name: "sentence, summary and receipt from the standard seed",
     async run({ page }) {
       const { balances, owedList, standing, sentence, tripCents, cadCents, tripMoney, dollars } = await lib();
-      await open(page, { seed: SEED, nowMs: NOON12 });
+      await open(page, { seed: SEED, nowMs: NOON28 });
       await waitRows(page, 8);
 
       const exps = live(SEED);
@@ -73,27 +73,27 @@ module.exports = [
       const heads = await page.$$eval("#rc .rc-day", (els) => els.map((e) => e.textContent));
       assert.equal(heads.length, 4, "four day headings");
       // Newest day at the top; what was paid before the trip is at the bottom.
-      assert.match(heads[0], /Dec 12/);
-      assert.match(heads[1], /Dec 11/);
-      assert.match(heads[2], /Dec 10/);
+      assert.match(heads[0], /Dec 28/);
+      assert.match(heads[1], /Dec 27/);
+      assert.match(heads[2], /Dec 26/);
       assert.match(heads[3], /出発前/);
 
       const rows = await page.$$eval("#rc .rc-row[data-id]", (els) => els.map((e) => e.textContent));
       assert.equal(rows.length, 8);
       assert.ok(!rows.some((t) => t.includes("Konbini snacks")), "deleted line is not shown");
 
-      assert.equal(await page.locator('.rc-group[data-day="2026-12-12"] .rc-empty').count(), 1, "Dec 12 is empty");
-      assert.equal(await page.locator('.rc-group[data-day="2026-12-12"] [data-addday="2026-12-12"]').count(), 1);
+      assert.equal(await page.locator('.rc-group[data-day="2026-12-28"] .rc-empty').count(), 1, "Dec 28 is empty");
+      assert.equal(await page.locator('.rc-group[data-day="2026-12-28"] [data-addday="2026-12-28"]').count(), 1);
 
       // Every day's subtotal: 小計, the day's US dollars and its Canadian dollars.
-      for (const day of ["pre", "2026-12-10", "2026-12-11"]) {
+      for (const day of ["pre", "2026-12-26", "2026-12-27"]) {
         const list = exps.filter((e) => e.day === day);
         const sub = await text(page, '.rc-group[data-day="' + day + '"] .rc-sub');
         assert.ok(sub.includes("小計"), day + " subtotal says 小計");
         assert.ok(sub.includes(tripMoney(list.reduce((a, e) => a + tripCents(e), 0))), day + " subtotal US dollars: " + sub);
         assert.ok(sub.includes(dollars(list.reduce((a, e) => a + cadCents(e), 0))), day + " subtotal dollars: " + sub);
       }
-      assert.ok((await text(page, '.rc-group[data-day="2026-12-11"] .rc-sub')).includes("US$182.45"));
+      assert.ok((await text(page, '.rc-group[data-day="2026-12-27"] .rc-sub')).includes("US$182.45"));
 
       assert.ok((await text(page, '.rc-row[data-id="seedexp008"]')).includes("Izzah only"));
       const onlyNames = await page.$$eval('.rc-row[data-id="seedexp008"] small b', (els) => els.map((b) => [b.textContent, getComputedStyle(b).fontWeight]));
@@ -140,11 +140,11 @@ module.exports = [
   {
     name: "day cities, and a dollar line shows dollars",
     async run({ page }) {
-      const seed = withExtras({ expenses: [BOARD], days: { "2026-12-11": { city: "Tokyo" } } });
-      await open(page, { seed, nowMs: NOON12 });
+      const seed = withExtras({ expenses: [BOARD], days: { "2026-12-27": { city: "Evanston" }, "2026-12-26": { city: "" } } });
+      await open(page, { seed, nowMs: NOON28 });
       await waitRows(page, 9);
-      await expectText(page, '.rc-group[data-day="2026-12-11"] .rc-day .rc-city', "Tokyo");
-      assert.equal(await page.locator('.rc-group[data-day="2026-12-10"] .rc-city').count(), 0, "no city, none shown");
+      await expectText(page, '.rc-group[data-day="2026-12-27"] .rc-day .rc-city', "Evanston");
+      assert.equal(await page.locator('.rc-group[data-day="2026-12-26"] .rc-city').count(), 0, "no city, none shown");
       await expectText(page, '.rc-row[data-id="seedexp010"] .rc-amt', "$730.00");
       assert.ok((await text(page, '.rc-group[data-day="pre"] .rc-sub')).includes("US$3,115.60"));
     },
@@ -152,7 +152,7 @@ module.exports = [
   {
     name: "the last-updated time, and tapping it refreshes",
     async run({ page }) {
-      const backend = await open(page, { seed: SEED, nowMs: NOON12 });
+      const backend = await open(page, { seed: SEED, nowMs: NOON28 });
       await expectText(page, "#fresh", "Up to date 13:20");
       const loads = () => backend.requests.filter((r) => r.action === "load").length;
       await until(() => loads() === 1, "one load at boot");
@@ -163,10 +163,10 @@ module.exports = [
   {
     name: "lines added by someone else since you looked are marked new",
     async run({ page }) {
-      const half = new Date(NOON12 - 30 * 60 * 1000).toISOString();
+      const half = new Date(NOON28 - 30 * 60 * 1000).toISOString();
       const seed = withExtras({ patch: { seedexp007: { addedAt: half }, seedexp009: { addedAt: half } } });
       // The store keeps chi.seen as milliseconds (String(Date.now())).
-      await open(page, { seed, nowMs: NOON12, storage: { "chi.seen": String(NOON12 - 60 * 60 * 1000) } });
+      await open(page, { seed, nowMs: NOON28, storage: { "chi.seen": String(NOON28 - 60 * 60 * 1000) } });
       await waitRows(page, 8);
       await until(() => page.evaluate(() => document.querySelector('.rc-row[data-id="seedexp007"]').classList.contains("is-new")), "Shibuya Sky is new");
       assert.equal(await page.locator('.rc-row[data-id="seedexp009"].is-new').count(), 0, "Mo's own Coffee is not new");
@@ -189,7 +189,7 @@ module.exports = [
   {
     name: "no key: says so and loads nothing",
     async run({ page }) {
-      const backend = await open(page, { seed: SEED, nowMs: NOON12, key: null });
+      const backend = await open(page, { seed: SEED, nowMs: NOON28, key: null });
       await expectText(page, "#gate p", "This phone needs the trip link. Open it from your chat again, or paste it here.");
       assert.ok(await visible(page, "#gate"));
       assert.equal(await page.evaluate(() => document.getElementById("rc").childElementCount), 0, "#rc is empty");
@@ -199,7 +199,7 @@ module.exports = [
   {
     name: "no key: pasting the trip link opens the trip without a reload, and keeps the key off the screen and the address",
     async run({ page }) {
-      const backend = await open(page, { seed: SEED, nowMs: NOON12, key: null });
+      const backend = await open(page, { seed: SEED, nowMs: NOON28, key: null });
       await expectText(page, "#gate p", "This phone needs the trip link. Open it from your chat again, or paste it here.");
       assert.ok(await visible(page, "#keyPaste"));
       assert.equal(await page.locator('label[for="keyPaste"]').count(), 0, "no label: the sentence says what the field is for");
@@ -239,7 +239,7 @@ module.exports = [
   {
     name: "no key: a bare key works too; one the trip refuses comes back to the same screen",
     async run({ page }) {
-      const backend = await open(page, { seed: SEED, nowMs: NOON12, key: null });
+      const backend = await open(page, { seed: SEED, nowMs: NOON28, key: null });
       await until(() => visible(page, "#keyPaste"), "the paste field");
       await page.fill("#keyPaste", "wrong-key-123");
       await page.click("#keyGo");
@@ -264,7 +264,7 @@ module.exports = [
         .replace(/API_URL = "[^"]*"/, 'API_URL = ""');
       assert.ok(config.includes('API_URL = ""'), "the address was blanked");
       await page.route("**/js/config.js", (route) => route.fulfill({ contentType: "text/javascript", body: config }));
-      const backend = makeBackend(SEED, { now: NOON12 });
+      const backend = makeBackend(SEED, { now: NOON28 });
       await page.exposeFunction("__matBridge", (body) => backend.handle(body));
       const outside = [];
       page.on("request", (r) => {
@@ -281,9 +281,9 @@ module.exports = [
   {
     name: "a Sheet set up for another trip: the gate says what is wrong, and nothing is painted",
     async run({ page }) {
-      const backend = makeBackend(SEED, { now: NOON12 });
+      const backend = makeBackend(SEED, { now: NOON28 });
       backend.fake.tables.Trip.find((r) => r.key === "currency").value = "JPY";
-      await open(page, { backend, nowMs: NOON12 });
+      await open(page, { backend, nowMs: NOON28 });
       await expectText(page, "#gate p", "The Trip tab doesn’t match this app (currency is JPY, not USD). This app’s zone and currencies are fixed in its code: put the Trip tab back as it was.");
       assert.equal(await visible(page, "#keyPaste"), false);
       assert.equal(await rowCount(page), 0);
@@ -292,7 +292,7 @@ module.exports = [
   {
     name: "first open: which one are you, then how this works",
     async run({ page }) {
-      await open(page, { seed: SEED, nowMs: NOON12, key: null, me: null, how: null, hash: "#k=test-key" });
+      await open(page, { seed: SEED, nowMs: NOON28, key: null, me: null, how: null, hash: "#k=test-key" });
       await until(() => visible(page, "#first"), "#first shows");
       assert.equal(await page.locator("#first [data-me]").count(), 2, "two seals");
       // Two keys, centred, each the size one of three would be.
@@ -341,7 +341,7 @@ module.exports = [
   {
     name: "how this works survives a reload before Got it",
     async run({ page }) {
-      await open(page, { seed: SEED, nowMs: NOON12, key: null, me: null, how: null, hash: "#k=test-key" });
+      await open(page, { seed: SEED, nowMs: NOON28, key: null, me: null, how: null, hash: "#k=test-key" });
       await until(() => visible(page, "#first"), "#first shows");
       await page.click('#first [data-me="Izzah"]');
       await until(() => visible(page, "#how"), "#how shows");
@@ -363,7 +363,7 @@ module.exports = [
           return set.call(this, k, v);
         };
       });
-      const backend = await open(page, { seed: SEED, nowMs: NOON12, key: null, hash: "#k=test-key" });
+      const backend = await open(page, { seed: SEED, nowMs: NOON28, key: null, hash: "#k=test-key" });
       await waitRows(page, 8);
       assert.equal(await page.evaluate(() => localStorage.getItem("chi.key")), null, "nothing was stored");
       assert.equal(await page.evaluate(() => location.hash), "", "key gone from the address");
@@ -380,11 +380,11 @@ module.exports.push(
   {
     name: "a Sheet row with a name the app does not know is left out, said so above the slip, and the rest works",
     async run({ page }) {
-      const backend = makeBackend(SEED, { now: NOON12 });
+      const backend = makeBackend(SEED, { now: NOON28 });
       // Mo mistypes a name by hand in the Sheet.
       const row = backend.fake.tables.Expenses.find((r) => r.id === "seedexp004");
       row.split = "Mo,Izzah,Trent";
-      await open(page, { backend, nowMs: NOON12 });
+      await open(page, { backend, nowMs: NOON28 });
       await waitRows(page, 7);
       await expectText(page, "#asideNote", "1 line in the Sheet can’t be read (a name the app doesn’t know). It’s left out of the totals. Tell Mo.");
       const order = await page.evaluate(() => {
@@ -409,9 +409,9 @@ module.exports.push(
   {
     name: "US dollars converted at the stand-in rate: one plain line under the trip summary",
     async run({ page }) {
-      const backend = makeBackend(SEED, { now: NOON12 });
+      const backend = makeBackend(SEED, { now: NOON28 });
       backend.fake.setRate(0.72, "fallback");
-      await open(page, { backend, nowMs: NOON12 });
+      await open(page, { backend, nowMs: NOON28 });
       await waitRows(page, 8);
       await expectText(page, "#rateNote", "US dollars are being converted at a stand-in rate of 0.72.");
       const under = await page.evaluate(() => document.getElementById("sayP").getBoundingClientRect().bottom <= document.getElementById("rateNote").getBoundingClientRect().top);

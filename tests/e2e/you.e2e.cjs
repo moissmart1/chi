@@ -1,20 +1,20 @@
 // Settings (Task 12): the "You 設定" sheet.
 
 const assert = require("node:assert/strict");
-const { ORIGIN, SEED, THREE, NOON12, open, advance, until, text, expectText, visible } = require("./helpers.cjs");
+const { ORIGIN, SEED, THREE, NOON28, open, advance, until, text, expectText, visible } = require("./helpers.cjs");
 
 // ---- small tools for this file ----
 
 // A made-up planner sheet: its id and Payments tab (Task 12).
 const PLANNER_ID = "fakePlannerSheet_0123456789abcdefXYZ";
 // As if a phone pulled a moment ago, so opening the app does not pull on its own and Fetch is what brings payments in.
-const JUST_PULLED = new Date(NOON12).toISOString();
+const JUST_PULLED = new Date(NOON28).toISOString();
 const PHEAD = ["payment_id", "date_paid", "payer", "description", "category", "vendor", "booking_ref", "amount", "currency", "amount_cad", "cad_is_exact", "split_between", "split_type", "status", "include_in_split", "source", "added_by", "notes"];
 const prow = (o) => PHEAD.map((h) => (o[h] === undefined ? "" : o[h]));
 const PLANNER = [
   PHEAD,
-  prow({ payment_id: "X7", date_paid: "2026-12-11", payer: "Mo", description: "Rail pass", category: "transport", vendor: "North Rail", booking_ref: "AB12", amount: 160.5, currency: "USD", amount_cad: 221.52, cad_is_exact: "yes", split_between: "Mo, Izzah", split_type: "equal", include_in_split: "yes" }),
-  prow({ payment_id: "Q3", date_paid: "2026-12-12", payer: "Izzah", description: "Noodle bar", category: "food", vendor: "Ramen Ya", amount: 36, currency: "USD", split_between: "Mo, Izzah", split_type: "equal", include_in_split: "yes" }),
+  prow({ payment_id: "X7", date_paid: "2026-12-27", payer: "Mo", description: "Rail pass", category: "transport", vendor: "North Rail", booking_ref: "AB12", amount: 160.5, currency: "USD", amount_cad: 221.52, cad_is_exact: "yes", split_between: "Mo, Izzah", split_type: "equal", include_in_split: "yes" }),
+  prow({ payment_id: "Q3", date_paid: "2026-12-28", payer: "Izzah", description: "Noodle bar", category: "food", vendor: "Ramen Ya", amount: 36, currency: "USD", split_between: "Mo, Izzah", split_type: "equal", include_in_split: "yes" }),
   // Read fine but can't be brought in (a personal payment): it needs a look in the planner.
   prow({ payment_id: "P5", payer: "Mo", description: "Own souvenir", amount: 9, currency: "USD", split_between: "Mo", split_type: "personal", include_in_split: "yes" }),
 ];
@@ -40,7 +40,7 @@ const storage = (page, k) => page.evaluate((key) => localStorage.getItem(key), k
 const waitMail = (page, v) => until(async () => (await mailValue(page)) === v, "the address field reads " + JSON.stringify(v));
 
 async function ready(page, opts = {}) {
-  const backend = await open(page, { seed: SEED, nowMs: NOON12, ...opts });
+  const backend = await open(page, { seed: SEED, nowMs: NOON28, ...opts });
   await until(() => page.evaluate(() => document.querySelectorAll("#rc .rc-row").length > 0), "the receipt draws");
   return backend;
 }
@@ -396,7 +396,7 @@ module.exports = [
       assert.match(note, /^Who: Mo$/m);
       assert.match(note, /^Screen: Money$/m);
       assert.ok(note.includes("App version: " + APP_VERSION));
-      assert.match(note, /^Time: Sat Dec 12, 13:20$/m);
+      assert.match(note, /^Time: Mon Dec 28, 13:20$/m);
       const entries = await backend.handle({ key: "test-key", actor: "Mo", via: "app", action: "history", args: {} });
       const newest = entries.data.entries.slice(0, 5).map((e) => e.who + " " + e.summary + (e.via === "claude" ? " (through Claude)" : ""));
       assert.equal(newest.length, 5);
@@ -610,7 +610,7 @@ module.exports = [
     name: "Planner payments: ten a tap; the notice says when there is more, and the next tap brings the rest",
     async run({ page }) {
       const rows = [PHEAD];
-      for (let i = 1; i <= 12; i++) rows.push(prow({ payment_id: "R" + i, date_paid: "2026-12-11", payer: "Mo", description: "Ticket " + i, category: "activity", amount: 10 + i, currency: "USD", split_between: "Mo, Izzah", split_type: "equal", include_in_split: true }));
+      for (let i = 1; i <= 12; i++) rows.push(prow({ payment_id: "R" + i, date_paid: "2026-12-27", payer: "Mo", description: "Ticket " + i, category: "activity", amount: 10 + i, currency: "USD", split_between: "Mo, Izzah", split_type: "equal", include_in_split: true }));
       const backend = await ready(page, { seed: { ...SEED, planner: rows, plannerId: PLANNER_ID, paymentsPulledAt: JUST_PULLED } });
       await openYou(page);
       await page.click("#setPlanner");

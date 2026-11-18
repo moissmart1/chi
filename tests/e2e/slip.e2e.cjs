@@ -4,11 +4,11 @@
 
 const assert = require("node:assert/strict");
 const P = require("../../backend/Pure.js");
-const { NOON12, SEED: TWO, open, until, text, expectText, visible } = require("./helpers.cjs");
+const { NOON28, SEED: TWO, open, until, text, expectText, visible } = require("./helpers.cjs");
 
 // Task 2's chain, among three people (Simplify only shows with three or
 // more): Mo owes Izzah $10, Izzah owes Sam $10.
-const line = (o) => ({ day: "2026-12-11", currency: "CAD", rate: 0.72, splitMode: "equal", splitVals: [], note: "", kind: "", deleted: false, ...o });
+const line = (o) => ({ day: "2026-12-27", currency: "CAD", rate: 0.72, splitMode: "equal", splitVals: [], note: "", kind: "", deleted: false, ...o });
 const CHAIN = [
   line({ id: "chainexp001", title: "Izakaya", amount: 20, paidBy: "Izzah", split: ["Mo", "Izzah"] }),
   line({ id: "chainexp002", title: "Karaoke", amount: 20, paidBy: "Sam", split: ["Izzah", "Sam"] }),
@@ -30,7 +30,7 @@ const isOn = async (page) => (await page.getAttribute("#simp", "aria-checked")) 
 const row = (key) => '#slip .s-row[data-key="' + key + '"]';
 
 async function ready(page, opts = {}) {
-  const backend = await open(page, { seed: SEED, nowMs: NOON12, ...opts });
+  const backend = await open(page, { seed: SEED, nowMs: NOON28, ...opts });
   await until(() => page.evaluate(() => document.querySelectorAll("#slip .s-row").length > 0), "the slip draws");
   return backend;
 }
@@ -176,7 +176,7 @@ module.exports = [
       await until(async () => (await page.locator("#slip .s-row.is-paid").count()) === 1, "the stamped row");
       await waitRows(page, []);
       await expectText(page, "#say", "You’re square.");
-      await expectText(page, "#slip .s-row.is-paid .s-sub", "Paid Fri Nov 20. Nothing more to send.");
+      await expectText(page, "#slip .s-row.is-paid .s-sub", "Paid Sun Dec 6. Nothing more to send.");
     },
   },
   {

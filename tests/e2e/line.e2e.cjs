@@ -3,7 +3,7 @@
 
 const assert = require("node:assert/strict");
 const P = require("../../backend/Pure.js");
-const { SEED, NOON12, SEEDED_AT, open, advance, until, text, expectText, visible } = require("./helpers.cjs");
+const { SEED, NOON28, SEEDED_AT, open, advance, until, text, expectText, visible } = require("./helpers.cjs");
 
 // ---- small tools for this file ----
 
@@ -42,7 +42,7 @@ const waitSentences = (page, check, what) =>
   }, what);
 
 async function ready(page, opts = {}) {
-  const backend = await open(page, { seed: SEED, nowMs: NOON12, ...opts });
+  const backend = await open(page, { seed: SEED, nowMs: NOON28, ...opts });
   await waitRows(page, 8);
   return backend;
 }
@@ -89,7 +89,7 @@ module.exports = [
       assert.ok(body.includes("Izzah paid"), body);
       assert.ok(body.includes("both"), "shared by both: " + body);
       assert.equal(body.includes("all three"), false, body);
-      assert.equal(SEEDED_DAY, "Fri Nov 20");
+      assert.equal(SEEDED_DAY, "Sun Dec 6");
       await expectText(page, "#lnBy", "Rung up by Izzah, " + SEEDED_DAY);
       // Focus moves to the sheet (not the note field), which is a modal dialog.
       assert.equal(await page.evaluate(() => document.activeElement.id), "lnDone");
