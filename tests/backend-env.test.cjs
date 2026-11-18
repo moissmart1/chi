@@ -138,26 +138,6 @@ function plannerWorld({ props = {}, get, tabs = ["Payments"], noAccess = false, 
   return { ctx, logged, asked, props };
 }
 
-test("plannerRows_ asks the Sheets service for Payments!A1:R, unformatted, dates as shown; setPlannerId_ keeps the id in PLANNER_ID", () => {
-  const w = plannerWorld({ props: {}, get: () => ({ values: [PHEAD] }) });
-  assert.equal(w.ctx.plannerId_(), null);
-  w.ctx.setPlannerId_(PLANNER_ID);
-  assert.equal(w.props.PLANNER_ID, PLANNER_ID);
-  assert.deepEqual(JSON.parse(JSON.stringify(w.ctx.plannerRows_())), [PHEAD]);
-  assert.deepEqual(JSON.parse(JSON.stringify(w.asked)), [[PLANNER_ID, "Payments!A1:R", { valueRenderOption: "UNFORMATTED_VALUE", dateTimeRenderOption: "FORMATTED_STRING" }]]);
-  const empty = plannerWorld({ props: { PLANNER_ID }, get: () => ({}) });
-  assert.deepEqual(JSON.parse(JSON.stringify(empty.ctx.plannerRows_())), []);
-  // R40 fix 6: no Payments tab (the range can't be read, but the sheet can): null.
-  const noTab = plannerWorld({ props: { PLANNER_ID }, tabs: ["Budget"], get: () => { throw new Error("Unable to parse range: Payments!A1:R"); } });
-  assert.equal(noTab.ctx.plannerRows_(), null);
-  assert.deepEqual(JSON.parse(JSON.stringify(noTab.asked[1])), [PLANNER_ID, { fields: "sheets.properties.title" }]);
-  // Any other failure still throws.
-  const tabThere = plannerWorld({ props: { PLANNER_ID }, get: () => { throw new Error("quota"); } });
-  assert.throws(() => tabThere.ctx.plannerRows_(), /quota/);
-  const shut = plannerWorld({ props: { PLANNER_ID }, noAccess: true, get: () => { throw new Error("denied"); } });
-  assert.throws(() => shut.ctx.plannerRows_());
-});
-
 // Book Now and Change Log as the planner holds them (made up), for checkPlanner.
 const BOOK = [["Before we go"], ["#", "Item", "Book by", "Status"], [1, "Secret Tour", "Dec 21", ""], [2, "Hidden Inn", "", "Booked"], ["* footnote"]];
 const CLOG = [["#", "Tab", "Old value", "New value"], [1, "Book Now", "Private old", "Private new"]];
@@ -167,99 +147,6 @@ const byRange = (payments, book = BOOK, log = CLOG) => (id, range) => {
   if (range.startsWith("'Change Log'!")) { if (log instanceof Error) throw log; return { values: log }; }
   throw new Error("Unable to parse range: " + range);
 };
-
-test("checkPlanner logs the row count or the problem, never a value or the id", () => {
-  const row = PHEAD.map((h) => ({ payment_id: "X7", payer: "Mo", description: "Secret Inn", amount: 160.5, currency: "USD", split_between: "Mo", split_type: "equal", include_in_split: "yes" })[h] || "");
-  const tabs = ["Payments", "Book Now", "Change Log"];
-  const good = plannerWorld({ props: { PLANNER_ID }, tabs, get: byRange([PHEAD, row, [], row.map((c, i) => (i === 0 ? "X8" : c))]) });
-  good.ctx.checkPlanner();
-  assert.deepEqual(good.logged, ["Planner: 2 payment rows, columns ok", "Book Now: 2 items, columns ok", "Book Now: 0 Status cells are formulas (the app leaves those alone).", "Change Log: found"]);
-
-  const missing = plannerWorld({ props: { PLANNER_ID }, tabs, get: byRange([PHEAD.filter((h) => h !== "amount_cad"), row], [["#", "Item", "Book by"]], [["#", "Tab"]]) });
-  missing.ctx.checkPlanner();
-  assert.deepEqual(missing.logged, ["Planner: The planner’s Payments tab is missing the column amount_cad.", "Book Now: The planner’s Book Now tab has no row with the columns #, Item, Book by and Status.", "Change Log: not found"]);
-
-  const fails = plannerWorld({ props: { PLANNER_ID }, tabs, get: () => { throw new Error("Requested entity was not found: " + PLANNER_ID); } });
-  fails.ctx.checkPlanner();
-  assert.deepEqual(fails.logged, ["Planner: couldn’t read its Payments tab. Check the id and that this account can open the sheet.", "Book Now: couldn’t read it.", "Change Log: couldn’t read it."]);
-
-  const noTab = plannerWorld({ props: { PLANNER_ID }, tabs: [], get: () => { throw new Error("Unable to parse range"); } });
-  noTab.ctx.checkPlanner();
-  assert.deepEqual(noTab.logged, ["Planner: The planner has no Payments tab to read.", "Book Now: The planner has no Book Now tab to read.", "Change Log: not found"]);
-
-  const none = plannerWorld({ props: {}, get: () => { throw new Error("not called"); } });
-  none.ctx.checkPlanner();
-  assert.deepEqual(none.logged, ["Planner: not linked yet. Link it with linkPlanner first."]);
-
-  const all = [good, missing, fails, noTab, none].flatMap((w) => w.logged).join("\n");
-  assert.equal(all.includes(PLANNER_ID), false);
-  assert.equal(/Secret Inn|24750|X7|Secret Tour|Hidden Inn|Private/.test(all), false);
-});
-
-test("checkPlanner asks for every permission first, the full Sheets one included (R46)", () => {
-  const s = src("Setup.js");
-  const body = s.slice(s.indexOf("function checkPlanner()"));
-  assert.ok(body.indexOf("ScriptApp.requireAllScopes") < body.indexOf("plannerId_()"));
-  const manifest = JSON.parse(src("appsscript.json"));
-  assert.deepEqual(manifest.oauthScopes, [
-    "https://www.googleapis.com/auth/spreadsheets.currentonly",
-    "https://www.googleapis.com/auth/script.external_request",
-    "https://www.googleapis.com/auth/spreadsheets",
-  ]);
-});
-
-test("plannerTab_ reads a tab from A1 by its quoted name; null when the sheet has no such tab", () => {
-  const w = plannerWorld({ props: { PLANNER_ID }, tabs: ["Book Now"], get: () => ({ values: BOOK }) });
-  assert.deepEqual(JSON.parse(JSON.stringify(w.ctx.plannerTab_("Book Now"))), BOOK);
-  assert.deepEqual(JSON.parse(JSON.stringify(w.asked)), [[PLANNER_ID, "'Book Now'!A1:Z", { valueRenderOption: "UNFORMATTED_VALUE", dateTimeRenderOption: "FORMATTED_STRING" }]]);
-  const odd = plannerWorld({ props: { PLANNER_ID }, get: () => ({}) });
-  assert.deepEqual(JSON.parse(JSON.stringify(odd.ctx.plannerTab_("Mo's tab"))), []);
-  assert.equal(odd.asked[0][1], "'Mo''s tab'!A1:Z");
-  const none = plannerWorld({ props: { PLANNER_ID }, tabs: ["Payments"], get: () => { throw new Error("Unable to parse range"); } });
-  assert.equal(none.ctx.plannerTab_("Change Log"), null);
-  const shut = plannerWorld({ props: { PLANNER_ID }, tabs: ["Change Log"], get: () => { throw new Error("denied"); } });
-  assert.throws(() => shut.ctx.plannerTab_("Change Log"), /denied/);
-});
-
-test("the two planner writers: one cell, RAW; one row appended under the table, RAW, rows inserted; Toronto time", () => {
-  const w = plannerWorld({ props: { PLANNER_ID }, get: () => ({}) });
-  w.ctx.plannerSetCell_("Book Now", "E4", "Booked");
-  w.ctx.plannerAppendRow_("Change Log", 2, 1, [8, "x", "", "y"]);
-  assert.equal(w.ctx.torontoNow_(), "2026-12-06 10:00 ET");
-  assert.deepEqual(JSON.parse(JSON.stringify(w.asked)), [
-    ["update", { values: [["Booked"]] }, PLANNER_ID, "'Book Now'!E4", { valueInputOption: "RAW" }],
-    ["append", { values: [[8, "x", "", "y"]] }, PLANNER_ID, "'Change Log'!B2:E2", { valueInputOption: "RAW", insertDataOption: "INSERT_ROWS" }],
-    ["formatDate", "America/Toronto", "yyyy-MM-dd HH:mm"],
-  ]);
-  const refused = plannerWorld({ props: { PLANNER_ID }, get: () => ({}), update: () => { throw new Error("no permission"); } });
-  assert.throws(() => refused.ctx.plannerSetCell_("Book Now", "E4", "Booked"), /no permission/);
-});
-
-test("withPlannerLock_ takes the document lock, never the script lock withLock_ uses; null when it can't be had (R49)", () => {
-  const seen = [];
-  const lock = (name, ok) => ({ tryLock: (ms) => { seen.push(name + ".tryLock:" + ms); return ok; }, releaseLock: () => seen.push(name + ".release") });
-  const mk = (docOk, doc = true) => vm.createContext({
-    LockService: {
-      getScriptLock: () => { seen.push("script"); return lock("script", true); },
-      getDocumentLock: () => (doc ? lock("doc", docOk) : null),
-      getUserLock: () => lock("user", true),
-    },
-  });
-  const w = mk(true);
-  vm.runInContext(src("Env.js"), w, { filename: "Env.js" });
-  assert.equal(w.withPlannerLock_(() => 5), 5);
-  assert.deepEqual(seen, ["doc.tryLock:5000", "doc.release"]);
-  seen.length = 0;
-  const busy = mk(false);
-  vm.runInContext(src("Env.js"), busy, { filename: "Env.js" });
-  assert.equal(busy.withPlannerLock_(() => { throw new Error("not run"); }), null);
-  assert.deepEqual(seen, ["doc.tryLock:5000"]);
-  seen.length = 0;
-  const unbound = mk(true, false);
-  vm.runInContext(src("Env.js"), unbound, { filename: "Env.js" });
-  assert.equal(unbound.withPlannerLock_(() => 1), 1);
-  assert.deepEqual(seen, ["user.tryLock:5000", "user.release"]);
-});
 
 // What Spreadsheets.get answers for one cell, by what the cell holds.
 const oneCell = (v) => ({ sheets: [{ data: [v === undefined ? {} : { rowData: [{ values: [v] }] }] }] });
@@ -272,35 +159,28 @@ const CELLS = {
   E9: { sheets: [{ data: [{ rowData: [{}] }] }] },
 };
 
-test("plannerCellComputed_: a formula in the cell or a value spilled into it is computed; a typed value or an empty cell is not", () => {
-  const w = plannerWorld({ props: { PLANNER_ID }, get: () => ({}), cells: (id, opt) => CELLS[opt.ranges[0].replace("'Book Now'!", "")] });
-  const at = (row) => w.ctx.plannerCellComputed_("Book Now", row, 4);
-  assert.deepEqual([4, 5, 6, 7, 8, 9].map(at), [true, true, false, false, false, false]);
-  assert.deepEqual(JSON.parse(JSON.stringify(w.asked[0])), [PLANNER_ID, { ranges: ["'Book Now'!E4"], fields: "sheets.data.rowData.values(userEnteredValue,effectiveValue)" }]);
-});
-
-test("plannerCellComputed_: a read that fails or comes back in an unexpected shape is unknown (null), neither computed nor plain", () => {
-  const fails = plannerWorld({ props: { PLANNER_ID }, get: () => ({}), cells: () => { throw new Error("quota"); } });
-  assert.equal(fails.ctx.plannerCellComputed_("Book Now", 4, 4), null);
-  for (const odd of [null, {}, { sheets: [] }, { sheets: [{}] }, { sheets: [{ data: [] }] }, { sheets: [{ data: [{ rowData: "x" }] }] }, { sheets: [{ data: [{ rowData: [{ values: ["x"] }] }] }] }]) {
-    const w = plannerWorld({ props: { PLANNER_ID }, get: () => ({}), cells: () => odd });
-    assert.equal(w.ctx.plannerCellComputed_("Book Now", 4, 4), null, JSON.stringify(odd));
+test("no planner: the script asks only for its own Sheet and outside fetches, with no advanced Sheets service, and nothing uses either", () => {
+  const manifest = JSON.parse(src("appsscript.json"));
+  assert.deepEqual(manifest.oauthScopes, [
+    "https://www.googleapis.com/auth/spreadsheets.currentonly",
+    "https://www.googleapis.com/auth/script.external_request",
+  ]);
+  assert.equal("dependencies" in manifest, false, "no advanced services");
+  for (const f of fs.readdirSync(BACKEND).filter((n) => n.endsWith(".js"))) {
+    const code = src(f);
+    assert.equal(/\bSheets\.Spreadsheets\b/.test(code), false, f + " uses the advanced Sheets service");
+    assert.equal(/openById|SpreadsheetApp\.open\(/.test(code), false, f + " opens another spreadsheet");
+    assert.equal(/\bplanner(Id|Rows|Tab|SetCell|AppendRow)_\b|checkPlanner|linkPlanner|syncPayments|syncTodos|tickTodo|claimTodo/.test(code), false, f + " still has planner code");
   }
 });
 
-test("checkPlanner counts the Status cells that are formulas or spilled, with no value in the line", () => {
-  const tabs = ["Payments", "Book Now", "Change Log"];
-  const mk = (held) => plannerWorld({ props: { PLANNER_ID }, tabs, get: byRange([PHEAD]), cells: (id, opt) => held[opt.ranges[0].replace("'Book Now'!", "")] || oneCell() });
-  const none = mk({});
-  none.ctx.checkPlanner();
-  assert.ok(none.logged.includes("Book Now: 0 Status cells are formulas (the app leaves those alone)."), none.logged.join("|"));
-  const two = mk({ D3: oneCell({ userEnteredValue: { formulaValue: "=1+1" }, effectiveValue: { numberValue: 2 } }), D4: oneCell({ effectiveValue: { stringValue: "Secret spill" } }) });
-  two.ctx.checkPlanner();
-  assert.ok(two.logged.includes("Book Now: 2 Status cells are formulas (the app leaves those alone)."), two.logged.join("|"));
-  assert.equal(two.logged.join("\n").includes("=1+1"), false);
-  assert.equal(two.logged.join("\n").includes("Secret spill"), false);
-  const unknown = mk({ D4: { sheets: [] } });
-  unknown.ctx.checkPlanner();
-  assert.ok(unknown.logged.includes("Book Now: couldn’t check its Status cells for formulas."), unknown.logged.join("|"));
-  assert.equal(unknown.logged.some((l) => l.includes("Status cells are formulas (")), false);
+test("no planner: the old planner actions are unknown to the backend, and load says no planner is linked", async () => {
+  const { createFakeBackend } = require("./fake-backend.cjs");
+  const fake = createFakeBackend();
+  for (const action of ["linkPlanner", "syncPayments", "syncTodos", "tickTodo", "claimTodo"]) {
+    const r = await fake({ key: "test-key", actor: "Mo", action, args: { id: "1", on: true } });
+    assert.deepEqual([r.ok, r.error], [false, "bad_input"], action);
+  }
+  const d = (await fake({ key: "test-key", actor: "Mo", action: "load", args: {} })).data;
+  assert.deepEqual([d.plannerLinked, d.todos, d.todosPulledAt, d.paymentsPulledAt, d.paymentProblems], [false, [], "", "", { at: "", list: [], more: 0 }]);
 });

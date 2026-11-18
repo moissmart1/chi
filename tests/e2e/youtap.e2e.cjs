@@ -5,17 +5,6 @@
 const assert = require("node:assert/strict");
 const { ORIGIN, SEED, NOON28, open, advance, until, text, expectText } = require("./helpers.cjs");
 
-const PHEAD = ["payment_id", "date_paid", "payer", "description", "category", "vendor", "booking_ref", "amount", "currency", "amount_cad", "cad_is_exact", "split_between", "split_type", "status", "include_in_split", "source", "added_by", "notes"];
-const prow = (o) => PHEAD.map((h) => (o[h] === undefined ? "" : o[h]));
-const PLANNER_ID = "fakePlannerSheet_0123456789abcdefXYZ";
-// As if a phone pulled a moment ago, so opening the app does not pull on its own and Fetch is what brings payments in.
-const JUST_PULLED = new Date(NOON28).toISOString();
-const PLANNER = [
-  PHEAD,
-  prow({ payment_id: "X7", date_paid: "2026-12-27", payer: "Mo", description: "Rail pass", category: "transport", amount: 160.5, currency: "USD", amount_cad: 221.52, cad_is_exact: "yes", split_between: "Mo, Izzah", split_type: "equal", include_in_split: "yes" }),
-  prow({ payment_id: "Q3", date_paid: "2026-12-28", payer: "Izzah", description: "Noodle bar", category: "food", amount: 36, currency: "USD", split_between: "Mo, Izzah", split_type: "equal", include_in_split: "yes" }),
-];
-
 const clipboard = (page) => page.evaluate(() => navigator.clipboard.readText());
 const requests = (backend, action) => backend.requests.filter((r) => r.action === action).length;
 
@@ -183,53 +172,16 @@ module.exports = [
     },
   },
   {
-    name: "Planner payments: Added 2, then Fetch; Nothing new; a failed pull says Not fetched; a second tap while busy does nothing",
-    async run({ page }) {
-      const backend = await ready(page, { seed: { ...SEED, planner: PLANNER, plannerId: PLANNER_ID, paymentsPulledAt: JUST_PULLED } });
-      assert.equal(await page.getAttribute("#setPlannerV", "aria-live"), "polite");
-      const h = hold(backend, "syncPayments");
-      await page.click("#setPlanner");
-      await expectText(page, "#setPlannerV", "Fetching…");
-      await page.evaluate(() => document.getElementById("setPlanner").click());
-      h.release();
-      await expectText(page, "#setPlannerV", "Added 2");
-      await expectText(page, "#ubarT", "Added 2 payments from the planner.");
-      assert.equal(h.asked(), 1, "one pull for two taps");
-      h.restore();
-      await advance(page, backend, 3900);
-      assert.equal(await text(page, "#setPlannerV"), "Added 2");
-      await advance(page, backend, 200);
-      await expectText(page, "#setPlannerV", "Fetch");
-
-      await page.click("#setPlanner");
-      await expectText(page, "#setPlannerV", "Nothing new");
-      await advance(page, backend, 4000);
-      await expectText(page, "#setPlannerV", "Fetch");
-
-      backend.failWith = "network";
-      await page.click("#setPlanner");
-      await expectText(page, "#setPlannerV", "Not fetched");
-      backend.failWith = null;
-      await advance(page, backend, 4000);
-      await expectText(page, "#setPlannerV", "Fetch");
-    },
-  },
-  {
     name: "a row that throws never stays busy",
     async run({ page }) {
-      const backend = await ready(page, { seed: { ...SEED, planner: PLANNER, plannerId: PLANNER_ID, paymentsPulledAt: JUST_PULLED } });
+      const backend = await ready(page);
       await page.evaluate(() => {
-        globalThis.__matTest.store.syncPayments = () => Promise.reject(new Error("test"));
         globalThis.__matTest.store.refresh = () => Promise.reject(new Error("test"));
       });
-      await page.click("#setPlanner");
-      await expectText(page, "#setPlannerV", "Not fetched");
       await page.click("#setFreshRow");
       await expectText(page, "#setFresh", "No signal");
       await advance(page, backend, 4000);
-      await expectText(page, "#setPlannerV", "Fetch");
       await expectText(page, "#setFresh", /^Up to date \d\d:\d\d$/);
-      assert.equal(await page.isDisabled("#setPlanner"), false);
     },
   },
   {

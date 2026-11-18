@@ -44,7 +44,7 @@ test("the handshake needs no token; everything else does", () => {
   assert.equal(fake.mcp(rpc("initialize", {}), {}).result.serverInfo.name, "mat");
   assert.equal(fake.mcp(rpc("tools/list"), {}).error.code, -32001);
   assert.equal(fake.mcp(rpc("tools/list"), { t: "test-key" }).error.code, -32001); // the trip key is not the token
-  assert.equal(fake.mcp(rpc("tools/list"), T).result.tools.length, 12);
+  assert.equal(fake.mcp(rpc("tools/list"), T).result.tools.length, 11);
   assert.equal(fake.mcp({ jsonrpc: "2.0", method: "notifications/initialized" }, T).error.code, -32600);
   assert.equal(fake.mcp(rpc("nope"), T).error.code, -32601);
 });
@@ -140,7 +140,7 @@ test("a set token must match whole; the trip key, a prefix, a longer string or a
   }
   assert.equal(fake.mcp(rpc("tools/list"), {}).error.code, -32001);
   assert.equal(fake.mcp(rpc("tools/list"), undefined).error.code, -32001);
-  assert.equal(fake.mcp(rpc("tools/list"), T).result.tools.length, 12);
+  assert.equal(fake.mcp(rpc("tools/list"), T).result.tools.length, 11);
 });
 
 test("a message that is not a request is -32600 with id null, before any token check", () => {
@@ -162,9 +162,9 @@ test("method not found, unknown tool and bad tools/call params", () => {
   assert.ok(fake.mcp(rpc("tools/call", { name: "get_trip" }), T).result, "no arguments at all is the same as {}");
 });
 
-test("tools/list names the twelve tools in order, each schema listing its own arguments", () => {
+test("tools/list names the eleven tools in order, each schema listing its own arguments", () => {
   const tools = createFakeBackend({}).mcp(rpc("tools/list"), T).result.tools;
-  assert.deepEqual(tools.map((t) => t.name), ["get_trip", "explain_debt", "add_expense", "add_stop", "change_stop", "remove_stop", "save_stay", "remove_stay", "set_day", "get_history", "undo", "sync_payments"]);
+  assert.deepEqual(tools.map((t) => t.name), ["get_trip", "explain_debt", "add_expense", "add_stop", "change_stop", "remove_stop", "save_stay", "remove_stay", "set_day", "get_history", "undo"]);
   const props = Object.fromEntries(tools.map((t) => [t.name, Object.keys(t.inputSchema.properties).sort()]));
   assert.deepEqual(props.add_expense, ["amount", "currency", "day", "kind", "note", "paid_by", "split", "title"]);
   assert.deepEqual(props.add_stop, ["booked", "date", "detail", "fixed", "getting_there", "link", "note", "photo", "place", "sign_jp", "time", "title", "travel_min"]);
@@ -172,7 +172,6 @@ test("tools/list names the twelve tools in order, each schema listing its own ar
   assert.deepEqual(props.save_stay, ["address_jp", "first_night", "id", "last_night", "link", "name", "name_jp", "note", "photo", "place"]);
   assert.deepEqual(props.set_day, ["city", "date", "from_en", "from_jp", "line_colour", "line_en", "line_jp", "title", "to_en", "to_jp"]);
   assert.deepEqual(props.undo, ["log_id"]);
-  assert.deepEqual(props.sync_payments, []);
   const req = Object.fromEntries(tools.map((t) => [t.name, (t.inputSchema.required || []).slice().sort()]));
   assert.deepEqual(req.add_expense, ["amount", "currency", "paid_by", "title"]);
   assert.deepEqual(req.add_stop, ["date", "title"]);
@@ -334,8 +333,7 @@ test("get_trip gives the trip, names only, the days, and only live stops, stays,
   await app(fake, "deleteStop", { id: "planstop1102" });
   await app(fake, "deleteExpense", { id: "seedexp004" });
   const t = ok(fake, "get_trip", {});
-  assert.deepEqual(Object.keys(t), ["trip", "people", "has_picture", "days", "stops", "stays", "expenses", "payments", "owed", "owed_direct", "todos"]);
-  assert.deepEqual(t.todos, { open: [], done: 0 }, "no pull yet: nothing to do");
+  assert.deepEqual(Object.keys(t), ["trip", "people", "has_picture", "days", "stops", "stays", "expenses", "payments", "owed", "owed_direct"]);
   assert.deepEqual(t.people, NAMES);
   assert.equal(t.trip.name, "Chicago 2026");
   assert.equal(t.days.length, 7);
@@ -510,7 +508,7 @@ test("migrate makes CLAUDE_TOKEN (32 hex) when it is missing, keeps one that is 
   const t = fake.props.CLAUDE_TOKEN;
   await fake({ key: "test-key", action: "migrate", args: {} });
   assert.equal(fake.props.CLAUDE_TOKEN, t, "a second migrate keeps it");
-  assert.equal(fake.mcp(rpc("tools/list"), { t }).result.tools.length, 12);
+  assert.equal(fake.mcp(rpc("tools/list"), { t }).result.tools.length, 11);
 });
 
 test("Apps Script side: setup() and migrate make the token from Utilities.getUuid, newId_ is 20 letters and digits", () => {
@@ -543,7 +541,6 @@ test("R35: an `as` that names no one refuses every write with -32602 and stores 
     ["add_stop", { date: "2026-12-28", title: "Tea" }],
     ["remove_stop", { id: "planstop1101" }],
     ["undo", { log_id: 1 }],
-    ["sync_payments", {}],
   ]) {
     const r = call(fake, name, args, q);
     assert.equal(r.error && r.error.code, -32602, name);
@@ -724,64 +721,6 @@ const prow = (o) => PHEAD.map((h) => (o[h] === undefined ? "" : o[h]));
 const PX7 = { payment_id: "X7", date_paid: "2026-12-27", payer: "Mo", description: "Rail pass", category: "transport", vendor: "North Rail", booking_ref: "AB12", amount: 247.5, currency: "USD", amount_cad: 221.52, cad_is_exact: "yes", split_between: "Mo, Izzah", split_type: "equal", include_in_split: "yes" };
 const PLANNER = [PHEAD, prow(PX7), prow({ ...PX7, payment_id: "P5", split_type: "personal" }), prow({ ...PX7, payment_id: "Z1", include_in_split: "no" })];
 
-test("sync_payments brings the planner's payments in, each credited to who paid, logged as from the planner", () => {
-  const fake = createFakeBackend({ planner: PLANNER, plannerId: PLANNER_ID });
-  const tool = fake.mcp(rpc("tools/list"), T).result.tools.find((t) => t.name === "sync_payments");
-  assert.equal(tool.description, "Use this to bring in what’s been paid from the planner sheet’s Payments tab: new payments are added and changed ones updated. The change shows in the app’s History and can be undone.");
-  assert.deepEqual(tool.inputSchema, { type: "object", properties: {}, additionalProperties: false });
-  const r = ok(fake, "sync_payments", {}, { ...T, as: " izzah " });
-  assert.deepEqual(r, { added: 1, changed: 0, same: 0, removed: 0, not_counted: [], problems: [{ id: "P5", message: "Only payments split equally can be brought in.", row: 3, what: "Rail pass" }], more: false, capped: false });
-  assert.deepEqual(fake.tables.Log.map((l) => [l.who, l.via]), [["Mo", "planner"]]); // credited to who paid, not the person in the link
-  assert.deepEqual(ok(fake, "sync_payments", {}), { added: 0, changed: 0, same: 1, removed: 0, not_counted: [], problems: [{ id: "P5", message: "Only payments split equally can be brought in.", row: 3, what: "Rail pass" }], more: false, capped: false });
-  const h = ok(fake, "get_history", {});
-  assert.equal(h.entries[0].sentence, "Mo rang up Rail pass $221.52 (from the planner)");
-  assert.equal(badArgs(fake, "sync_payments", { id: "x" }), "Invalid params: unknown argument id.");
-  // R40: the tie to the planner is the backend's own business.
-  const seen = JSON.stringify([call(fake, "get_trip", {}), call(fake, "get_history", { limit: 200 }), call(fake, "add_expense", { title: "Tea", amount: 3, currency: "USD", paid_by: "Mo" })]);
-  assert.equal(/planner_?[iI]d/.test(seen), false);
-  assert.equal(fake.tables.Expenses[0].planner_id, "X7");
-});
-
-test("sync_payments says when more remain (10 a pull) and when the planner was cut at 300", () => {
-  const many = [PHEAD];
-  for (let i = 1; i <= 12; i++) many.push(prow({ ...PX7, payment_id: "R" + i, amount_cad: i }));
-  const fake = createFakeBackend({ planner: many, plannerId: PLANNER_ID });
-  assert.deepEqual([ok(fake, "sync_payments", {}).added, ok(fake, "sync_payments", {}).added], [10, 2]);
-  fake.planner.rows.push(prow({ ...PX7, payment_id: "R13" }));
-  for (let i = 14; i <= 25; i++) fake.planner.rows.push(prow({ ...PX7, payment_id: "R" + i }));
-  assert.equal(ok(fake, "sync_payments", {}).more, true);
-  const big = [PHEAD];
-  for (let i = 1; i <= 301; i++) big.push(prow({ ...PX7, payment_id: "C" + i, include_in_split: "no" }));
-  assert.equal(ok(createFakeBackend({ planner: big, plannerId: PLANNER_ID }), "sync_payments", {}).capped, true);
-  const cols = createFakeBackend({ planner: [PHEAD.slice(1)], plannerId: PLANNER_ID });
-  assert.equal(refusal(cols, "sync_payments", {}), "The planner’s Payments tab is missing the column payment_id.");
-});
-
-test("sync_payments needs the token and a known `as`; a refusal is the backend's sentence; the planner id is never in a reply", () => {
-  const fake = createFakeBackend({ planner: PLANNER, plannerId: PLANNER_ID });
-  assert.equal(call(fake, "sync_payments", {}, {}).error.code, -32001);
-  const reads = fake.planner.reads;
-  const r = call(fake, "sync_payments", {}, { ...T, as: "nobody" });
-  assert.equal(r.error.code, -32602);
-  assert.equal(fake.planner.reads, reads, "the planner is not read");
-  assert.equal(fake.tables.Expenses.length, 0);
-
-  const replies = [];
-  fake.planner.fails = true;
-  replies.push(call(fake, "sync_payments", {}));
-  assert.equal(refusal(fake, "sync_payments", {}), "Couldn’t read the planner sheet. Ask Mo to check its permission.");
-  fake.planner.fails = false;
-  // A planner cell that holds the id itself is hidden too.
-  fake.planner.rows = [PHEAD, prow({ ...PX7, vendor: PLANNER_ID }), prow({ ...PX7, payment_id: "N2", payer: PLANNER_ID })];
-  replies.push(call(fake, "sync_payments", {}), call(fake, "get_trip", {}), call(fake, "get_history", {}));
-  const text = JSON.stringify(replies);
-  assert.equal(text.includes(PLANNER_ID), false);
-  assert.ok(text.includes("(hidden)"));
-
-  const unlinked = createFakeBackend({ planner: PLANNER });
-  assert.equal(refusal(unlinked, "sync_payments", {}), "No planner sheet is linked yet. Ask Mo to link it.");
-});
-
 // ---------- Task 16: pictures ----------
 
 test("get_trip says who has a picture, never the picture; undoing one answers without it; no tool sets one", async () => {
@@ -808,5 +747,5 @@ test("get_trip says who has a picture, never the picture; undoing one answers wi
   assert.equal(all.includes("data:image"), false);
   assert.equal(all.includes(JPEG.slice(30, 60)), false);
   assert.equal(all.includes("photo\":\"data"), false);
-  assert.equal(fake.mcp(rpc("tools/list"), T).result.tools.length, 12, "no new tool");
+  assert.equal(fake.mcp(rpc("tools/list"), T).result.tools.length, 11, "no new tool");
 });

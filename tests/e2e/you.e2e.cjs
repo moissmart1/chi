@@ -5,20 +5,6 @@ const { ORIGIN, SEED, THREE, NOON28, open, advance, until, text, expectText, vis
 
 // ---- small tools for this file ----
 
-// A made-up planner sheet: its id and Payments tab (Task 12).
-const PLANNER_ID = "fakePlannerSheet_0123456789abcdefXYZ";
-// As if a phone pulled a moment ago, so opening the app does not pull on its own and Fetch is what brings payments in.
-const JUST_PULLED = new Date(NOON28).toISOString();
-const PHEAD = ["payment_id", "date_paid", "payer", "description", "category", "vendor", "booking_ref", "amount", "currency", "amount_cad", "cad_is_exact", "split_between", "split_type", "status", "include_in_split", "source", "added_by", "notes"];
-const prow = (o) => PHEAD.map((h) => (o[h] === undefined ? "" : o[h]));
-const PLANNER = [
-  PHEAD,
-  prow({ payment_id: "X7", date_paid: "2026-12-27", payer: "Mo", description: "Rail pass", category: "transport", vendor: "North Rail", booking_ref: "AB12", amount: 160.5, currency: "USD", amount_cad: 221.52, cad_is_exact: "yes", split_between: "Mo, Izzah", split_type: "equal", include_in_split: "yes" }),
-  prow({ payment_id: "Q3", date_paid: "2026-12-28", payer: "Izzah", description: "Noodle bar", category: "food", vendor: "Ramen Ya", amount: 36, currency: "USD", split_between: "Mo, Izzah", split_type: "equal", include_in_split: "yes" }),
-  // Read fine but can't be brought in (a personal payment): it needs a look in the planner.
-  prow({ payment_id: "P5", payer: "Mo", description: "Own souvenir", amount: 9, currency: "USD", split_between: "Mo", split_type: "personal", include_in_split: "yes" }),
-];
-
 const isOpen = (page) => page.evaluate(() => document.getElementById("you").classList.contains("is-open"));
 // Open, and risen all the way (the sheet slides up over 500 ms).
 const waitYou = (page) =>
@@ -555,73 +541,6 @@ module.exports = [
       await openYou(page);
       assert.equal(await page.evaluate(() => document.getElementById("setPlanner").hidden), true, "the row is there, hidden");
       assert.equal(await page.isHidden("#setPlanner"), true);
-    },
-  },
-  {
-    name: "Planner payments: a tap brings the planner's payments onto the receipt and says so; a second tap finds nothing new; History says from the planner",
-    async run({ page }) {
-      const backend = await ready(page, { seed: { ...SEED, planner: PLANNER, plannerId: PLANNER_ID, paymentsPulledAt: JUST_PULLED } });
-      await openYou(page);
-      assert.equal(await page.isVisible("#setPlanner"), true);
-      assert.equal(await page.evaluate(() => document.querySelector("#setPlanner > span").firstChild.textContent), "Planner payments");
-      assert.equal(await text(page, "#setPlanner small"), "Brings in what’s been paid from the planner sheet");
-      assert.equal(await text(page, "#setPlanner b"), "Fetch");
-
-      // While the pull runs: Fetching…, and a second tap does nothing.
-      let release;
-      const gate = new Promise((r) => (release = r));
-      const handle = backend.handle;
-      backend.handle = async (body) => {
-        if (body.action === "syncPayments") await gate;
-        return handle(body);
-      };
-      await page.click("#setPlanner");
-      await expectText(page, "#setPlanner b", "Fetching…");
-      await page.evaluate(() => document.getElementById("setPlanner").click());
-      release();
-      await expectText(page, "#ubarT", "Added 2 payments from the planner. 1 payment needs a look in the planner. See You for which.");
-      await expectText(page, "#setPlanner b", "Added 2");
-      assert.equal(backend.requests.filter((r) => r.action === "syncPayments").length, 1, "one pull for two taps");
-      backend.handle = handle;
-
-      await page.click("#youDone");
-      await waitYouClosed(page);
-      const titles = () => page.$$eval("#rc .rc-row .rc-t", (els) => els.map((e) => e.firstChild.textContent));
-      await until(async () => (await titles()).includes("Rail pass") && (await titles()).includes("Noodle bar"), "the payments are on the receipt");
-
-      await page.evaluate(() => globalThis.__matTest.store.clearNotice());
-      await openYou(page);
-      await page.click("#setPlanner");
-      await expectText(page, "#ubarT", "Nothing new in the planner. 1 payment needs a look in the planner. See You for which.");
-      assert.equal(backend.fake.primitives.readTable_("Expenses").filter((e) => e.note.startsWith("X7 · ")).length, 1, "nothing added twice");
-
-      await page.click("#youDone");
-      await waitYouClosed(page);
-      await page.evaluate(() => document.getElementById("histBtn").click());
-      await until(
-        () => page.$$eval("#tape .tp-row .tp-s", (els) => els.some((e) => e.textContent === "Mo rang up Rail pass $221.52 (from the planner)")),
-        "History says the line came from the planner",
-      );
-      const seen = await page.evaluate(() => [document.body.innerHTML, JSON.stringify({ ...localStorage })].join("|"));
-      assert.equal(seen.includes(PLANNER_ID), false, "the planner's id is never on the phone");
-    },
-  },
-  {
-    name: "Planner payments: ten a tap; the notice says when there is more, and the next tap brings the rest",
-    async run({ page }) {
-      const rows = [PHEAD];
-      for (let i = 1; i <= 12; i++) rows.push(prow({ payment_id: "R" + i, date_paid: "2026-12-27", payer: "Mo", description: "Ticket " + i, category: "activity", amount: 10 + i, currency: "USD", split_between: "Mo, Izzah", split_type: "equal", include_in_split: true }));
-      const backend = await ready(page, { seed: { ...SEED, planner: rows, plannerId: PLANNER_ID, paymentsPulledAt: JUST_PULLED } });
-      await openYou(page);
-      await page.click("#setPlanner");
-      await expectText(page, "#ubarT", "Added 10 payments from the planner. More to bring in: tap Fetch again.");
-      await expectText(page, "#setPlanner b", "Added 10");
-      await advance(page, backend, 4000);
-      await expectText(page, "#setPlanner b", "Fetch");
-      await page.evaluate(() => globalThis.__matTest.store.clearNotice());
-      await page.click("#setPlanner");
-      await expectText(page, "#ubarT", "Added 2 payments from the planner.");
-      assert.equal(backend.fake.primitives.readTable_("Expenses").filter((e) => /^R\d+$/.test(e.planner_id)).length, 12);
     },
   },
 ];

@@ -2,9 +2,9 @@
 // which one the app opens on.
 
 const assert = require("node:assert/strict");
-const { WITH_PLAN, open, until, expectText, visible } = require("./helpers.cjs");
+const { WITH_PLAN, open, advance, until, expectText, visible } = require("./helpers.cjs");
 
-const NOV15 = Date.parse("2026-12-01T12:00:00-06:00");
+const DEC1 = Date.parse("2026-12-01T12:00:00-06:00");
 
 const isActive = (page, sel) => page.evaluate((s) => document.querySelector(s).classList.contains("is-active"), sel);
 const isInert = (page, sel) => page.evaluate((s) => document.querySelector(s).inert === true, sel);
@@ -52,6 +52,29 @@ async function fits(page) {
 
 module.exports = [
   {
+    name: "no planner: no Before tab before or during the trip, four keys in the bar, no Planner payments row, and nothing ever asks for the planner",
+    async run({ page, newPhone }) {
+      const planner = (backend) => backend.requests.filter((r) => /^(syncPayments|syncTodos|tickTodo|claimTodo|linkPlanner)$/.test(r.action)).map((r) => r.action);
+      // Before the trip (when a linked planner's list would be in the bar) and during it.
+      for (const [p, nowMs] of [[page, DEC1], [await newPhone(), Date.parse("2026-12-28T13:20:00-06:00")]]) {
+        const backend = await open(p, { seed: WITH_PLAN, nowMs, tab: "days" });
+        await showing(p, "#vDays");
+        assert.equal(await visible(p, "#beforeBtn"), false, "no Before key");
+        assert.equal(await p.evaluate(() => [...document.querySelectorAll("#nav button")].filter((b) => b.getClientRects().length).length), 4, "Days, Money, You, Ring up");
+        // Half an hour of checks, looks and coming back to the app.
+        for (let i = 0; i < 6; i++) {
+          await advance(p, backend, 5 * 60 * 1000);
+          await p.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+        }
+        await p.click("#youBtn");
+        await until(() => visible(p, "#setHist"), "You opens");
+        assert.equal(await p.isHidden("#setPlanner"), true, "no Planner payments row");
+        assert.ok(backend.requests.some((r) => r.action === "rev"), "the phone did check in");
+        assert.deepEqual(planner(backend), [], "no planner calls");
+      }
+    },
+  },
+  {
     name: "opens on Days with nothing stored",
     async run({ page }) {
       await open(page, { seed: WITH_PLAN, tab: null });
@@ -94,7 +117,7 @@ module.exports = [
   {
     name: "before the trip the last screen wins",
     async run({ page }) {
-      await open(page, { seed: WITH_PLAN, nowMs: NOV15, tab: null, storage: { "chi.tab": "money", "chi.tabDay": "2026-11-30" } });
+      await open(page, { seed: WITH_PLAN, nowMs: DEC1, tab: null, storage: { "chi.tab": "money", "chi.tabDay": "2026-11-30" } });
       await showing(page, "#vMoney");
     },
   },

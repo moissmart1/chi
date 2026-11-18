@@ -11,7 +11,7 @@ Survey: `triplit/docs/superpowers/specs/2026-11-17-second-trip-survey.md`.
 - [x] 3. Currency
 - [x] 4. Two people
 - [x] 5. The trip's own seed
-- [ ] 6. No planner
+- [x] 6. No planner
 - [ ] 7. Japanese words in the interface
 - [ ] 8. README and PHOTO-CREDITS
 - [ ] Finish: stamp, unit, full e2e, screenshots, this report
@@ -67,9 +67,112 @@ Survey: `triplit/docs/superpowers/specs/2026-11-17-second-trip-survey.md`.
 - Test fixtures moved with the trip: every Nov/Dec 2026 date up to Dec 25 is 16 days later (weekdays two on; the old last days Dec 17–20 map to Dec 31 / Jan 1, the day after to Jan 2), so "today" is Mon Dec 28 13:20 Chicago (`NOON28`, was `NOON12`), Day 3 of 7; counts of eleven days became seven; the stamp book fixtures have seven day stamps and the issue stamp (eight, was twelve); the gate/issue mark is `MI` (Mo + Izzah). A script did the mechanical part; each leftover was fixed by hand.
 - A sparse-day test now blanks one day's city to keep testing the fall-back to the trip's name (every seeded day now has a city).
 
+### 6. No planner
+- Dropping the full `spreadsheets` scope and the advanced Sheets service needed code removed, so (as the plan allows) the planner left the backend: router actions `linkPlanner`, `syncPayments`, `syncTodos`, `tickTodo`, `claimTodo` (now "unknown action"), their implementations and the "todo" undo (Actions.js), the planner readers/writers and planner lock (Env.js), `checkPlanner` (Setup.js), the planner payment and Book Now parsers and `changeLogRow` (Pure.js), the connector's `sync_payments` tool and the todos in `get_trip` (Mcp.js: 11 tools). `appsscript.json` asks for `spreadsheets.currentonly` and `script.external_request` only, with no advanced services.
+- `load` answers `plannerLinked: false`, `todos: []`, empty pull times and problems, so the phone's dormant planner screens stay hidden. MY CALL: the phone's planner code (Before tab, Planner payments row, store pulls) stays, hidden, as the plan's "confirm each by test" implies; the Sheet schema keeps its Todos tab and `Expenses.planner_id` column (unused) to keep the schema as it was.
+- Confirmed by tests: e2e `tabs` (before and during the trip: no Before key, four keys, no Planner payments row, half an hour of checks with no planner call), `you` (no Planner payments row), unit `store` (autoPayments sends nothing), `backend-env` (scopes, no Sheets service, no planner code; old actions refused; load's planner fields).
+- The fake backend lost its planner stand-ins and gained nothing else.
+
 ## Tests deleted (and why)
 
-(none yet)
+All with item 6 (the planner pull and "Before we go" write-back are left out of this edition; the backend no longer has them, so nothing can exercise them).
+
+- `tests/todos.test.cjs`: the whole file (108 tests): the backend's Book Now pull, ticks, claims, Change Log writes and their undo.
+- `tests/e2e/todos.e2e.cjs`: the whole file (23 cases): the Before tab against a linked planner.
+- `tests/e2e/autopay.e2e.cjs`: the whole file (1 case): the automatic planner payment pull.
+- `tests/e2e/problems.e2e.cjs`: the whole file (5 cases): You's "payment that needs a look in the planner" blocks.
+- `tests/fake-backend.test.cjs` (planner payments pull, linkPlanner, payment problems):
+  - a first pull adds each included payment as an expense, as addExpense would, tied by planner_id, logged as from the planner
+  - R40: planner_id is never in load, History, a Log row's before/after or an undo reply
+  - a second pull straight after writes nothing and rev stays
+  - fix 1 (the review's probe): a note edited in the app keeps the expense tied; the next pull adds nothing
+  - a changed amount_cad changes that one expense: one edit, before/after differ only in amount, only that column written; Undo works
+  - each planner-owned field that differs is changed; day and kind are the app's and stay
+  - fix 9: a line set to exact amounts or shares is put back to an equal split, with or without a change of names
+  - an expense deleted in the app is not brought back, nor changed, and counts as removed
+  - a payment no longer included leaves its expense as it is and is listed in notCounted
+  - R40 back-fill: a hand-rung line whose note starts with a payment id in the planner is tied once, that column only, with no Log row and no rev
+  - R40 back-fill: a deleted hand-rung line is tied too (and stays deleted); a note naming an id the planner does not have is not tied
+  - fix 2 (the review's probe): a payment renamed in the planner is added as new and the old line is listed as no longer in the planner
+  - fix 3 (the review's probe): two live lines carrying one payment's id: a problem, and neither is changed
+  - fix 4: a planner cannot be relinked from outside, and no problem repeats a planner cell's text
+  - fix 5: at most 10 expenses written per pull, changes first then adds; Expenses read once per pull
+  - fix 6: a tab with a missing column, an empty tab or none is refused as planner_columns; 300 rows read says capped
+  - R40 migrate: an older Sheet gets Expenses.planner_id; until then a pull is refused rather than add untied lines
+  - a row the app's validation refuses is a problem, never stored, and the other rows still come in
+  - syncPayments: not linked, unreadable, no actor, the lock busy
+  - Log rows from a pull say planner whoever started it; an app body cannot claim planner, nor set planner_id
+  - linkPlanner stores a spreadsheet id; a bad one is refused; nothing is logged and the id is never in a reply
+  - the planner id is never in a reply, a Log row or a History sentence
+  - auto pull: reads the planner, records when, and load says when
+  - auto pull within 10 minutes of the last pull: the planner is not read, nothing is written, and the answer says skipped
+  - Fetch (no auto) always reads the planner, even a minute after a pull
+  - a pull that fails does not count as a pull: the next auto pull reads again
+  - auto has to be true or false
+  - a planner line is credited to who paid, not to whichever phone asked
+  - a planner change is credited to who paid
+  - a pull cut short does not count as done: the next auto pull carries on at once
+  - a pull whose read is older than one that already landed writes nothing
+  - a pull with one bad row stores it, and load hands it to any phone
+  - a later clean pull stores an empty list, which clears the old one
+  - 23 bad rows store the first 20 and more: 3; a message is cut to 160
+  - a skipped auto pull leaves the stored list alone
+  - a pull cut short by the ten-write limit still stores what it found
+  - an add writes no row onto the expense, and the problem list is not in the expense
+  - a seeded paymentProblems comes back from load
+- `tests/backend-pure.test.cjs` (planner row parsing):
+  - paymentsFromRows reads each payment by column name, trimmed, numbers as numbers
+  - paymentsFromRows: row is the sheet's own row number (first data row 2, a blank row still counts); a problem carries row and what
+  - paymentsFromRows finds columns in any order
+  - paymentsFromRows: a missing column gives one problem and no payments
+  - paymentsFromRows reads numbers given as text, and NaN when it can't
+  - paymentsFromRows: include_in_split is yes, trimmed, in any case
+  - paymentsFromRows skips blank rows, leaves out unusable and repeated ids, and reads 300 at most
+  - expenseFromPayment: the two note examples, word for word
+  - expenseFromPayment: only equal splits, only the trip's people, in their own spelling
+  - expenseFromPayment: the amount is amount_cad when there is one, else US or Canadian dollars as charged
+  - expenseFromPayment: the title is the description, whitespace collapsed, at most 80 letters
+  - expenseFromPayment: the day, the kind and the note's other parts
+  - paymentIdOf: the note's first part when it is an id
+- `tests/backend-env.test.cjs` (the Sheets-service planner readers and writers, checkPlanner; the scope test is replaced by one that pins the two remaining scopes):
+  - plannerRows_ asks the Sheets service for Payments!A1:R, unformatted, dates as shown; setPlannerId_ keeps the id in PLANNER_ID
+  - checkPlanner logs the row count or the problem, never a value or the id
+  - checkPlanner asks for every permission first, the full Sheets one included (R46)
+  - plannerTab_ reads a tab from A1 by its quoted name; null when the sheet has no such tab
+  - the two planner writers: one cell, RAW; one row appended under the table, RAW, rows inserted; Toronto time
+  - withPlannerLock_ takes the document lock, never the script lock withLock_ uses; null when it can't be had (R49)
+  - plannerCellComputed_: a formula in the cell or a value spilled into it is computed; a typed value or an empty cell is not
+  - plannerCellComputed_: a read that fails or comes back in an unexpected shape is unknown (null), neither computed nor plain
+  - checkPlanner counts the Status cells that are formulas or spilled, with no value in the line
+- `tests/mcp.test.cjs` (the connector's sync_payments tool):
+  - sync_payments brings the planner's payments in, each credited to who paid, logged as from the planner
+  - sync_payments says when more remain (10 a pull) and when the planner was cut at 300
+  - sync_payments needs the token and a known `as`; a refusal is the backend's sentence; the planner id is never in a reply
+- `tests/store.test.js` (the phone's planner calls against the backend):
+  - syncPayments pulls, reloads so the lines are there, says what came in, and resolves with the counts
+  - syncPayments: each sentence it says
+  - syncPayments with the phone known offline sends nothing and says No signal; a refusal shows the backend's sentence
+  - syncPayments with no reply says it couldn't confirm and the next contact reloads
+  - syncTodos puts the list into state and asks again while the backend says more remain, at most 4 calls
+  - syncTodos: quiet says nothing when it fails; otherwise the usual notice; never queued
+  - tickTodo shows the tick at once, keeps what the backend saved, and Undo puts it back
+  - tickTodo refused rolls back with the backend's sentence; offline it says not saved
+  - claimTodo: I’ll do it, take it over, hand it back, each with its own words on the undo bar
+  - syncTodos: when a later call of a long pull fails, what the earlier one brought in is kept, and the failure is said
+  - autoPayments: brings new planner payments in, says so, and the lines are on the receipt
+  - autoPayments: a pull with only problems raises no notice, but the list is brought up to date
+  - autoPayments: sooner than 10 minutes after a pull sends nothing; at 10 minutes it asks again
+  - autoPayments: nothing new is said nowhere and does not reload
+  - autoPayments: another phone pulled a minute ago (load says so): this one waits
+  - autoPayments: no planner linked, offline, or a refusal: nothing said
+  - autoPayments: one at a time
+  - autoPayments: never replaces a notice already showing (review, 2026-12-03)
+  - paymentProblems arrives in state from load, and is empty when the backend has none
+- `tests/e2e/you.e2e.cjs`: "Planner payments: a tap brings the planner's payments onto the receipt…", "Planner payments: ten a tap…".
+- `tests/e2e/youtap.e2e.cjs`: "Planner payments: Added 2, then Fetch…"; "a row that throws never stays busy" kept, without its planner half.
+- `tests/e2e/desktop.e2e.cjs`: "Before opens over the Days pane…", "WIDE: only a key that shows is marked current, and when Before goes…".
+- `tests/e2e/effects.e2e.cjs`: "the Before count rolls in when it changes…", "under reduced motion the count does not roll"; the Before-paper halves of four other effects cases (their ticket, stub, stamp and notch checks stay, on a planner-less Days).
+
 
 ## Left for phase 2 (still says or assumes Japan)
 

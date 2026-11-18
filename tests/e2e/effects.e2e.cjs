@@ -8,27 +8,15 @@
 const assert = require("node:assert/strict");
 const { SEED, WITH_PLAN, NOON28, makeBackend, open, advance, until, visible } = require("./helpers.cjs");
 
-const PLANNER_ID = "fakePlannerSheet_0123456789abcdefXYZ";
-const BHEAD = ["#", "Item", "Who", "Book by", "Status", "Notes", "Booking link"];
-const brow = (o) => BHEAD.map((h) => (o[h] === undefined ? "" : o[h]));
-const CHEAD = ["#", "Date / time", "Agent / session", "Tab", "Cell(s)", "Item", "Old value", "New value", "Why", "Proof / source", "Verified?"];
-const ITEMS = [
-  { "#": 1, Item: "Rail pass seat reservations", "Book by": "2026-11-30", Status: "Not booked", Notes: "Window seats for three." },
-  { "#": 2, Item: "Tea ceremony class", "Book by": "2026-12-04", Status: "Pending" },
-  { "#": 3, Item: "Snow park day trip", "Book by": "Dec 21", Status: "Not booked" },
-  { "#": 5, Item: "Pocket wifi pickup", "Book by": "2026-11-26", Status: "Booked" },
-];
-// 14:00 on Wed Dec 2 in Toronto: before the trip, so the Before tab is there.
-const BEFORE = Date.parse("2026-12-02T19:00:00Z");
+// 13:20 on Mon Dec 28 in Chicago, Day 3 of the trip.
+const DAY3 = NOON28;
 
-// The Days screen over a plan, with the planner's list pulled in (3 open, 1 done).
+// The Days screen over a plan. This trip has no planner, so no Before tab.
 async function daysReady(page) {
-  const seed = { ...WITH_PLAN, plannerId: PLANNER_ID, plannerTabs: { "Book Now": [["Before we go: bookings"], BHEAD, ...ITEMS.map(brow)], "Change Log": [CHEAD] } };
-  const backend = makeBackend(seed, { now: BEFORE });
-  await backend.fake({ key: "test-key", actor: "Mo", action: "syncTodos", args: {} });
-  await open(page, { backend, nowMs: BEFORE, tab: "days" });
+  const backend = makeBackend(WITH_PLAN, { now: DAY3 });
+  await open(page, { backend, nowMs: DAY3, tab: "days" });
   await until(() => page.evaluate(() => document.querySelectorAll("#rail .tk").length > 0), "the tickets draw");
-  await until(() => visible(page, "#beforeBtn"), "the Before tab is in the bar");
+  assert.equal(await visible(page, "#beforeBtn"), false, "no Before tab");
   return backend;
 }
 
@@ -48,7 +36,7 @@ const style = (page, sel, pseudo = null) => page.evaluate(([s, p]) => {
 
 module.exports = [
   {
-    name: "paper sits on the table: tickets, the Before paper, the slip and the receipt have four or more shadow layers and the grain; the day stubs and hotel card too",
+    name: "paper sits on the table: tickets have four or more shadow layers and the grain; the day stubs too",
     async run({ page }) {
       await daysReady(page);
       const tk = await style(page, "#rail .tk");
@@ -57,13 +45,7 @@ module.exports = [
       assert.match(tk.bg, /linear-gradient/, "the ticket has its sheen");
       // The fan motion is still on the ticket where the browser has it.
       assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector("#rail .tk")).animationName !== undefined), true);
-      await page.click('#nav button[data-tab="before"]');
-      await until(() => visible(page, "#bwCard"), "the Before paper shows");
-      const bw = await style(page, "#bwCard");
-      assert.ok(layers(bw.shadow) >= 4, "Before paper: " + bw.shadow);
-      assert.match(bw.bg, /url\("data:image\/svg\+xml/);
       // The all-days stubs.
-      await page.click('#nav button[data-tab="days"]');
       await page.click("#dayCount");
       await until(() => visible(page, ".ad-row"), "the all-days list shows");
       const ad = await style(page, ".ad-row");
@@ -181,8 +163,8 @@ module.exports = [
     },
   },
   {
-    name: "a stamp that has just landed is wet and dries within 3 s: the money stamp and the to-do stamp; one drawn on load never is",
-    async run({ page, newPhone }) {
+    name: "a stamp that has just landed is wet and dries within 3 s; one drawn on load never is",
+    async run({ page }) {
       // Money stamp.
       await moneyReady(page);
       assert.equal(await page.locator(".stamp.wet").count(), 0, "nothing wet on load");
@@ -200,23 +182,11 @@ module.exports = [
       await page.reload();
       await until(() => page.locator("#slip .s-row.is-paid .stamp").count().then((n) => n === 1), "the stamp is drawn again");
       assert.equal(await page.locator(".stamp.wet").count(), 0, "not wet on a reload");
-
-      // To-do stamp, on a second phone.
-      const p2 = await newPhone();
-      await daysReady(p2);
-      await p2.click('#nav button[data-tab="before"]');
-      await until(() => visible(p2, "#todos"), "the list shows");
-      assert.equal(await p2.locator(".stamp.wet").count(), 0);
-      await p2.click('#bwOpen .bw-r[data-id="3"] .bw-b');
-      await p2.click('#bwOpen .bw-r[data-id="3"] .bw-tick');
-      await until(() => p2.locator(".bw-r.is-landed .stamp.hit.wet").count().then((n) => n === 1), "the to-do stamp lands wet");
-      await p2.clock.fastForward(1000);
-      assert.equal(await p2.locator(".stamp.wet").count(), 0, "dry within 3 s");
     },
   },
   {
     name: "under reduced motion a stamp is never wet",
-    async run({ page, newPhone }) {
+    async run({ page }) {
       await page.emulateMedia({ reducedMotion: "reduce" });
       await moneyReady(page);
       await page.click('#slip button.spot[data-key="Izzah>Mo"]');
@@ -224,19 +194,10 @@ module.exports = [
       await page.click('#slip button.spot[data-key="Izzah>Mo"]');
       await until(() => page.locator("#slip .s-row.is-paid .stamp").count().then((n) => n === 1), "the stamp");
       assert.equal(await page.locator(".stamp.wet").count(), 0);
-      const p2 = await newPhone();
-      await p2.emulateMedia({ reducedMotion: "reduce" });
-      await daysReady(p2);
-      await p2.click('#nav button[data-tab="before"]');
-      await until(() => visible(p2, "#todos"), "the list shows");
-      await p2.click('#bwOpen .bw-r[data-id="3"] .bw-b');
-      await p2.click('#bwOpen .bw-r[data-id="3"] .bw-tick');
-      await until(() => p2.locator(".bw-r.is-landed .stamp").count().then((n) => n === 1), "the to-do stamp");
-      assert.equal(await p2.locator(".stamp.wet").count(), 0);
     },
   },
   {
-    name: "every tear line has two notches: half-moons 14 px across, in the table's colour, shaded on their upper inside; the Before paper too",
+    name: "every tear line has two notches: half-moons 14 px across, in the table's colour, shaded on their upper inside",
     async run({ page }) {
       await daysReady(page);
       const perfs = await page.$$eval("#rail .tk-perf", (els) => els.map((e) => ["::before", "::after"].map((p) => { const c = getComputedStyle(e, p); return [c.content, c.width, c.height, c.backgroundColor, c.boxShadow, c.position]; })));
@@ -249,51 +210,14 @@ module.exports = [
       }
       // Centred on the paper's side edges: the notch's centre is on the ticket's left and right edge.
       const geo = await page.evaluate(() => {
-        const perf = document.querySelector("#rail .tk-perf");
+        // The ticket in view (today, Day 3): the others lean back in the fan.
+        const perf = document.querySelector('#rail .pg[data-date="2026-12-28"] .tk-perf');
         const tk = perf.closest(".tk").getBoundingClientRect();
         const pr = perf.getBoundingClientRect();
         // The circle is 14 px wide, its left (right) edge 16 px outside the line's.
         return { left: pr.left - 16 + 7 - tk.left, right: tk.right - (pr.right + 16 - 7) };
       });
       assert.ok(Math.abs(geo.left) < 0.6 && Math.abs(geo.right) < 0.6, "centred on the edges: " + JSON.stringify(geo));
-      await page.click('#nav button[data-tab="before"]');
-      await until(() => visible(page, "#bwCard"), "the Before paper shows");
-      assert.ok(await visible(page, ".bw-perf"), "a tear line in the Before paper");
-      const bw = await page.$$eval(".bw-perf", (els) => els.map((e) => ["::before", "::after"].map((p) => { const c = getComputedStyle(e, p); return [c.content, c.width, c.backgroundColor]; })));
-      for (const pair of bw) for (const n of pair) assert.deepEqual(n, ['""', "14px", "rgb(26, 22, 20)"]);
-    },
-  },
-  {
-    name: "the Before count rolls in when it changes (on the key and in the list), and not on load",
-    async run({ page }) {
-      const backend = await daysReady(page);
-      const pill = () => page.evaluate(() => [getComputedStyle(document.getElementById("beforeN")).animationName, document.getElementById("beforeN").textContent]);
-      assert.deepEqual(await pill(), ["none", "3"], "no roll on load");
-      await page.click('#nav button[data-tab="before"]');
-      await until(() => visible(page, "#todos"), "the list shows");
-      const num = () => page.evaluate(() => [getComputedStyle(document.querySelector("#bwCard .bw-band .num")).animationName, document.querySelector("#bwCard .bw-band .num").textContent]);
-      assert.deepEqual(await num(), ["none", "3open"], "no roll on load in the list");
-      // A count still settling (the list arrives in steps) does not roll; one that has been up for a couple of seconds does.
-      await advance(page, backend, 2500);
-      await page.click('#bwOpen .bw-r[data-id="3"] .bw-b');
-      await page.click('#bwOpen .bw-r[data-id="3"] .bw-tick');
-      await until(async () => (await pill())[1] === "2", "the count goes down");
-      assert.equal((await pill())[0], "roll", "the key's count rolls");
-      assert.deepEqual(await num(), ["roll", "2open"], "the list's count rolls");
-    },
-  },
-  {
-    name: "under reduced motion the count does not roll",
-    async run({ page }) {
-      await page.emulateMedia({ reducedMotion: "reduce" });
-      await daysReady(page);
-      await page.click('#nav button[data-tab="before"]');
-      await until(() => visible(page, "#todos"), "the list shows");
-      await page.click('#bwOpen .bw-r[data-id="3"] .bw-b');
-      await page.click('#bwOpen .bw-r[data-id="3"] .bw-tick');
-      await until(() => page.evaluate(() => document.getElementById("beforeN").textContent === "2"), "the count goes down");
-      assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById("beforeN")).animationName), "none");
-      assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector("#bwCard .bw-band .num")).animationName), "none");
     },
   },
   {
@@ -330,9 +254,6 @@ module.exports = [
           return bad;
         });
       assert.deepEqual(await scan(), { backdrop: [], filter: [] }, "Days");
-      await page.click('#nav button[data-tab="before"]');
-      await until(() => visible(page, "#todos"), "the list shows");
-      assert.deepEqual(await scan(), { backdrop: [], filter: [] }, "Before");
       await page.click('#nav button[data-tab="money"]');
       await until(() => page.evaluate(() => document.getElementById("vMoney").classList.contains("is-active")), "Money");
       assert.deepEqual(await scan(), { backdrop: [], filter: [] }, "Money");

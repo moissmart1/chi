@@ -290,40 +290,6 @@ for (const size of [BIG, LAPTOP]) {
 
 cases.push(
   {
-    name: "Before opens over the Days pane, the Days key in the rail is the way back, and what the app remembers is left alone",
-    viewport: BIG,
-    mobile: false,
-    async run({ page }) {
-      const BHEAD = ["#", "Item", "Who", "Book by", "Status", "Notes", "Booking link"];
-      const CHEAD = ["#", "Date / time", "Agent / session", "Tab", "Cell(s)", "Item", "Old value", "New value", "Why", "Proof / source", "Verified?"];
-      const items = [{ "#": 1, Item: "Rail pass seat reservations", "Book by": "2026-11-30", Status: "Not booked" }, { "#": 2, Item: "Tea ceremony class", "Book by": "2026-12-04", Status: "Pending" }];
-      const nowMs = Date.parse("2026-12-02T19:00:00Z");
-      const backend = makeBackend({ ...WITH_PLAN, plannerId: "fakePlannerSheet_desk", plannerTabs: { "Book Now": [["Before we go: bookings"], BHEAD, ...items.map((o) => BHEAD.map((h) => (o[h] === undefined ? "" : o[h])))], "Change Log": [CHEAD] } }, { now: nowMs - 300000 });
-      assert.equal((await backend.fake({ key: "test-key", actor: "Mo", action: "syncTodos", args: {} })).ok, true);
-      backend.now = nowMs;
-      await open(page, { backend, nowMs, tab: "money" });
-      await until(() => visible(page, "#beforeBtn"), "the Before key is in the rail");
-      assert.deepEqual((await layout(page)).keys, ["before", "ring", "youBtn"], "Before, Ring up and You");
-      await page.click("#beforeBtn");
-      await until(() => visible(page, "#todos"), "the list shows");
-      const l = await layout(page);
-      const before = await rect(page, "#vBefore");
-      assert.ok(Math.abs(before.left - l.days.left) < 1 && Math.abs(before.width - l.days.width) < 1, "Before stands where the Days pane stands");
-      assert.equal(await page.evaluate(() => document.getElementById("vBefore").inert), false);
-      assert.equal(l.moneyShown && !l.moneyInert, true, "Money is still shown and usable");
-      assert.equal(await page.evaluate(() => document.getElementById("vDays").inert), true, "Days is put away under it");
-      assert.deepEqual(l.keys, ["days", "before", "ring", "youBtn"], "the Days key is the way back");
-      assert.equal(await page.evaluate(() => document.getElementById("beforeBtn").classList.contains("is-active")), true);
-      await page.click('#nav [data-tab="days"]');
-      await until(async () => (await layout(page)).daysShown, "Days is back");
-      assert.deepEqual((await layout(page)).keys, ["before", "ring", "youBtn"]);
-      assert.equal(await page.evaluate(() => localStorage.getItem("chi.tab")), "money", "the remembered tab is left as it was");
-      // A narrow window shows that tab.
-      await page.setViewportSize(PHONE);
-      await until(() => page.evaluate(() => document.querySelector(".view.is-active").id === "vMoney" && !document.getElementById("vDays").classList.contains("is-active")), "the phone shows Money");
-    },
-  },
-  {
     name: "between (800x900): one column of at most 560 px, square, the window's height, the bar across its foot",
     viewport: BETWEEN,
     mobile: false,
@@ -543,38 +509,6 @@ cases.push(
         assert.equal(await day(), "Day 7 of 7", "the count at " + size.width + "x" + size.height);
         assert.equal(await shown(), 7, "the ticket in view at " + size.width + "x" + size.height);
       }
-    },
-  },
-  {
-    name: "WIDE: only a key that shows is marked current, and when Before goes focus lands on a key that shows",
-    viewport: BIG,
-    mobile: false,
-    async run({ page }) {
-      const BHEAD = ["#", "Item", "Who", "Book by", "Status", "Notes", "Booking link"];
-      const CHEAD = ["#", "Date / time", "Agent / session", "Tab", "Cell(s)", "Item", "Old value", "New value", "Why", "Proof / source", "Verified?"];
-      const items = [{ "#": 2, Item: "Tea ceremony class", "Book by": "2026-12-04", Status: "Pending" }, { "#": 5, Item: "Pocket wifi pickup", "Book by": "2026-11-26", Status: "Booked" }];
-      const backend = makeBackend({ ...WITH_PLAN, plannerId: "fakePlannerSheet_desk", plannerTabs: { "Book Now": [["Before we go: bookings"], BHEAD, ...items.map((o) => BHEAD.map((h) => (o[h] === undefined ? "" : o[h])))], "Change Log": [CHEAD] } }, { now: NOON28 - 300000 });
-      assert.equal((await backend.fake({ key: "test-key", actor: "Mo", action: "syncTodos", args: {} })).ok, true);
-      backend.now = NOON28;
-      await open(page, { backend, nowMs: NOON28, tab: "money" });
-      await until(() => visible(page, "#beforeBtn"), "the Before key is in the rail");
-      const marked = () => page.evaluate(() => [...document.querySelectorAll("#nav [aria-current]")].map((b) => (b.getBoundingClientRect().width > 0 ? "" : "hidden:") + (b.dataset.tab || b.id)));
-      assert.deepEqual(await marked(), [], "nothing hidden is marked");
-      await page.click("#beforeBtn");
-      await until(() => visible(page, "#todos"), "the list shows");
-      assert.deepEqual(await marked(), ["before"]);
-      await page.focus("#beforeBtn");
-      assert.equal((await backend.fake({ key: "test-key", actor: "Izzah", action: "tickTodo", args: { id: "2" } })).ok, true, "ticked on another phone");
-      await advance(page, backend, 31 * 1000);
-      await page.evaluate(() => window.__matTest.store.checkRev());
-      await advance(page, backend, 1700);
-      await until(async () => !(await visible(page, "#beforeBtn")), "the key goes");
-      const f = await page.evaluate(() => {
-        const a = document.activeElement;
-        return { body: a === document.body, shows: !!a && a.getBoundingClientRect().width > 0 };
-      });
-      assert.deepEqual(f, { body: false, shows: true }, "focus is on something that shows");
-      assert.deepEqual(await marked(), [], "nothing hidden is marked");
     },
   },
 );

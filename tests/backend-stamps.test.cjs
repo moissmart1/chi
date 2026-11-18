@@ -128,10 +128,10 @@ test("through the connector a press is refused with exactly: Press this one in t
   assert.equal(lines(call).length, 0);
 });
 
-test("the connector keeps exactly 12 tools and none of them presses", () => {
+test("the connector keeps exactly 11 tools and none of them presses", () => {
   const call = book();
   const tools = call.fake.mcp({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }, { t: "claude-token" }).result.tools;
-  assert.equal(tools.length, 12);
+  assert.equal(tools.length, 11);
   assert.equal(tools.some((t) => /stamp/i.test(t.name)), false);
 });
 
@@ -381,12 +381,12 @@ test("through the fake: one read of each stamp tab per load, no tab or column pr
   call.fake.sheetCalls.hasTab = call.fake.sheetCalls.hasColumn = call.fake.sheetCalls.orNull = 0;
   const before = { ...call.fake.tableReads };
   await call("load");
-  assert.deepEqual({ ...call.fake.sheetCalls }, { hasTab: 1, hasColumn: 0, orNull: 2 }, "the one hasTab is the Before list's own");
+  assert.deepEqual({ ...call.fake.sheetCalls }, { hasTab: 0, hasColumn: 0, orNull: 2 }, "no tab probes at all (there is no Before list)");
   assert.equal(call.fake.tableReads.StampDefs - (before.StampDefs || 0), 1);
   assert.equal(call.fake.tableReads.Stamps - (before.Stamps || 0), 1);
   const old = book({ over: { missingTabs: ["StampDefs", "Stamps"] }, defs: [] });
   old.fake.sheetCalls.orNull = 0;
   await old("load");
-  assert.deepEqual({ ...old.fake.sheetCalls }, { hasTab: 1, hasColumn: 0, orNull: 1 }, "the one hasTab is the Before list's own");
+  assert.deepEqual({ ...old.fake.sheetCalls }, { hasTab: 0, hasColumn: 0, orNull: 1 }, "no tab probes at all (there is no Before list)");
   assert.equal(old.fake.tableReads.StampDefs || 0, 0);
 });

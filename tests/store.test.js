@@ -2373,86 +2373,6 @@ const prow = (o) => PHEAD.map((h) => (o[h] === undefined ? "" : o[h]));
 const PX7 = { payment_id: "X7", date_paid: "2026-12-27", payer: "Mo", description: "Rail pass", category: "transport", vendor: "North Rail", booking_ref: "AB12", amount: 24750, currency: "USD", amount_cad: 221.52, cad_is_exact: "yes", split_between: "Mo, Izzah", split_type: "equal", include_in_split: "yes" };
 const PQ3 = { ...PX7, payment_id: "Q3", description: "Noodle bar", amount_cad: "", amount: 3600, vendor: "Ramen Ya", booking_ref: "" };
 
-test("syncPayments pulls, reloads so the lines are there, says what came in, and resolves with the counts", async () => {
-  const p = phone({ seed: { ...SEED, planner: [PHEAD, prow(PX7), prow(PQ3), prow({ ...PX7, payment_id: "P5", split_type: "personal" })], plannerId: PLANNER_ID } });
-  await p.store.boot();
-  assert.equal(p.store.state.plannerLinked, true);
-  const before = p.store.state.expenses.length;
-  const r = await p.store.syncPayments();
-  assert.deepEqual(r, { added: 2, changed: 0, same: 0, removed: 0, notCounted: [], problems: [{ id: "P5", message: "Only payments split equally can be brought in.", row: 4, what: "Rail pass" }], more: false, capped: false });
-  assert.equal(p.store.state.notice, "Added 2 payments from the planner. 1 payment needs a look in the planner. See You for which.");
-  assert.deepEqual(p.store.state.paymentProblems.list, [{ id: "P5", message: "Only payments split equally can be brought in.", row: 4, what: "Rail pass" }], "the list comes in with the reload");
-  assert.equal(p.store.state.expenses.length, before + 2);
-  assert.ok(p.store.state.expenses.some((e) => e.title === "Rail pass" && e.amount === 221.52 && !e.pending));
-  assert.equal(p.net.sent.filter((b) => b.action === "syncPayments").length, 1);
-  assert.equal(p.net.sent.filter((b) => b.action === "syncPayments")[0].actor, "Mo");
-  assert.equal(JSON.stringify(p.storage.map.get("chi.cache")).includes(PLANNER_ID), false);
-
-  await p.store.syncPayments();
-  assert.equal(p.store.state.notice, "Nothing new in the planner. 1 payment needs a look in the planner. See You for which.");
-});
-
-test("syncPayments: each sentence it says", async () => {
-  const cases = [
-    [{ added: 0, changed: 0 }, "Nothing new in the planner."],
-    [{ added: 1, changed: 0 }, "Added 1 payment from the planner."],
-    [{ added: 3, changed: 0 }, "Added 3 payments from the planner."],
-    [{ added: 0, changed: 1 }, "Changed 1 payment to match the planner."],
-    [{ added: 0, changed: 4 }, "Changed 4 payments to match the planner."],
-    [{ added: 2, changed: 1 }, "Added 2 and changed 1 to match the planner."],
-    [{ added: 1, changed: 0, problems: [{ id: "", message: "x" }] }, "Added 1 payment from the planner. 1 payment needs a look in the planner. See You for which."],
-    [{ added: 0, changed: 0, problems: [{ id: "a", message: "x" }, { id: "b", message: "y" }] }, "Nothing new in the planner. 2 payments need a look in the planner. See You for which."],
-    [{ added: 10, changed: 0, more: true }, "Added 10 payments from the planner. More to bring in: tap Fetch again."],
-    [{ added: 0, changed: 0, capped: true }, "Nothing new in the planner. Only the first 300 payments were read."],
-    [{ added: 7, changed: 3, problems: [{ id: "a", message: "x" }], capped: true, more: true }, "Added 7 and changed 3 to match the planner. 1 payment needs a look in the planner. See You for which. Only the first 300 payments were read. More to bring in: tap Fetch again."],
-  ];
-  for (const [counts, said] of cases) {
-    const p = phone({ seed: SEED });
-    await p.store.boot();
-    const data = { added: 0, changed: 0, same: 0, removed: 0, notCounted: [], problems: [], more: false, capped: false, ...counts };
-    p.net.override = (b) => (b.action === "syncPayments" ? { ok: true, rev: 0, data } : null);
-    const loads = p.net.sent.filter((b) => b.action === "load").length;
-    assert.deepEqual(await p.store.syncPayments(), data);
-    assert.equal(p.store.state.notice, said, JSON.stringify(counts));
-    assert.equal(p.net.sent.filter((b) => b.action === "load").length, loads + 1, "it reloads");
-  }
-});
-
-test("syncPayments with the phone known offline sends nothing and says No signal; a refusal shows the backend's sentence", async () => {
-  const p = phone({ seed: SEED });
-  await p.store.boot();
-  assert.equal(p.store.state.plannerLinked, false);
-  p.net.knownOffline = true;
-  const sent = p.net.sent.length;
-  assert.equal(await p.store.syncPayments(), null);
-  assert.equal(p.net.sent.length, sent, "nothing sent");
-  assert.equal(p.store.state.notice, "No signal. Try again.");
-
-  p.net.knownOffline = false;
-  assert.equal(await p.store.syncPayments(), null);
-  assert.equal(p.store.state.notice, "No planner sheet is linked yet. Ask Mo to link it.");
-
-  p.net.override = (b) => (b.action === "syncPayments" ? { ok: false, error: "planner_unreadable", message: "Couldn’t read the planner sheet. Ask Mo to check its permission." } : null);
-  assert.equal(await p.store.syncPayments(), null);
-  assert.equal(p.store.state.notice, "Couldn’t read the planner sheet. Ask Mo to check its permission.");
-
-  // R40 fix 6: a tab the backend can't use is a refusal with its own sentence, not "nothing new".
-  p.net.override = (b) => (b.action === "syncPayments" ? { ok: false, error: "planner_columns", message: "The planner’s Payments tab is missing the column amount_cad." } : null);
-  assert.equal(await p.store.syncPayments(), null);
-  assert.equal(p.store.state.notice, "The planner’s Payments tab is missing the column amount_cad.");
-});
-
-test("syncPayments with no reply says it couldn't confirm and the next contact reloads", async () => {
-  const p = phone({ seed: { ...SEED, planner: [PHEAD, prow(PX7)], plannerId: PLANNER_ID } });
-  await p.store.boot();
-  p.net.lose.add("syncPayments");
-  assert.equal(await p.store.syncPayments(), null);
-  assert.equal(p.store.state.notice, "Couldn’t confirm that. Checking…");
-  await p.store.checkRev();
-  await p.store.idle();
-  assert.ok(p.store.state.expenses.some((e) => e.title === "Rail pass"), "what landed shows after the next contact");
-});
-
 // ---------- "Before we go" (Task 20): the planner's Book Now list ----------
 
 const BHEAD = ["#", "Item", "Book by", "Status", "Notes", "Booking link"];
@@ -2463,129 +2383,6 @@ function bookSeed(n = 3, over = {}) {
   for (let i = 1; i <= n; i++) rows.push(brow({ "#": i, Item: "Made-up booking " + i, "Book by": "2026-12-0" + ((i % 9) + 1), Status: "Not booked" }));
   return { ...SEED, plannerId: PLANNER_ID, plannerTabs: { "Book Now": rows, "Change Log": [CHEAD] }, ...over };
 }
-
-test("syncTodos puts the list into state and asks again while the backend says more remain, at most 4 calls", async () => {
-  const p = phone({ seed: bookSeed(17) });
-  await p.store.boot();
-  assert.deepEqual(p.store.state.todos, []);
-  assert.equal(p.store.state.todosPulledAt, "");
-  const r = await p.store.syncTodos();
-  const calls = p.net.sent.filter((b) => b.action === "syncTodos");
-  assert.deepEqual(calls.map((b) => b.args), [{ force: false }, { force: true }], "15 rows, then the 2 left");
-  assert.equal(r.ok, true);
-  assert.equal(r.more, false);
-  assert.equal(p.store.state.todos.length, 17);
-  assert.ok(p.store.state.todosPulledAt);
-  assert.equal(r.pulledAt, p.store.state.todosPulledAt);
-  assert.equal(JSON.parse(p.storage.map.get("chi.cache")).data.todos.length, 17, "kept in the cache");
-
-  // A backend that always says more: four calls, then it stops and says so.
-  p.net.override = (b) => (b.action === "syncTodos" ? { ok: true, rev: 0, data: { todos: [], pulledAt: "", more: true, problems: [] } } : null);
-  const before = p.net.sent.length;
-  const again = await p.store.syncTodos({ force: true });
-  assert.equal(p.net.sent.length - before, 4);
-  assert.equal(again.more, true);
-  assert.ok(p.store.state.todosPulledAt, "an unfinished pull leaves the last fetched time");
-});
-
-test("syncTodos: quiet says nothing when it fails; otherwise the usual notice; never queued", async () => {
-  const p = phone({ seed: bookSeed(2) });
-  await p.store.boot();
-  p.net.knownOffline = true;
-  let r = await p.store.syncTodos({ quiet: true });
-  assert.equal(r.ok, false);
-  assert.equal(p.store.state.notice, null);
-  r = await p.store.syncTodos();
-  assert.equal(p.store.state.notice, "No signal. Try again.");
-  p.net.knownOffline = false;
-  p.store.clearNotice();
-  p.net.override = (b) => (b.action === "syncTodos" ? { ok: false, error: "planner_unreadable", message: "Couldn’t read the planner sheet." } : null);
-  r = await p.store.syncTodos();
-  assert.equal(r.ok, false);
-  assert.equal(r.message, "Couldn’t read the planner sheet.");
-  assert.equal(p.store.state.notice, "Couldn’t read the planner sheet.");
-});
-
-test("tickTodo shows the tick at once, keeps what the backend saved, and Undo puts it back", async () => {
-  const p = phone({ seed: bookSeed(2) });
-  await p.store.boot();
-  await p.store.syncTodos();
-  const token = p.store.tickTodo("1");
-  let t = byId(p.store.state.todos, "1");
-  assert.equal(t.tickedBy, "Mo");
-  assert.equal(t.done, true);
-  assert.equal(t.pending, true);
-  assert.equal(p.store.state.lastChange.kind, "todo");
-  assert.equal(p.store.state.lastChange.action, "tick");
-  await p.store.idle();
-  t = byId(p.store.state.todos, "1");
-  assert.equal(t.pending, undefined);
-  assert.equal(t.status, "Booked", "the planner took it");
-  assert.deepEqual(p.net.sent.filter((b) => b.action === "tickTodo").map((b) => b.args), [{ id: "1" }]);
-
-  await p.store.undo(token);
-  await p.store.idle();
-  t = byId(p.store.state.todos, "1");
-  assert.equal(t.tickedBy, "");
-  assert.equal(t.done, false);
-});
-
-test("tickTodo refused rolls back with the backend's sentence; offline it says not saved", async () => {
-  const p = phone({ seed: bookSeed(2) });
-  await p.store.boot();
-  await p.store.syncTodos();
-  await backend(p.fake, "tickTodo", { id: "2" }, "Izzah"); // another phone ticked it first
-  p.store.tickTodo("2");
-  await p.store.idle();
-  assert.equal(p.store.state.notice, "That one is already done.");
-  assert.equal(byId(p.store.state.todos, "2").tickedBy, "", "rolled back to what this phone knew");
-
-  p.store.clearNotice();
-  p.net.knownOffline = true;
-  p.store.tickTodo("1");
-  await p.store.idle();
-  assert.equal(p.store.state.notice, "No signal. That wasn’t saved.");
-  assert.equal(byId(p.store.state.todos, "1").tickedBy, "");
-  assert.equal(p.fake.tables.Todos.find((r) => r.id === "1").ticked_by, "");
-});
-
-test("claimTodo: I’ll do it, take it over, hand it back, each with its own words on the undo bar", async () => {
-  const p = phone({ seed: bookSeed(2) });
-  await p.store.boot();
-  await p.store.syncTodos();
-  p.store.claimTodo("1", true);
-  assert.equal(byId(p.store.state.todos, "1").claimedBy, "Mo");
-  assert.equal(p.store.state.lastChange.action, "claim");
-  await p.store.idle();
-  p.store.claimTodo("1", false);
-  assert.equal(byId(p.store.state.todos, "1").claimedBy, "");
-  assert.equal(p.store.state.lastChange.action, "unclaim");
-  await p.store.idle();
-  await backend(p.fake, "claimTodo", { id: "2", on: true }, "Izzah");
-  await p.store.refresh();
-  p.store.claimTodo("2", true);
-  assert.equal(p.store.state.lastChange.action, "takeover");
-  await p.store.idle();
-  assert.equal(byId(p.store.state.todos, "2").claimedBy, "Mo");
-  assert.deepEqual(p.net.sent.filter((b) => b.action === "claimTodo").map((b) => b.args), [{ id: "1", on: true }, { id: "1", on: false }, { id: "2", on: true }]);
-});
-
-test("syncTodos: when a later call of a long pull fails, what the earlier one brought in is kept, and the failure is said", async () => {
-  const p = phone({ seed: bookSeed(2) });
-  await p.store.boot();
-  let calls = 0;
-  p.net.override = (b) => {
-    if (b.action !== "syncTodos") return null;
-    calls += 1;
-    p.net.failing.add("syncTodos"); // the next one has no signal
-    return { ok: true, rev: 0, data: { todos: [{ id: "9", item: "Made-up first part", bookBy: "", status: "", note: "", link: "", claimedBy: "", tickedBy: "", tickedAt: "", done: false }], pulledAt: "", more: true, problems: [] } };
-  };
-  const r = await p.store.syncTodos({ force: true });
-  assert.equal(calls, 1);
-  assert.equal(r.ok, false);
-  assert.deepEqual(p.store.state.todos.map((t) => t.id), ["9"], "the first answer is kept");
-  assert.equal(p.store.state.notice, "Couldn’t confirm that. Checking…");
-});
 
 // ---------- payments pulled on their own (Mo, 2026-12-03) ----------
 // autoPayments(): while the app is open, at most once every 10 minutes per
@@ -2598,118 +2395,6 @@ const autoPhone = (over = {}) => {
   return { at, ...phone({ fake, clock: () => at.ms }) };
 };
 const autoCalls = (p) => p.net.sent.filter((b) => b.action === "syncPayments");
-
-test("autoPayments: brings new planner payments in, says so, and the lines are on the receipt", async () => {
-  const p = autoPhone();
-  await p.store.boot();
-  const r = await p.store.autoPayments();
-  assert.equal(r.added, 1);
-  assert.deepEqual(autoCalls(p).map((b) => b.args), [{ auto: true }]);
-  assert.equal(p.store.state.notice, "Added 1 payment from the planner.");
-  assert.ok(p.store.state.expenses.some((e) => e.title === "Rail pass"));
-  assert.equal(p.store.state.paymentsPulledAt, new Date(NOW).toISOString(), "load carries when it last pulled");
-});
-
-test("paymentProblems arrives in state from load, and is empty when the backend has none", async () => {
-  const none = phone({ seed: SEED });
-  await none.store.boot();
-  assert.deepEqual(none.store.state.paymentProblems, { at: "", list: [], more: 0 });
-  const seeded = { at: "2026-12-28T01:00:00.000Z", list: [{ id: "Q1", message: "Why.", row: 9, what: "Thing" }], more: 2 };
-  const p = phone({ seed: { ...SEED, paymentProblems: seeded } });
-  await p.store.boot();
-  assert.deepEqual(p.store.state.paymentProblems, seeded);
-});
-
-test("autoPayments: a pull with only problems raises no notice, but the list is brought up to date", async () => {
-  const p = autoPhone({ planner: [PHEAD, prow({ ...PX7, split_type: "personal" })] });
-  await p.store.boot();
-  assert.deepEqual(p.store.state.paymentProblems.list, []);
-  const loads = p.net.sent.filter((b) => b.action === "load").length;
-  const r = await p.store.autoPayments();
-  assert.equal(r.added, 0);
-  assert.equal(r.problems.length, 1);
-  assert.equal(p.store.state.notice, null, "no notice");
-  assert.equal(p.net.sent.filter((b) => b.action === "load").length, loads + 1, "it reloads to get the list");
-  assert.deepEqual(p.store.state.paymentProblems.list.map((x) => [x.id, x.row, x.what]), [["X7", 2, "Rail pass"]]);
-  // The same problem on the next pull is not news: no reload.
-  p.at.ms += 10 * 60 * 1000;
-  const again = p.net.sent.filter((b) => b.action === "load").length;
-  await p.store.autoPayments();
-  assert.equal(p.net.sent.filter((b) => b.action === "load").length, again);
-  assert.equal(p.store.state.notice, null);
-});
-
-test("autoPayments: sooner than 10 minutes after a pull sends nothing; at 10 minutes it asks again", async () => {
-  const p = autoPhone();
-  await p.store.boot();
-  await p.store.autoPayments();
-  p.at.ms += 9 * 60 * 1000;
-  assert.equal(await p.store.autoPayments(), null);
-  assert.equal(autoCalls(p).length, 1);
-  p.at.ms += 60 * 1000;
-  await p.store.autoPayments();
-  assert.equal(autoCalls(p).length, 2);
-});
-
-test("autoPayments: nothing new is said nowhere and does not reload", async () => {
-  const p = autoPhone({ planner: [PHEAD] });
-  await p.store.boot();
-  const loads = p.net.sent.filter((b) => b.action === "load").length;
-  p.store.clearNotice && p.store.clearNotice();
-  const before = p.store.state.notice;
-  await p.store.autoPayments();
-  assert.equal(autoCalls(p).length, 1);
-  assert.equal(p.store.state.notice, before, "no notice");
-  assert.equal(p.net.sent.filter((b) => b.action === "load").length, loads, "no reload");
-});
-
-test("autoPayments: another phone pulled a minute ago (load says so): this one waits", async () => {
-  const p = autoPhone();
-  await backend(p.fake, "syncPayments", {});
-  p.at.ms += 60 * 1000;
-  await p.store.boot();
-  assert.equal(await p.store.autoPayments(), null);
-  assert.equal(autoCalls(p).length, 0);
-});
-
-test("autoPayments: no planner linked, offline, or a refusal: nothing said", async () => {
-  const p = phone({ seed: SEED });
-  await p.store.boot();
-  assert.equal(await p.store.autoPayments(), null);
-  assert.equal(p.net.sent.filter((b) => b.action === "syncPayments").length, 0, "not linked: nothing sent");
-
-  const q = autoPhone();
-  await q.store.boot();
-  const before = q.store.state.notice;
-  q.net.knownOffline = true;
-  assert.equal(await q.store.autoPayments(), null);
-  assert.equal(autoCalls(q).length, 0, "offline: nothing sent");
-  q.net.knownOffline = false;
-  q.net.override = (b) => (b.action === "syncPayments" ? { ok: false, error: "planner_unreadable", message: "Couldn’t read the planner sheet." } : null);
-  assert.equal(await q.store.autoPayments(), null);
-  assert.equal(q.store.state.notice, before, "a refusal is not said");
-});
-
-test("autoPayments: one at a time", async () => {
-  const p = autoPhone();
-  await p.store.boot();
-  const release = p.net.hold("syncPayments");
-  const first = p.store.autoPayments();
-  assert.equal(await p.store.autoPayments(), null, "a second call while one runs sends nothing");
-  release();
-  await first;
-  assert.equal(autoCalls(p).length, 1);
-});
-
-test("autoPayments: never replaces a notice already showing (review, 2026-12-03)", async () => {
-  const p = autoPhone();
-  await p.store.boot();
-  p.store.notify("No signal. That wasn’t saved.");
-  const r = await p.store.autoPayments();
-  assert.equal(r.added, 1);
-  assert.equal(p.store.state.notice, "No signal. That wasn’t saved.");
-  assert.ok(p.store.state.expenses.some((e) => e.title === "Rail pass"), "the line still came in");
-});
 
 // ---------- busy(): nothing may be dropped by a reload (review, 2026-12-03) ----------
 
@@ -3047,4 +2732,13 @@ test("a Trip tab set up for another trip: boot keeps the backend's sentence in t
   await p.store.boot();
   assert.equal(p.store.state.tripProblem, null);
   assert.equal(p.store.state.status, "ready");
+});
+
+test("no planner: load says none is linked, and the store's own pulls send nothing", async () => {
+  const p = phone();
+  await p.store.boot();
+  assert.equal(p.store.state.plannerLinked, false);
+  assert.deepEqual(p.store.state.todos, []);
+  assert.equal(await p.store.autoPayments(), null);
+  assert.equal(p.net.sent.some((b) => /^(syncPayments|syncTodos|tickTodo|claimTodo)$/.test(b.action)), false);
 });

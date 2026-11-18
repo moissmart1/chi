@@ -6,14 +6,11 @@
 // back the way Sheets hands them back (a stored "'=x" reads as "=x").
 //
 // seed = { expenses?, payments?, people?, addPeople?, days?, stops?, stays?,
-// planner?, plannerId? } (see constraints R6). addPeople: more People rows
-// ({ name, initials, ... }) after the seed's Mo and Izzah. planner: the planner sheet's Payments tab
-// as rows (row 1 its column names; null: the planner has no Payments tab);
-// plannerId: PLANNER_ID in Script Properties; paymentProblems: { at, list, more }, kept as PAYMENT_PROBLEMS; missingColumns: ["Tab.column", ...]
-// an older Sheet lacks until migrate (ensureColumns_) adds them; missingTabs:
-// ["Tab", ...] an older Sheet lacks altogether until migrate adds them;
-// plannerTabs: { "Book Now": rows, "Change Log": rows } the planner's other
-// tabs, as Sheets hands them back from A1 (a tab left out is not there).
+// missingColumns?, missingTabs? } (see constraints R6). addPeople: more
+// People rows ({ name, initials, ... }) after the seed's Mo and Izzah;
+// missingColumns: ["Tab.column", ...] an older Sheet lacks until migrate
+// (ensureColumns_) adds them; missingTabs: ["Tab", ...] an older Sheet lacks
+// altogether until migrate adds them.
 // stops and stays are arrays in API shape (deleted: true marks
 // one deleted), each logged as added by Mo; days is a per-date patch in the
 // Sheet's own column names.
@@ -28,22 +25,7 @@
 // request the connector makes reaches handle_), fake.primitives (the in-memory helpers), fake.props (Script
 // Properties), fake.propReads (every Script Properties key read, in order),
 // fake.setRate(rate, source) (today's rate and where it came from: "live",
-// "last" or "fallback"; default 0.72, "live"), fake.planner ({ rows, fails,
-// reads }: the planner's Payments tab; fails makes reading it throw, with the
-// planner's id in the error's text; reads counts the reads; also tabs (the
-// other tabs by name, which its writes change as Sheets would), writes (every
-// write the planner received, in order: { kind: "cell", tab, cell, value } or
-// { kind: "append", tab, headerRow, values }), cellFails and appendFails (make
-// that kind of write throw, received as nothing; cellFails may also be a
-// function (cell, value) => boolean), lockFails (the planner lock
-// can't be had), calls (every planner read or write, in order: { op, tab,
-// appLock, plannerLock }: whether the app's lock and the planner lock were
-// held at that moment), between (test-only: a function run once, just
-// before the planner lock is taken: another hand editing the planner),
-// formulas and spilled ({ tab: { cell: ... } }: cells the planner computes,
-// by a formula in the cell or one spilled into it) and formulaFails (the
-// computed check's read fails)),
-// fake.tableReads
+// "last" or "fallback"; default 0.72, "live"), fake.tableReads
 // (readTable_ calls per tab).
 
 const fs = require("fs");
@@ -104,18 +86,7 @@ function createFakeBackend(seed, { clock, lockFails, keepsApostrophe = false } =
   // Seeded Log rows are not writes, so REV starts at 0 even when seeded (an
   // unset REV would otherwise fall back to the Log's highest id).
   const props = { TRIP_KEY, CLAUDE_TOKEN, REV: "0" };
-  if (seed && seed.plannerId) props.PLANNER_ID = seed.plannerId;
-  // paymentsPulledAt: when the planner's payments were last pulled (as if a phone just had).
-  if (seed && seed.paymentsPulledAt) props.PAYMENTS_PULLED_AT = seed.paymentsPulledAt;
-  // paymentProblems: the last pull's list as load hands it back ({ at, list, more }).
-  if (seed && seed.paymentProblems) props.PAYMENT_PROBLEMS = JSON.stringify(seed.paymentProblems);
-  const planner = {
-    rows: seed && seed.planner !== undefined ? copy(seed.planner) : [], fails: false, reads: 0,
-    tabs: copy((seed && seed.plannerTabs) || {}), writes: [], cellFails: false, appendFails: false,
-    lockFails: false, calls: [], between: null, formulas: {}, spilled: {}, formulaFails: false,
-  };
-  const held = { app: false, planner: false };
-  const plannerCall = (op, tab, cell) => planner.calls.push({ op, tab, ...(cell ? { cell } : {}), appLock: held.app, plannerLock: held.planner });
+  const held = { app: false };
   const missing = new Set((seed && seed.missingColumns) || []);
   const missingTabs = new Set((seed && seed.missingTabs) || []);
   const tableReads = {};
@@ -224,22 +195,6 @@ function createFakeBackend(seed, { clock, lockFails, keepsApostrophe = false } =
         held.app = was;
       }
     },
-    // Same as Env.js: the planner lock, a different lock; null when busy.
-    withPlannerLock_(fn) {
-      if (typeof planner.between === "function") {
-        const f = planner.between;
-        planner.between = null;
-        f();
-      }
-      if (planner.lockFails) return null;
-      const was = held.planner;
-      held.planner = true;
-      try {
-        return fn();
-      } finally {
-        held.planner = was;
-      }
-    },
     clockMs_: () => Date.now() + lockWaited,
     getRate_: () => rate.rate,
     getRateInfo_: () => ({ rate: rate.rate, source: rate.source }),
@@ -252,79 +207,6 @@ function createFakeBackend(seed, { clock, lockFails, keepsApostrophe = false } =
     claudeToken_: () => (Object.prototype.hasOwnProperty.call(props, "CLAUDE_TOKEN") && props.CLAUDE_TOKEN) || null,
     ensureClaudeToken_() {
       if (!primitives.claudeToken_()) props.CLAUDE_TOKEN = crypto.randomBytes(16).toString("hex");
-    },
-    // Same as Env.js: PLANNER_ID, and the planner's Payments tab as the
-    // Sheets API hands it back. Reading throws when it cannot read.
-    plannerId_: () => (Object.prototype.hasOwnProperty.call(props, "PLANNER_ID") && props.PLANNER_ID) || null,
-    setPlannerId_(id) {
-      props.PLANNER_ID = String(id);
-    },
-    plannerRows_() {
-      plannerCall("read", "Payments");
-      planner.reads++;
-      if (planner.fails) throw new Error("boom: Requested entity was not found: " + props.PLANNER_ID);
-      return planner.rows === null ? null : copy(planner.rows);
-    },
-    // Same as Env.js: another planner tab from A1, null when it is not there.
-    plannerTab_(tab) {
-      plannerCall("read", tab);
-      planner.reads++;
-      if (planner.fails) throw new Error("boom: Requested entity was not found: " + props.PLANNER_ID);
-      return Object.prototype.hasOwnProperty.call(planner.tabs, tab) ? copy(planner.tabs[tab]) : null;
-    },
-    // Same as Env.js: one cell ("E4") of a planner tab, written as given (RAW).
-    plannerSetCell_(tab, cell, value) {
-      plannerCall("cell", tab, cell);
-      const fails = typeof planner.cellFails === "function" ? planner.cellFails(cell, value) : planner.cellFails;
-      if (fails || !planner.tabs[tab]) throw new Error("boom: The caller does not have permission " + props.PLANNER_ID);
-      const m = /^([A-Z]+)(\d+)$/.exec(cell);
-      if (!m) throw new Error("bad cell " + cell);
-      const col = m[1].split("").reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0) - 1;
-      const rows = planner.tabs[tab];
-      const r = Number(m[2]) - 1;
-      while (rows.length <= r) rows.push([]);
-      while (rows[r].length <= col) rows[r].push("");
-      rows[r][col] = value;
-      // A plain value entered in the cell replaces any formula it held, as Sheets does.
-      if (planner.formulas[tab]) delete planner.formulas[tab][cell];
-      planner.writes.push({ kind: "cell", tab, cell, value: copy(value) });
-    },
-    // Same as Env.js: whether the planner computes a cell (row: the sheet's
-    // row number, col: 0-based): a formula in it (planner.formulas[tab][cell]
-    // = "=..."), or a value spilled into it by an array formula placed
-    // elsewhere (planner.spilled[tab][cell] = true). A read that fails is
-    // unknown (null), as in Env.js: the app then writes nothing and retries.
-    plannerCellComputed_(tab, row, col) {
-      const cell = P.colLetter(col) + row;
-      plannerCall("formula", tab, cell);
-      if (planner.fails || planner.formulaFails) return null;
-      return Boolean((planner.formulas[tab] || {})[cell]) || Boolean((planner.spilled[tab] || {})[cell]);
-    },
-    // Same as Env.js: one row appended under the table whose header is
-    // headerRow, as Sheets' own append with INSERT_ROWS does: a new row just
-    // after the table's first run of filled rows below the header (so a blank
-    // gap inside the sheet attracts it), inserted, never written over a row.
-    // Like Sheets, it writes from the first non-empty cell of the header row
-    // inside the given range, whatever column the range starts at.
-    plannerAppendRow_(tab, headerRow, firstCol, values) {
-      plannerCall("append", tab);
-      if (planner.appendFails || !planner.tabs[tab]) throw new Error("boom: The caller does not have permission " + props.PLANNER_ID);
-      const rows = planner.tabs[tab];
-      let at = headerRow + 1;
-      while (at <= rows.length && rows[at - 1] && rows[at - 1].some((c) => c !== "")) at++;
-      while (rows.length < at - 1) rows.push([]);
-      const head = rows[headerRow - 1] || [];
-      let start = firstCol;
-      while (start <= firstCol + values.length - 1 && (head[start] === undefined || head[start] === "")) start++;
-      if (start > firstCol + values.length - 1) start = firstCol;
-      rows.splice(at - 1, 0, new Array(start).fill("").concat(copy(values)));
-      planner.writes.push({ kind: "append", tab, headerRow, values: copy(values) });
-    },
-    // Same as Env.js: now in Toronto, "YYYY-MM-DD HH:MM ET", by this backend's clock.
-    torontoNow_() {
-      const parts = {};
-      for (const p of new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(now()))) parts[p.type] = p.value;
-      return parts.year + "-" + parts.month + "-" + parts.day + " " + parts.hour + ":" + parts.minute + " ET";
     },
   };
   Object.assign(world, primitives);
@@ -393,7 +275,6 @@ function createFakeBackend(seed, { clock, lockFails, keepsApostrophe = false } =
     };
   };
   fake.props = props;
-  fake.planner = planner;
   fake.tableReads = tableReads;
   fake.sheetCalls = sheetCalls;
   fake.propReads = propReads;
