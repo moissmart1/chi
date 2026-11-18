@@ -86,9 +86,21 @@ if (live === want) {
 
 // 3 ---------------------------------------------------------------------------
 if (migrate && !check) {
-  const r = await call(cfg.apiUrl, env.CHI_KEY, "migrate");
-  if (!r || r.ok !== true) stop("migrate did not succeed (" + ((r && (r.message || r.error)) || "no answer") + ").", "The site was NOT published.");
-  step("backend: migrate ran");
+  // Asked until it answers that nothing is left to add. Right after a deploy a
+  // request can still land on the old version, whose migrate adds nothing and
+  // says ok (seen on 2026-11-18: the new columns only went in on a second call).
+  let added = [];
+  let settled = false;
+  for (let i = 0; i < 6 && !settled; i++) {
+    const r = await call(cfg.apiUrl, env.CHI_KEY, "migrate");
+    if (!r || r.ok !== true) stop("migrate did not succeed (" + ((r && (r.message || r.error)) || "no answer") + ").", "The site was NOT published.");
+    const now = (r.data && r.data.added) || [];
+    added = added.concat(now);
+    settled = i > 0 && now.length === 0;
+    if (!settled) await sleep(5000);
+  }
+  if (!settled) stop("migrate kept adding columns after six calls.", "Look at the Sheet. The site was NOT published.");
+  step("backend: migrate ran" + (added.length ? ", added " + added.join(", ") : ", nothing to add"));
 }
 const load = await call(cfg.apiUrl, env.CHI_KEY, "load").catch(() => null);
 if (!load || load.ok !== true || !Array.isArray(load.data.days) || !load.data.days.length || !Array.isArray(load.data.stops)) {
