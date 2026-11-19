@@ -5,6 +5,7 @@
 
 import { dateIn } from "./time.js";
 import { tripCents } from "./money.js";
+import { metres, walkMinutes, distanceText } from "./geo.js";
 
 const str = (v) => (typeof v === "string" ? v.trim() : "");
 
@@ -125,6 +126,73 @@ export function nextLine(stop, minutes) {
     return minutes >= leave ? "Leave now." : "Leave by " + clock(leave) + ", in " + span(leave - minutes) + ".";
   }
   return "Next, in " + span(at - minutes) + ".";
+}
+
+// ---- where you are (js/where.js gives the position; it never leaves the phone) ----
+// Ported from the Japan app (its leave-by, nearest stop, lodging distance and
+// stamp in the place). No screen uses these yet.
+
+// Past this a straight line says nothing (you would take a train): the
+// leave-by and the stops' distances fall back to today's lines.
+export const NEAR_M = 3000;
+// The stamp is pressed "in the place" within this of the day's coordinates.
+export const PLACE_M = 15000;
+
+// Leave by, from where you are: the next stop's distance line and its leave
+// line from the walking minutes, or null when today's line stands (no time,
+// already started, no coordinates, no usable position, or over NEAR_M).
+// `here`: a usable position (js/where.js current()), or null.
+// -> { dist: "1.2 km · 20 min on foot", lead, late }
+export function hereLine(stop, minutes, here) {
+  const at = minutesOf(stop && stop.time);
+  if (at === null || !here || minutes >= at) return null;
+  const m = metres(here, stop);
+  if (!Number.isFinite(m) || m > NEAR_M) return null;
+  const walk = walkMinutes(m);
+  const spare = at - walk - minutes;
+  const dist = distanceText(m) + " · " + walk + " min on foot";
+  if (spare > 5) return { dist, lead: "Leave by " + clock(at - walk) + ", in " + span(spare) + ".", late: false };
+  if (spare > 0) return { dist, lead: "Leave now. " + spare + " min to spare.", late: false };
+  if (spare === 0) return { dist, lead: "Leave now.", late: false };
+  return { dist, lead: "About " + span(-spare) + " late. Leave now.", late: true };
+}
+
+// A loose day: each stop still to come with no time and coordinates within
+// NEAR_M gets its distance; the nearest is marked (near: true) when two or
+// more have one. The order never changes. -> { [id]: { dist, near } }
+export function nearStops(dayStops, here) {
+  const out = {};
+  if (!here) return out;
+  let best = null;
+  for (const s of dayStops || []) {
+    if (!s || s.deleted || minutesOf(s.time) !== null) continue;
+    const m = metres(here, s);
+    if (!Number.isFinite(m) || m > NEAR_M) continue;
+    out[s.id] = { dist: distanceText(m) + " · " + walkMinutes(m) + " min on foot", near: false, m };
+    if (!best || m < out[best].m) best = s.id;
+  }
+  const ids = Object.keys(out);
+  if (ids.length > 1) out[best].near = true;
+  for (const id of ids) delete out[id].m;
+  return out;
+}
+
+// Past this the card says nothing of how far (another city, another day's stay).
+export const STAY_FAR_M = 50000;
+
+// "2.4 km from here" for the stay card, or "".
+export function stayDistance(stay, here) {
+  if (!here || !stay) return "";
+  const m = metres(here, stay);
+  return Number.isFinite(m) && m <= STAY_FAR_M ? distanceText(m) + " from here" : "";
+}
+
+// Whether a stamp for this day is pressed in the place: a usable position
+// within PLACE_M of the day's coordinates.
+export function inPlace(day, here) {
+  if (!here || !day) return false;
+  const m = metres(here, day);
+  return Number.isFinite(m) && m <= PLACE_M;
 }
 
 export function stayFor(stays, date) {
