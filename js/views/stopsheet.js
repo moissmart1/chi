@@ -19,9 +19,16 @@
 // removes, the sheet says so and keeps what was typed. The fields are
 // words, so the phone's own keyboard is used; the field being typed in is
 // kept in view above it. Nothing here depends on the time.
+//
+// The ticket (js/views/ticketpart.js), once migrate has made the ticket tabs
+// (store.state.ticketsReady; until then the sheet is exactly as it was): the
+// four facts are stop fields, saved with the rest; picked pictures are sent
+// after the stop is saved, one by one, each with its progress. One refused
+// keeps the sheet open with the reason; the others are saved.
 
 import { dayHead } from "../format.js";
 import { newId } from "../time.js";
+import { mountTicketPart } from "./ticketpart.js";
 
 const NO_SIGNAL = "No signal. Stops need a connection.";
 const GONE = "Someone removed this stop, so it can’t be saved.";
@@ -46,6 +53,7 @@ const MARKUP = `
   <label class="st-sw"><span>The time can’t slip</span><input id="stFixed" type="checkbox" role="switch"></label>
   <label class="st-f"><span>Place name or pasted Maps link</span><input id="stPlace" maxlength="200" autocomplete="off" enterkeyhint="next"></label>
   <label class="st-f"><span>Link to a ticket or confirmation</span><input id="stLink" type="url" inputmode="url" maxlength="500" autocomplete="off" enterkeyhint="done"></label>
+  <div id="stTix" hidden></div>
   <p class="st-msg" id="stMsg" role="status"></p>
   <div class="st-btns"><button type="button" id="stDel" hidden>Remove</button><button type="button" id="stSave" disabled>Add stop</button></div>
 </div>`;
@@ -82,7 +90,7 @@ function problem(v) {
   return null;
 }
 
-export function mountStopSheet(root, store) {
+export function mountStopSheet(root, store, { keep = null } = {}) {
   const scrim = el("div", "scrim");
   scrim.id = "stopScrim";
   scrim.hidden = true;
@@ -106,6 +114,9 @@ export function mountStopSheet(root, store) {
     title: $("stWhat"), time: $("stTime"), detail: $("stDetail"), gettingThere: $("stGo"), travelMin: $("stMin"),
     fixed: $("stFixed"), place: $("stPlace"), link: $("stLink"),
   };
+  const tixBox = $("stTix");
+  const part = keep ? mountTicketPart(tixBox, store, keep) : null;
+  let withTix = false; // the Ticket part is shown (migrate has run): its facts are part of the stop
 
   let mode = null; // "add" or "edit" while open
   let date = null; // the day the stop is on
@@ -134,6 +145,7 @@ export function mountStopSheet(root, store) {
       fixed: f.fixed.checked,
       place: f.place.value.trim(),
       link: f.link.value.trim(),
+      ...(withTix ? part.read() : {}),
     };
   }
 
@@ -149,6 +161,7 @@ export function mountStopSheet(root, store) {
       fixed: stop.fixed === true,
       place: str(stop.place).trim(),
       link: str(stop.link).trim(),
+      ...(withTix ? part.fieldsOf(stop) : {}),
     };
   }
 
@@ -162,6 +175,12 @@ export function mountStopSheet(root, store) {
     f.fixed.checked = stop.fixed === true;
     f.place.value = str(stop.place);
     f.link.value = str(stop.link);
+    withTix = !!part && store.state.ticketsReady === true;
+    tixBox.hidden = !withTix;
+    // The keyboard's key says what Enter does: on to the ticket's facts, or done.
+    f.link.enterKeyHint = withTix ? "next" : "done";
+    if (part) part.fill(withTix ? stop : {});
+    was = null;
     was = read();
   }
 
@@ -175,7 +194,7 @@ export function mountStopSheet(root, store) {
   // put back counts as unchanged).
   function changed() {
     const now = read();
-    return Object.keys(now).some((k) => now[k] !== was[k]);
+    return Object.keys(now).some((k) => now[k] !== was[k]) || (withTix && part.changed());
   }
 
   // Save and Remove, and the line above them: saving or checking, no
@@ -186,6 +205,7 @@ export function mountStopSheet(root, store) {
     if (!isOpen()) return;
     const busy = phase !== null;
     for (const field of Object.values(f)) field.disabled = busy;
+    if (withTix) part.setBusy(busy);
     sheet.classList.toggle("is-saving", phase === "saving");
     done.disabled = phase === "saving";
     save.textContent = phase === "saving" ? SAVING : saveWord;
@@ -193,6 +213,10 @@ export function mountStopSheet(root, store) {
       save.disabled = true;
       del.disabled = true;
       msg.textContent = phase === "checking" ? CHECKING : "";
+      return;
+    }
+    if (withTix && part.reading()) {
+      save.disabled = true;
       return;
     }
     const off = !online();
@@ -273,6 +297,7 @@ export function mountStopSheet(root, store) {
     scrim.hidden = true;
     root.classList.remove("stop-open");
     sheet.style.removeProperty("--kb");
+    if (part) part.clear();
     if (sheet.contains(document.activeElement)) document.activeElement.blur();
     if (restoreFocus !== true) return;
     const edit = id ? root.querySelector('.r[data-id="' + CSS.escape(id) + '"] .r-edit') : null;
@@ -316,6 +341,10 @@ export function mountStopSheet(root, store) {
       const patch = diff(was, now);
       if (Object.keys(patch).length) token = store.updateStop(stopId, patch, { quiet: true, onUnsure });
       else if (current()) {
+        if (withTix && part.pending()) {
+          pictures(stopId, mine);
+          return;
+        }
         phase = null;
         close();
         return;
@@ -346,12 +375,37 @@ export function mountStopSheet(root, store) {
           send(sentAdd);
           return;
         }
+        if (withTix && part.pending() && out.item) {
+          // The stop is saved: now it can hold pictures (a new one has its id now).
+          mode = "edit";
+          stopId = out.item.id;
+          was = fieldsOf(out.item);
+          pictures(out.item.id, mine);
+          return;
+        }
         close();
         return;
       }
       if (out && out.reason === "refused") refused = out.message;
       else unsaved = true;
       update();
+    });
+  }
+
+  // Sends the picked pictures, one by one (the sheet stays saving meanwhile).
+  // All saved (or waiting on the phone for signal): it closes. One refused:
+  // it stays open with the reason by that picture; Save tries it again.
+  function pictures(id, mine) {
+    phase = "saving";
+    update();
+    part.upload(id).then((res) => {
+      if (mine !== session) return;
+      phase = null;
+      if (res.failed) {
+        update();
+        return;
+      }
+      close();
     });
   }
 
@@ -387,6 +441,8 @@ export function mountStopSheet(root, store) {
   }
 
   f.title.addEventListener("input", update);
+  // A picture picked or taken off (the Ticket part says so with an input event).
+  tixBox.addEventListener("input", update);
   // Correcting any field takes the reason away.
   const edited = () => {
     if (!refused) return;
@@ -413,15 +469,31 @@ export function mountStopSheet(root, store) {
   // The keyboard's Next, in a one-line field, goes to the next field (the
   // directions box among them); on the last one it puts the keyboard away.
   // Enter in the directions box is its own (a new line).
-  const order = [f.title, f.time, f.detail, f.gettingThere, f.travelMin, f.place, f.link];
+  const order = [f.title, f.time, f.detail, f.gettingThere, f.travelMin, f.place, f.link, ...(part ? part.inputs() : [])];
   sheet.addEventListener("keydown", (ev) => {
-    const i = order.indexOf(ev.target);
+    // Only the fields that show (the ticket's facts are hidden before migrate).
+    const shown = order.filter((x) => !x.closest("[hidden]"));
+    const i = shown.indexOf(ev.target);
     if (ev.key !== "Enter" || i < 0 || ev.isComposing || ev.target === f.gettingThere) return;
     ev.preventDefault();
-    if (order[i + 1]) order[i + 1].focus();
+    if (shown[i + 1]) shown[i + 1].focus();
     else ev.target.blur();
   });
-  store.subscribe(render);
+  // The trip was taken off this phone: the sheet closes, even mid-save, and
+  // the stop it held (with its ticket's facts and pictures) is taken out of it.
+  function wipe() {
+    phase = null;
+    close(false);
+    fill({});
+    head.textContent = "";
+    dayLine.replaceChildren();
+    msg.textContent = "";
+    date = null;
+  }
+  store.subscribe((s) => {
+    if (s && s.status === "nokey") wipe();
+    else render();
+  });
 
   return { add, edit, close: (restoreFocus) => close(restoreFocus), isOpen };
 }

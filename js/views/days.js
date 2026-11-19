@@ -11,6 +11,12 @@
 // - onAllDays(): the counter was tapped. onStay(stayId): a ticket's stay row
 //   was tapped. onAddStop(date): a ticket's ＋ Add a stop was tapped.
 //   onStop(stopId): an open stop's Edit was tapped.
+// - tickets: { info(stop, state), keep, subscribe(fn) } (a stop's ticket as
+//   js/views/stubs.js tixInfo draws it, the picture keep, and a hook for a
+//   picture arriving), or null; onTicket(stopId, button): the big stub on an
+//   open stop (Show ticket) was tapped.
+// - The trip taken off this phone (status "nokey": a refused key, Forget
+//   this phone): every check is taken out of the page, tickets and all.
 // - held(): true while a sheet over Days is in use (the stop sheet): coming
 //   back to the screen then does not move the rail (R32).
 // - goDay(index, smooth): bring that day's ticket into view. day(): the date
@@ -132,7 +138,7 @@ function patchTicket(old, fresh) {
   return old;
 }
 
-export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = () => {}, onStop = () => {}, onAddStop = () => {}, onStampBook = () => {}, held = () => false } = {}) {
+export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = () => {}, onStop = () => {}, onAddStop = () => {}, onStampBook = () => {}, held = () => false, tickets = null, onTicket = () => {} } = {}) {
   const count = el("button", "bar-t");
   count.type = "button";
   count.id = "dayCount";
@@ -389,6 +395,12 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
       onAddStop(add.dataset.date);
       return;
     }
+    const show = ev.target.closest(".r-tk");
+    if (show) {
+      const r = show.closest(".r[data-id]");
+      if (r) onTicket(r.dataset.id, show);
+      return;
+    }
     const edit = ev.target.closest(".r-edit");
     if (edit) {
       const r = edit.closest(".r[data-id]");
@@ -458,8 +470,32 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
     return on ? b.openToday : "";
   }
 
+  // The trip was taken off this phone: nothing of it stays in the page.
+  // Merely loading or offline is not this: those keep what is drawn.
+  function wipe() {
+    dates = [];
+    states = [];
+    ahead = [];
+    sigs.clear();
+    cur = -1;
+    opened = false;
+    seen = null;
+    autoId = null;
+    openId = null;
+    chosen = false;
+    rail.replaceChildren();
+    pager.replaceChildren();
+    count.replaceChildren();
+    count.hidden = true;
+    barDate.textContent = "";
+  }
+
   function render(s) {
     showDemo();
+    if (s.status === "nokey") {
+      if (dates.length || rail.firstChild) wipe();
+      return;
+    }
     const stampToday = showStamps(s);
     const ready = s.status === "ready" && s.trip && s.trip.start && list(s.days).length;
     if (!ready) {
@@ -528,10 +564,19 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
         // Today's stamp is open and not yet pressed: the ticket says so.
         stampOpen: stampToday === day.date,
       };
+      // The stops with a ticket, stapled to their lines. None, no key at all.
+      if (tickets) {
+        const tix = {};
+        for (const st of dayStops) {
+          const m = tickets.info(st, s);
+          if (m) tix[st.id] = m;
+        }
+        if (Object.keys(tix).length) model.tix = tix;
+      }
       const sig = JSON.stringify(model);
       if (sigs.get(day.date) === sig) return;
       sigs.set(day.date, sig);
-      const fresh = ticketEl(model);
+      const fresh = ticketEl(model, { keep: tickets ? tickets.keep : null });
       for (const r of fresh.querySelectorAll(".r[data-id]")) drawn.set(r, r.outerHTML);
       const pg = rail.children[i];
       const old = pg.firstElementChild;
@@ -612,6 +657,8 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
 
   render(store.state);
   store.subscribe(render);
+  // A picture reaching this phone makes its stub solid.
+  if (tickets && tickets.subscribe) tickets.subscribe(() => render(store.state));
   // Starting or stopping a demo is a deliberate jump: the rail goes to the
   // day the clock now says is today, whatever R32 would otherwise hold.
   let demoWas = clock.demoDay();

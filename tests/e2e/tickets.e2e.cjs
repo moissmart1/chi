@@ -1,5 +1,5 @@
-// Ticket pictures on the phone, before any ticket screen exists (ported from
-// the Japan app's version 29; the Chicago screens come later). What these
+// Ticket pictures on the phone (ported from the Japan app's version 29; the
+// screens themselves are tested in tix-*.e2e.cjs). What these
 // cases hold: after a load with signal the phone fetches a picture the trip
 // has and keeps it in its own database, chi-tickets; a refused key and
 // Forget this phone take every picture off; Forget leaves the Japan app's
@@ -78,18 +78,17 @@ const makeJapanDatabase = (page) =>
 
 module.exports = [
   {
-    name: "after a load with signal the phone fetches a picture the trip has and keeps it in chi-tickets; nothing changes on screen",
+    name: "after a load with signal the phone fetches a picture the trip has and keeps it in chi-tickets; its stub is stapled to the stop",
     async run({ page }) {
       const backend = await ready(page, { own: "Mo" });
       assert.equal(await page.evaluate(() => globalThis.__matTest.store.state.ticketsReady), true);
-      const before = await page.evaluate(() => document.body.innerText);
       await addElsewhere(backend, "tktpicture01", "Izzah");
       await page.evaluate(() => globalThis.__matTest.store.refresh());
       await until(async () => (await keptIds(page)).includes("tktpicture01"), "the picture is kept on this phone");
       assert.equal(backend.requests.filter((r) => r.action === "ticket").length, 1, "asked for once");
       assert.deepEqual(await page.evaluate(() => globalThis.__matTest.store.state.tickets.map((t) => [t.id, t.who, "data" in t])), [["tktpicture01", "Izzah", false]]);
-      // No ticket screen yet: the page reads exactly as it did.
-      assert.equal(await page.evaluate(() => document.body.innerText), before);
+      // Its stub is stapled to the stop's line, printed (on this phone).
+      await until(() => page.evaluate(() => { const t = document.querySelector('.r[data-id="planstop1203"] .ts-on .ts'); return !!t && !t.classList.contains("is-ghost"); }), "the stub is on the stop");
       // A second load asks for nothing more.
       await page.evaluate(() => globalThis.__matTest.store.refresh());
       await page.evaluate(() => globalThis.__matTest.store.idle());

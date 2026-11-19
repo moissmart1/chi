@@ -25,6 +25,8 @@ import { mountStampBook } from "./views/stampbook.js";
 import { createUpdater } from "./update.js";
 import { isWide, onWide } from "./shape.js";
 import { createKeep, fetchMissing, toBase64, fetchesAll, pruneKeep } from "./tickets.js";
+import { mountStub } from "./views/stub.js";
+import { tixInfo, forgetThumbs } from "./views/stubs.js";
 
 // How often a visible phone asks the backend whether anything changed.
 const CHECK_MS = 20000;
@@ -219,8 +221,9 @@ function start() {
   // Ticket pictures kept on this phone (IndexedDB "chi-tickets"): every phone
   // fetches every one after each load with signal, so it opens with none
   // (js/tickets.js), unless the Ticket pictures setting (chi.tixFetch) says
-  // only when one is opened. No screen shows them yet: the ticket screens
-  // plug in here (keep, store.addTicket, store.removeTicket, ticketMark).
+  // only when one is opened. The screens (look F, stapled to the check): the
+  // stub on a stop's line (js/views/ticket.js), the ticket held up
+  // (js/views/stub.js) and the Ticket part of a stop's Edit sheet.
   const keep = createKeep();
   const fetchAll = () => fetchesAll(raw);
   // A refused key takes the trip off the phone (js/store.js): the stored
@@ -269,10 +272,17 @@ function start() {
   // The Days sheets: the hotel card, the list of every day and the stop sheet.
   const stayCard = mountStayCard(phone, store);
   const allDays = mountAllDays(phone, store, { clock, onPick: (i) => days.goDay(i) });
-  const stopSheet = mountStopSheet(phone, store);
+  const stopSheet = mountStopSheet(phone, store, { keep });
   // The stamp book, a panel like History, opened from the Days bar or today's ticket.
   const book = mountStampBook(phone, store);
+  // The ticket, lifted off its stop's line and held up (js/views/stub.js).
+  const stub = mountStub(phone, store, keep);
+  // The trip taken off this phone: the small pictures drawn from the keep go too.
+  store.subscribe((s) => {
+    if (s.status === "nokey") forgetThumbs();
+  });
   const closeDaySheets = () => {
+    stub.close(false);
     stayCard.close(false);
     allDays.close(false);
     stopSheet.close(false);
@@ -339,6 +349,10 @@ function start() {
       you.close(false);
       history.open();
     },
+    // Ticket pictures: back to every one, the fetching starts at once.
+    onTixMode: (mode) => {
+      if (mode === "all" && store.state.ticketsReady) fetchMissing(store, keep, { allowed: fetchAll });
+    },
     // Forget this phone (forgetAll, below). Kept while it runs, so a link pasted on the no-key screen meanwhile
     // (it shows as soon as the store forgets) waits for it to finish and is
     // never wiped by it.
@@ -356,6 +370,7 @@ function start() {
     // The store is marked wiped first (nothing is written or sent after it),
     // then the ticket pictures: their open database would hold up its deletion.
     store.forgot();
+    stub.close(false);
     await keep.wipe();
     let session = null;
     try {
@@ -422,8 +437,13 @@ function start() {
       closeForDays();
       stopSheet.edit(id);
     },
-    // A stop being added or changed is being looked at: the rail stays put.
-    held: () => stopSheet.isOpen(),
+    // A stop being added or changed, or a ticket held up, is being looked at: the rail stays put.
+    held: () => stopSheet.isOpen() || stub.isOpen(),
+    tickets: { info: (stop, s) => (s.ticketsReady ? tixInfo(stop, s.tickets, keep.have, s.me) : null), keep, subscribe: (fn) => keep.subscribe(fn) },
+    onTicket: (id, button) => {
+      closeForDays();
+      stub.open(id, button);
+    },
   });
   mountMoney(document.getElementById("vMoney"), store, {
     onRing: ring,

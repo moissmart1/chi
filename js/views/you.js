@@ -5,7 +5,11 @@
 // the invite link, the Claude link, the Google Sheet and "Report a problem".
 // One sheet, no sub-pages.
 //
-// mountYou(root, store, { onHistory(), onDemo(date), getKey(), screen(), onForget() }) -> { open(), close(restoreFocus), isOpen() }
+// mountYou(root, store, { onHistory(), onDemo(date), getKey(), screen(), onForget(), onTixMode(mode), onBulk() }) -> { open(), close(restoreFocus), isOpen() }
+// Ticket pictures (only once the trip has the ticket tabs): every picture
+// fetched in the background, or only when one is opened (js/tickets.js
+// fetchMode); onTixMode(mode) is told of a change. Add tickets (the same):
+// onBulk() opens bulk add (js/views/bulkadd.js).
 // onDemo(date): a trip day was picked under "Try another day". demo: the trip's
 // clock (js/clock.js), so the row can say a demo is running.
 // screen(): the screen showing, "Days" or "Money", for Report a problem.
@@ -26,6 +30,7 @@
 import { API_URL, APP_VERSION } from "../config.js";
 import { screenNumbers } from "../diag.js";
 import { soundOn, setSound } from "../sound.js";
+import { fetchMode, setFetchMode } from "../tickets.js";
 import { clock, dayHead, dayShort, localDay, freshText, historySentence } from "../format.js";
 import { HOW_LINES, standalone } from "./first.js";
 import { copyText } from "../clip.js";
@@ -72,6 +77,7 @@ const MARKUP = `
     <input type="file" accept="image/*" id="setPicFile" tabindex="-1" aria-hidden="true" hidden>
   </div>
   <button type="button" class="set-r" id="setSound"><span>Stamp sound</span><b id="setSoundV">On</b></button>
+  <button type="button" class="set-r" id="setTix" hidden><span>Ticket pictures<small id="setTixS"></small></span><b id="setTixV">On Wi‑Fi and mobile</b></button>
   <button type="button" class="set-r" id="setHist"><span>History<small>Every change, with undo</small></span><b>Open</b></button>
   <button type="button" class="set-r" id="setFreshRow"><span>Last updated<small>Tap to fetch the latest</small></span><b id="setFresh" aria-live="polite" data-w="Up to date 00:00"></b></button>
   <button type="button" class="set-r" id="setDemo" aria-expanded="false" aria-controls="setDemoDays"><span>Try another day<small>See how a day will look before you go</small></span><b id="setDemoV">Pick</b></button>
@@ -133,7 +139,7 @@ const FORGET_FOR = "Takes the trip and your link off this phone";
 const FORGET_SURE = "Tap again to take everything off this phone";
 const FORGET_MS = 5000; // how long the row waits for the second tap
 
-export function mountYou(root, store, { onHistory = () => {}, onDemo = () => {}, demo = null, getKey = () => null, screen = () => "Money", onForget = async () => {} } = {}) {
+export function mountYou(root, store, { onHistory = () => {}, onDemo = () => {}, demo = null, getKey = () => null, screen = () => "Money", onForget = async () => {}, onTixMode = () => {}, onBulk = () => {} } = {}) {
   const scrim = el("div", "scrim");
   scrim.id = "youScrim";
   scrim.hidden = true;
@@ -288,6 +294,7 @@ export function mountYou(root, store, { onHistory = () => {}, onDemo = () => {},
     drawMail(s);
     drawPic(s);
     soundV.textContent = soundOn() ? "On" : "Off";
+    drawTix();
     drawDemoDays(s);
     setDemo(!demoDays.hidden);
     if (!fetching && !saying.has(fresh)) fresh.textContent = freshWord(s);
@@ -443,6 +450,25 @@ export function mountYou(root, store, { onHistory = () => {}, onDemo = () => {},
   });
 
   $("setHist").addEventListener("click", () => onHistory());
+  // Ticket pictures (once the trip has them): every one fetched in the
+  // background, or only the one being opened (roaming data).
+  const tixRow = $("setTix");
+  const tixV = $("setTixV");
+  const tixS = $("setTixS");
+  const TIX_ALL = "Every phone keeps every ticket, so they open with no signal. Up to about 50 MB in all.";
+  const TIX_OPEN = "Fetched when you open one. Each needs signal once.";
+  function drawTix() {
+    tixRow.hidden = store.state.ticketsReady !== true;
+    const all = fetchMode() === "all";
+    tixV.textContent = all ? "On Wi‑Fi and mobile" : "Only when I open one";
+    tixS.textContent = all ? TIX_ALL : TIX_OPEN;
+  }
+  tixRow.addEventListener("click", () => {
+    const next = fetchMode() === "all" ? "open" : "all";
+    setFetchMode(next);
+    drawTix();
+    onTixMode(next);
+  });
   // Last updated: Fetching… while it loads, then Up to date ✓ (or No
   // signal) for a moment, then the time of the last fetch.
   let fetching = false;
