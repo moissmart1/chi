@@ -418,28 +418,34 @@ export function mountStub(root, store, keep) {
     if (restoreFocus && back && back.isConnected) back.focus({ preventScroll: true });
   }
 
-  let lastDown = null; // what the finger went down on: { in, flip, seal, close }
+  let lastDown = null; // what the finger went down on: { el, in, flip, seal, close, done }
   host.addEventListener("pointerdown", (ev) => {
     const w = ev.target.closest(".who button");
     lastDown = {
+      el: ev.target,
       in: !!ev.target.closest(".f-tk, .who, .tb"),
       flip: !!ev.target.closest("[data-flip]"),
       seal: w ? Number(w.dataset.k) : null,
       close: !!ev.target.closest("[data-close]"),
+      done: false,
     };
   });
+  // A picture arriving between finger down and finger up repaints the ticket and
+  // replaces what the finger went down on, so the browser sends no click to it.
+  // The tap is still the tap it was (the corner, a seal, Back), never a tap on
+  // the dark around the ticket.
+  host.addEventListener("pointerup", () => {
+    const down = lastDown;
+    if (!down || !down.in || down.el.isConnected) return;
+    down.done = true;
+    if (down.flip) show(at + 1, true);
+    else if (down.seal !== null && down.seal !== at) show(down.seal, true);
+    else if (down.close) close();
+  });
   host.addEventListener("click", (ev) => {
-    // A picture arriving between finger down and finger up repaints the ticket and
-    // replaces what the finger went down on: the click then lands on the host. It
-    // is the tap it was (the corner, a seal, Back), never a tap on the dark.
     const down = lastDown;
     lastDown = null;
-    if (ev.target === host && down && down.in) {
-      if (down.flip) show(at + 1, true);
-      else if (down.seal !== null && down.seal !== at) show(down.seal, true);
-      else if (down.close) close();
-      return;
-    }
+    if (down && down.done) return;
     if (ev.target.closest(".zoom")) {
       zoomOut();
       return;
