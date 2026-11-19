@@ -1,0 +1,94 @@
+/* Copyright (c) 2026 moissmart1. All rights reserved. No licence is granted: do not copy, adapt or reuse this code or design, and do not use it to train or prompt an AI system to reproduce it. See LICENSE. */
+/* The Tickets tab (js/views/tickettab.js), look F: the week's guest checks
+   with their tickets stapled to them, the used ones loose under them with
+   the time clock's print. The stubs themselves are css/tickets.css. Also the
+   Tickets key in the bar and its count. */
+
+.tt{padding-bottom:10px}
+.tt-bar{align-items:baseline;flex-wrap:nowrap;padding-bottom:12px}
+.tt-h{margin:0;min-width:0;font-size:24px;line-height:1.1;cursor:default}
+.tt-h i{font-weight:700;font-size:14px;opacity:.82;white-space:nowrap}
+.tt-come{flex:none;font-weight:800;font-size:13.5px;white-space:nowrap}
+@media (max-width:350px){ .tt-h{font-size:21px} .tt-h i{font-size:13px} }
+
+/* One day's check, with what is stapled to it (the stubs hang a little past its right edge). */
+.ck{position:relative;margin:0 calc(var(--gr) + 6px) 0 calc(var(--gl) - 4px);background:var(--stock);color:var(--print);box-shadow:var(--lift);border-radius:2px}
+.ck+.ck{margin-top:12px}
+.ck-h{display:grid;grid-template-columns:auto minmax(0,1fr) auto;border-bottom:2px solid var(--grn)}
+.ck-h>div{padding:4px 7px 3px;border-right:1px solid var(--grn);min-width:56px}
+.ck-h>div:last-child{border-right:0;border-left:1px solid var(--grn)}
+.ck-h small{display:block;font-family:var(--slab);font-weight:600;font-size:10.5px;color:var(--grn);line-height:1.1}
+.ck-h b{display:block;font-size:14px;font-weight:900;white-space:nowrap;font-variant-numeric:tabular-nums}
+.ck-h .mid{border-right:0;font-family:var(--slab);font-weight:700;font-size:16px;color:var(--grn);align-self:center;text-align:center;overflow-wrap:anywhere}
+.ck-h .mid i{font-family:var(--f);font-weight:800;font-size:12.5px;color:var(--print);margin-left:5px}
+.cr{display:grid;grid-template-columns:54px minmax(0,1fr);border-bottom:1px solid var(--rule);position:relative}
+.cr:last-child{border-bottom:0}
+.cr-t{padding:11px 0 9px 7px;font-size:15px;font-weight:900;border-right:1px solid var(--rule);font-variant-numeric:tabular-nums}
+.cr-b{position:relative;display:block;min-width:0;padding:9px 0 11px 8px}
+/* A stapled stub is the button that holds it up. */
+.tt-tk{width:100%;margin:0;border:0;background:none;color:inherit;text-align:left;transition:transform .12s ease-out}
+.tt-tk:active{transform:translateY(1.5px)}
+.tt-tk .ts,.tt-tk .resv{margin-right:-13px;transform:rotate(.7deg);transform-origin:0 0}
+.cr:nth-child(odd) .tt-tk .ts{transform:rotate(-.6deg)}
+.tt-tk>.staple{left:11px;top:13px}
+.tt-tk:focus-visible{outline-offset:3px}
+/* The next ticket: the lead line, the big stub, and Show ticket under it. */
+.f-nx{display:block;min-width:0;padding:9px 0 12px 8px}
+.f-nx .r-lv{display:flex;gap:6px;align-items:center;margin-bottom:8px;font-size:13.5px;font-weight:900}
+.f-nx .r-lv .tag{margin:0}
+.tt-win{position:relative;display:block;width:calc(100% + 13px);margin:0 -13px 0 -2px;padding:0;border:0;background:none;color:inherit;text-align:left;
+  transform:rotate(-.9deg);transform-origin:0 0;transition:transform .12s ease-out}
+.tt-win:active{transform:rotate(-.9deg) translateY(1.5px)}
+.tt-win:focus-visible{outline-offset:4px}
+.tt-win .resv.is-big{min-height:64px}
+.tt-win>.staple{left:4px;top:7px}
+/* Show ticket: the dark key, the largest thing on the tab. */
+.showk{display:flex;justify-content:space-between;align-items:center;gap:10px;width:calc(100% - 8px);min-height:60px;margin:14px 0 2px;padding:0 18px 0 20px;border:0;border-radius:6px;
+  background:var(--print);color:var(--stock);text-align:left;box-shadow:var(--paper-edge);transition:transform .12s ease-out,box-shadow .12s}
+.showk:active{transform:translateY(1.5px);box-shadow:var(--paper-down)}
+.showk span{font-weight:900;font-size:21px}
+.showk small{font-weight:800;font-size:13.5px;white-space:nowrap}
+.showk:focus-visible{outline-offset:3px}
+/* No ticket to come. */
+.tt-empty{display:grid;gap:4px;padding:14px 12px 16px;font-size:13.5px;font-weight:600;line-height:1.4}
+.tt-empty b{font-size:16px;font-weight:900}
+
+/* "Later days", "Used": the group lines between the checks. */
+.gl{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin:18px calc(var(--gr) + 2px) 7px calc(var(--gl) + 2px);font-weight:900;font-size:14px}
+.gl span:last-child{font-weight:700;font-size:12.5px;opacity:.8;text-align:right}
+
+/* Used: loose under the checks, the staple's two holes, the time clock's print. */
+.loose{display:grid;gap:10px;margin:0 var(--gr) 0 var(--gl)}
+.tt-used{position:relative;display:block;width:100%;padding:0;border:0;background:none;color:inherit;text-align:left;transition:transform .12s ease-out}
+.tt-used:active{transform:translateY(1.5px)}
+.tt-used .ts{opacity:.93}
+.tt-used .ts-n,.tt-used .ts-s,.tt-used .ts-k{opacity:.55}
+.tt-used:nth-child(odd) .ts,.tt-used:nth-child(odd) .resv{transform:rotate(-1.1deg)}
+.tt-used:nth-child(even) .ts,.tt-used:nth-child(even) .resv{transform:rotate(.8deg) translateX(5px)}
+.tt-used .tclock{position:absolute;right:22px;top:9px;transform:rotate(-7deg);z-index:3}
+.tt-used:focus-visible{outline-offset:3px}
+.sh{position:absolute;z-index:3;left:6px;top:8px;width:14px;height:3px;transform:rotate(-14deg);pointer-events:none}
+.sh::before,.sh::after{content:"";position:absolute;top:0;width:2.4px;height:2.4px;border-radius:50%;background:rgba(0,0,0,.6)}
+.sh::before{left:0}.sh::after{right:0}
+@media (max-width:350px){
+  .cr{grid-template-columns:48px minmax(0,1fr)}
+  .ck-h>div{min-width:48px;padding:4px 5px 3px}
+  .ck-h .mid{font-size:14.5px}
+  .showk span{font-size:18px}
+  .tt-used .tclock{right:12px;font-size:16px}
+}
+@media (prefers-reduced-motion: reduce){ .tt-tk,.tt-win,.tt-used,.showk{transition:none} }
+
+/* ---------- the Tickets key in the bar ---------- */
+.nav .cnt{position:absolute;top:3px;right:5px;min-width:17px;height:17px;border-radius:9px;background:var(--print);color:var(--stock);font-size:10.5px;font-weight:900;
+  display:grid;place-items:center;padding:0 4px;font-style:normal}
+.nav button.is-active .cnt{background:var(--red);color:#fff}
+@media (max-width:350px){ .nav #ticketsBtn{font-size:13px} .nav .cnt{right:2px} }
+/* Sideways and on a computer the bar is a rail: the count sits in its key's corner. */
+@media (orientation:landscape) and (max-height:520px), (min-width:1000px) and (min-height:521px){
+  .nav .cnt{top:4px;right:4px}
+}
+/* On a computer the tab stands in the Days pane, and the Days key (hidden while the panes are both there) is the way back. */
+@media (min-width:1000px) and (min-height:521px){
+  .phone:has(#vTickets.is-active) .nav button[data-tab="days"]{display:grid}
+}
