@@ -16,6 +16,12 @@
 //   picture arriving), or null; onTicket(stopId, button): the big stub on an
 //   open stop (Show ticket) was tapped.
 // - storage: the phone's storage, for the board's close (js/views/board.js).
+// - where: the phone's position (js/where.js), or null. Read inside a redraw
+//   and dropped: it is never kept here, put in a redraw key or sent. While its
+//   choice is unset, today's check asks once (.tk-ask), only when it has a
+//   next stop and at least one of its stops is on the map: Use it asks the
+//   phone (its own prompt comes with it), Not now turns it off; either way
+//   the line goes for good and focus goes to the day counter.
 // - The trip taken off this phone (status "nokey": a refused key, Forget
 //   this phone): every check is taken out of the page, tickets and all.
 // - held(): true while a sheet over Days is in use (the stop sheet): coming
@@ -56,6 +62,7 @@ import { boardFor } from "../board.js";
 import { summary as bookSummary, countText } from "../stampbook.js";
 import { isPhone } from "../shape.js";
 import { tapOnRelease } from "./tap.js";
+import { point } from "../geo.js";
 
 const TICK_MS = 15000;
 // While a demo runs, a trip minute passes every half second.
@@ -142,7 +149,7 @@ function patchTicket(old, fresh) {
   return old;
 }
 
-export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = () => {}, onStop = () => {}, onAddStop = () => {}, onStampBook = () => {}, held = () => false, tickets = null, onTicket = () => {}, storage = null } = {}) {
+export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = () => {}, onStop = () => {}, onAddStop = () => {}, onStampBook = () => {}, held = () => false, tickets = null, onTicket = () => {}, storage = null, where = null } = {}) {
   const count = el("button", "bar-t");
   count.type = "button";
   count.id = "dayCount";
@@ -403,8 +410,45 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
       if (k) onTicket(id, k);
     },
   });
+  // The ask's two keys, and a stop's name and Edit: a position arriving (or a
+  // sync) can draw the check's heading or a row again under the finger; the
+  // tap is then done on finger up on what is now in its place.
+  const rescue = tapOnRelease(rail, {
+    pick: (t) => {
+      if (where && t.closest(".tk-ask .yes")) return { k: "yes" };
+      if (where && t.closest(".tk-ask .no")) return { k: "no" };
+      const r = t.closest(".r[data-id]");
+      if (!r) return null;
+      if (t.closest(".r-edit")) return { k: "edit", id: r.dataset.id };
+      if (t.closest(".r-b")) return { k: "open", id: r.dataset.id };
+      return null;
+    },
+    act: ({ k, id }) => {
+      if (k === "yes" || k === "no") return answer(k);
+      const r = rail.querySelector('.r[data-id="' + CSS.escape(id) + '"]');
+      if (!r) return;
+      if (k === "edit") onStop(id);
+      else toggle(r);
+    },
+  });
+  // Use it, or Not now: the line goes on the redraw this causes, and focus goes to the day counter.
+  function answer(k) {
+    if (!where) return;
+    if (k === "yes") where.ask();
+    else where.turnOff();
+    if (!count.hidden) count.focus({ preventScroll: true });
+  }
   rail.addEventListener("click", (ev) => {
-    if (tap.skip(ev)) return;
+    const tapped = tap.skip(ev);
+    if (rescue.skip(ev) || tapped) return;
+    if (where && ev.target.closest(".tk-ask .yes")) {
+      answer("yes");
+      return;
+    }
+    if (where && ev.target.closest(".tk-ask .no")) {
+      answer("no");
+      return;
+    }
     if (ev.target.closest(".tk-stampline")) {
       onStampBook();
       return;
@@ -591,6 +635,8 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
         // Today's stamp is open and not yet pressed: the ticket says so.
         stampOpen: stampToday === day.date,
       };
+      // Asked once, on today's check, only when something on it could show a distance.
+      if (nextId && where && where.supported() && where.state() === "unset" && dayStops.some((x) => point(x))) model.ask = true;
       // The stops with a ticket, stapled to their lines. None, no key at all.
       if (tickets) {
         const tix = {};
@@ -685,6 +731,8 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
 
   render(store.state);
   store.subscribe(render);
+  // A new position, or the choice changing: the lines that use it are drawn again.
+  if (where) where.subscribe(() => render(store.state));
   // A picture reaching this phone makes its stub solid.
   if (tickets && tickets.subscribe) tickets.subscribe(() => render(store.state));
   // Starting or stopping a demo is a deliberate jump: the rail goes to the

@@ -40,11 +40,15 @@
 //   when the stop is open, the big stub (.r-tk) above the links: Show ticket.
 //   Absent, a stop reads exactly as it did. ticketEl's second argument,
 //   { keep }, is where the big stub's small picture of the code comes from.
+// - ask: today's check asks, once, whether to use where the phone is: the
+//   last thing in its heading, .tk-ask, with Use it (.yes) and Not now (.no)
+//   (the Days view sees to the taps). No sign is drawn with it.
 
 import { minutesOf, issueLine, isPast, nextLine, mapsUrl, safeHref, gateDate, checkDate } from "../plan.js";
 import { dayHead, tripMoney, dollars } from "../format.js";
 import { rng, gateStampSVG } from "../stamp.js";
 import { onCheckEl, bigStubEl, kindWord, bandDay, thumbEl, statusWords } from "./stubs.js";
+import { plainBlade } from "./sign.js";
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
@@ -237,6 +241,27 @@ function stampLine() {
   return b;
 }
 
+// The one-time ask, under the heading of today's check.
+function askLine() {
+  const q = "Leave-by times from where you are?";
+  const d = el("div", "tk-ask");
+  d.setAttribute("role", "group");
+  d.setAttribute("aria-label", q);
+  const m = el("div", "ask-m");
+  m.append(plainBlade("FROM HERE"));
+  const keys = el("div", "ask-k");
+  const key = (cls, text) => {
+    const k = document.createElement("button");
+    k.type = "button";
+    k.className = cls;
+    k.textContent = text;
+    return k;
+  };
+  keys.append(key("yes", "Use it"), key("no", "Not now"));
+  d.append(m, el("b", "ask-q", q), el("span", "ask-s", "Your location stays on this phone."), keys);
+  return d;
+}
+
 // Tonight and the stay's name: a button that opens the hotel card.
 function stayRow(stay) {
   const b = el("button", "tk-stay");
@@ -276,6 +301,7 @@ export function ticketEl(model, { keep = null } = {}) {
   const w = where(h, tripName);
   if (w) head.append(w);
   if (model.stampOpen) head.append(stampLine());
+  if (model.ask) head.append(askLine());
 
   const rows = el("div", "rows");
   if (stops.length) rows.append(...stops.map((stop, i) => row(stop, i, model, keep)));

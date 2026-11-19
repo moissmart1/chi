@@ -22,6 +22,7 @@ import { mountStopSheet } from "./views/stopsheet.js";
 import { mountUndoBar } from "./views/ubar.js";
 import { mountNet } from "./views/net.js";
 import { mountStampBook } from "./views/stampbook.js";
+import { createWhere } from "./where.js";
 import { createUpdater } from "./update.js";
 import { isWide, onWide } from "./shape.js";
 import { createKeep, fetchMissing, toBase64, fetchesAll, pruneKeep } from "./tickets.js";
@@ -257,6 +258,27 @@ function start() {
       if (fetchAll()) fetchMissing(store, keep, { allowed: fetchAll });
     },
   });
+  // Where the phone is (js/where.js): a position is kept in memory only, never
+  // sent or stored; chi.where holds the choice alone. The trip taken off this
+  // phone (a refused link, Forget this phone) stops it asking and keeps no
+  // choice: nothing of it is written again until a new link is in.
+  let whereGone = false;
+  const whereKeep = {
+    getItem: (k) => raw.getItem(k),
+    setItem: (k, v) => {
+      if (!whereGone) raw.setItem(k, v);
+    },
+  };
+  const where = createWhere({ storage: whereKeep, geolocation: navigator.geolocation, permissions: navigator.permissions });
+  where.start();
+  store.subscribe((s) => {
+    if (s.status !== "nokey" || whereGone) return;
+    const st = where.state();
+    if (st !== "on" && st !== "refused") return;
+    whereGone = true;
+    where.turnOff();
+  });
+
   // A picture just kept may unblock the next one once saving ends: look again then.
   store.subscribe(() => {
     if (!store.busy() && store.state.ticketsReady && fetchAll()) fetchMissing(store, keep, { allowed: fetchAll });
@@ -456,6 +478,7 @@ function start() {
   const days = mountDays(document.getElementById("vDays"), store, {
     clock,
     storage: raw,
+    where,
     onStay: (id) => {
       closeForDays();
       stayCard.open(id);
@@ -539,6 +562,7 @@ function start() {
       // Forget this phone still running: it would take this key off too.
       if (forgetting) await forgetting;
       keyHere = key;
+      whereGone = false;
       try {
         raw.setItem(STORAGE_PREFIX + "key", key);
       } catch {
