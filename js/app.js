@@ -24,6 +24,7 @@ import { mountNet } from "./views/net.js";
 import { mountStampBook } from "./views/stampbook.js";
 import { createUpdater } from "./update.js";
 import { isWide, onWide } from "./shape.js";
+import { createKeep, fetchMissing, toBase64, fetchesAll, pruneKeep } from "./tickets.js";
 
 // How often a visible phone asks the backend whether anything changed.
 const CHECK_MS = 20000;
@@ -215,15 +216,35 @@ function start() {
     // On its own link the backend knows who this is: no name is sent.
     getActor: () => (store && store.state.personal ? undefined : (store && store.state.me) || storage.getItem(STORAGE_PREFIX + "me")),
   });
+  // Ticket pictures kept on this phone (IndexedDB "chi-tickets"): every phone
+  // fetches every one after each load with signal, so it opens with none
+  // (js/tickets.js), unless the Ticket pictures setting (chi.tixFetch) says
+  // only when one is opened. No screen shows them yet: the ticket screens
+  // plug in here (keep, store.addTicket, store.removeTicket, ticketMark).
+  const keep = createKeep();
+  const fetchAll = () => fetchesAll(raw);
   // A refused key takes the trip off the phone (js/store.js): the stored
-  // keys, and the key this visit came with.
+  // keys, the key this visit came with, and every ticket picture.
   store = createStore({
     api,
     storage,
     clear: (queue) => {
       keyHere = null;
       clearTrip(raw, { queue });
+      keep.wipe();
     },
+    ticketData: async (id) => {
+      const blob = await keep.get(id);
+      return blob ? toBase64(blob) : null;
+    },
+    afterLoad: () => {
+      pruneKeep(store, keep);
+      if (fetchAll()) fetchMissing(store, keep, { allowed: fetchAll });
+    },
+  });
+  // A picture just kept may unblock the next one once saving ends: look again then.
+  store.subscribe(() => {
+    if (!store.busy() && store.state.ticketsReady && fetchAll()) fetchMissing(store, keep, { allowed: fetchAll });
   });
 
   // The one clock the Days screen reads, in the trip's time zone.
@@ -320,6 +341,10 @@ function start() {
     // copy and the worker, then the no-key screen.
     onForget: async () => {
       keyHere = null;
+      // The store is marked wiped first (nothing is written or sent after it),
+      // then the ticket pictures: their open database would hold up its deletion.
+      store.forgot();
+      await keep.wipe();
       let session = null;
       try {
         session = window.sessionStorage;
@@ -334,7 +359,6 @@ function start() {
         // Only this app's worker: the Japan app shares the origin.
         scope: new URL("./", location.href).href,
       });
-      store.forgot();
       you.close(false);
     },
   });
@@ -420,6 +444,8 @@ function start() {
       } catch {
         // nowhere to keep it: it works for this visit only
       }
+      // A new link after a wipe: the picture keep opens its database again, empty.
+      keep.restart();
       store.boot();
     },
   });

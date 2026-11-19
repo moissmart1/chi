@@ -42,6 +42,7 @@
 import { STORAGE_PREFIX } from "./config.js";
 import { HOME_CURRENCY, TRIP_CURRENCY } from "./trip.js";
 import { newId } from "./time.js";
+import { LOST as TICKET_LOST } from "./tickets.js";
 import { clearTrip } from "./forget.js";
 
 const BUSY_RETRIES = 3;
@@ -53,21 +54,26 @@ const NOT_SAVED = "No signal. That wasn’t saved.";
 const UNCONFIRMED = "Couldn’t confirm that. Checking…";
 const STALE = "That was changed again since. Undo the newer change first.";
 const NO_SIGNAL = "No signal. Try again.";
-const DATA_KEYS = ["trip", "people", "days", "stops", "stays", "expenses", "payments", "rateToday", "rateSource", "sheetUrl", "stampDefs", "stamps"];
+const DATA_KEYS = ["trip", "people", "days", "stops", "stays", "expenses", "payments", "rateToday", "rateSource", "sheetUrl", "stampDefs", "stamps", "tickets"];
 // Every kind of item the store keeps, the field it is found by and the flag
 // that marks it gone. Stays and day headers only ever change here through an
 // undo from History (their writes come in later tasks).
 // A stamp of the book (js/stampbook.js) is one person's press of one stamp:
 // found by its definition and who pressed it ("def|who", as the backend's Log
 // names it), and marked gone when it is lifted from History.
-const LIST = { expense: "expenses", payment: "payments", person: "people", stop: "stops", stay: "stays", day: "days", stamp: "stamps" };
-const KEY_FIELD = { expense: "id", payment: "id", person: "name", stop: "id", stay: "id", day: "date" };
-const FLAG = { expense: "deleted", payment: "removed", stop: "deleted", stay: "deleted", stamp: "gone" };
+// A ticket is one picture of a stop's ticket (js/tickets.js), marked gone when removed.
+const LIST = { expense: "expenses", payment: "payments", person: "people", stop: "stops", stay: "stays", day: "days", stamp: "stamps", ticket: "tickets" };
+const KEY_FIELD = { expense: "id", payment: "id", person: "name", stop: "id", stay: "id", day: "date", ticket: "id" };
+const FLAG = { expense: "deleted", payment: "removed", stop: "deleted", stay: "deleted", stamp: "gone", ticket: "gone" };
 const keyOf = (kind, x) => (kind === "stamp" ? x.def + "|" + x.who : x[KEY_FIELD[kind]]);
 // Adds kept in the stored queue and resent with the same id until the backend has
 // them. A stop add is not one of them: stop writes need a connection, so
 // with no reply it is rolled back like any other write (and never resent).
-const ADD_API = { expense: "addExpense", payment: "addPayment", stamp: "pressStamp" };
+// A ticket picture is one too: its data stays in the phone's keep (IndexedDB),
+// never in the stored queue, and is read back from there to send (ticketData).
+const ADD_API = { expense: "addExpense", payment: "addPayment", stamp: "pressStamp", ticket: "addTicket" };
+// Adds that wait on the phone when it knows it has no signal.
+const QUEUED_API = ["addExpense", "addTicket"];
 // A press still queued this long after the moment it was made is dropped:
 // the backend would refuse it as late, and its day has closed.
 const STAMP_DROP_MS = 48 * 3600000;
@@ -128,7 +134,11 @@ function isData(d) {
 // A key that came in the address and the trip refused (the phone keeps its own).
 const ADDRESS_KEY_REFUSED = "That link didn’t work. This phone stays on the link it already had.";
 
-export function createStore({ api, storage, now = () => Date.now(), wait = defaultWait, clear = (queue) => clearTrip(storage, { queue }) }) {
+// ticketData(id) -> Promise<base64 | null>: a ticket picture's data from the
+// phone's keep, to send one that was queued (its data is never in the stored
+// queue). afterLoad(): called after every load that answered (js/tickets.js
+// fetchMissing hangs here).
+export function createStore({ api, storage, now = () => Date.now(), wait = defaultWait, clear = (queue) => clearTrip(storage, { queue }), ticketData = async () => null, afterLoad = null }) {
   // Set once the trip was taken off this phone: nothing more is written to
   // storage or sent with the refused key until boot() starts again.
   let wiped = false;
@@ -164,7 +174,7 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
 
   const state = {
     status: "boot", online: true, rev: null, me: null,
-    trip: null, people: [], days: [], stops: [], stays: [], expenses: [], payments: [], rateToday: null, rateSource: null, sheetUrl: "", stampDefs: [], stamps: [],
+    trip: null, people: [], days: [], stops: [], stays: [], expenses: [], payments: [], rateToday: null, rateSource: null, sheetUrl: "", stampDefs: [], stamps: [], tickets: [], ticketsReady: false,
     loadedAt: null, seenAt: null, lastChange: null, notice: null, setAside: [], keyRefused: false, tripProblem: null,
     // personal: this phone opened its own person's link (load said so); me is then theirs.
     // cleared: the trip was taken off this phone after its key was refused ({ kept: own unsent lines kept }).
@@ -210,6 +220,8 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
     if (base) for (const k of DATA_KEYS) state[k] = base[k];
     // A cache or a backend from before the book has neither list.
     if (!Array.isArray(state.stampDefs)) state.stampDefs = [];
+    // A backend where migrate has not made the ticket tabs sends no tickets at all.
+    state.ticketsReady = !!base && Array.isArray(base.tickets);
     const lists = {};
     // A cache kept before the plan existed has no stops, stays or days.
     for (const kind of Object.keys(LIST)) lists[kind] = base && Array.isArray(base[LIST[kind]]) ? base[LIST[kind]].slice() : [];
@@ -278,6 +290,8 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
         ? { payment: op.args.payment, stampedAt: op.after.stampedAt, stampedBy: op.after.stampedBy, sent: op.inFlight || op.lost }
         : op.kind === "stamp"
         ? { stamp: op.args, who: op.after.who, sent: op.inFlight || op.lost }
+        : op.kind === "ticket"
+        ? { ticket: ticketMeta(op.args.ticket), by: op.after.by, at: op.after.at, size: op.after.size, sent: op.inFlight || op.lost }
         : {
             expense: op.args.expense,
             addedAt: op.after.addedAt,
@@ -287,7 +301,7 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
             sent: op.inFlight || op.lost,
           },
     );
-    const undos = resolving.map((op) => ({ undo: true, kind: op.kind, args: op.args, logId: op.logId, actor: op.actor || null }));
+    const undos = resolving.map((op) => ({ undo: true, kind: op.kind, args: op.kind === "ticket" ? { ticket: ticketMeta(op.args.ticket) } : op.args, logId: op.logId, actor: op.actor || null }));
     setItem(STORAGE_PREFIX + "queue", JSON.stringify(live.concat(undos)));
   }
 
@@ -352,7 +366,9 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
     const queue = keep ? getJson(STORAGE_PREFIX + "queue") : null;
     // With nobody known (an earlier refusal already took who you are off),
     // the queue is already only this person's: kept as it is.
-    const mine = !Array.isArray(queue) ? [] : myName ? queue.filter((q) => queuedBy(q) === myName) : queue.filter((q) => q && typeof q === "object");
+    // Never a ticket picture: every one comes off the phone, unsent ones too.
+    const notPicture = (q) => q && typeof q === "object" && !q.ticket && !(q.undo === true && q.kind === "ticket");
+    const mine = !Array.isArray(queue) ? [] : myName ? queue.filter((q) => notPicture(q) && queuedBy(q) === myName) : queue.filter(notPicture);
     // Only say the trip was taken off when there was one here (a wrong key
     // pasted on an empty phone has nothing to take off).
     const had = base !== null || getItem(STORAGE_PREFIX + "cache") !== null || (Array.isArray(queue) && queue.length > 0);
@@ -488,6 +504,13 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
     changed();
     afterContact();
     wakeLoadWaiters(mine);
+    if (typeof afterLoad === "function") {
+      try {
+        afterLoad();
+      } catch {
+        // the hook's own trouble
+      }
+    }
     return true;
   }
 
@@ -540,7 +563,7 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
         if (!ADD_API[kind] || !item || typeof item.id !== "string") continue;
         if (resolving.some((o) => o.kind === kind && o.id === item.id)) continue;
         const op = {
-          token: newId(), kind, id: item.id, action: kind === "expense" ? "add" : "stamp", api: ADD_API[kind],
+          token: newId(), kind, id: item.id, action: kind === "expense" || kind === "ticket" ? "add" : "stamp", api: ADD_API[kind],
           args: copy(q.args), before: null, after: copy(item), view: () => null,
           status: "queued", undone: true, inFlight: false, lost: true,
           logId: typeof q.logId === "number" ? q.logId : null,
@@ -553,6 +576,15 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
         const who = typeof q.who === "string" ? q.who : myName;
         if (!who || ops.some((o) => o.kind === "stamp" && o.id === q.stamp.def + "|" + who)) continue;
         const op = pressOp({ def: q.stamp.def, at: q.stamp.at, seed: q.stamp.seed }, who);
+        op.status = "queued";
+        op.lost = q.sent !== false;
+        writes.set(op.token, op);
+        ops.push(op);
+        continue;
+      }
+      if (q.ticket && typeof q.ticket === "object" && typeof q.ticket.id === "string") {
+        if (ops.some((o) => o.kind === "ticket" && o.id === q.ticket.id)) continue;
+        const op = ticketOp(q.ticket, { by: typeof q.by === "string" ? q.by : myName, at: typeof q.at === "string" ? q.at : undefined, size: q.size });
         op.status = "queued";
         op.lost = q.sent !== false;
         writes.set(op.token, op);
@@ -677,10 +709,11 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
     // A write its caller waits on (op.quiet) is shown on the bar once saved.
     if (op.quiet) op.outcome = new Promise((resolve) => { op.finish = resolve; });
     else if (!op.silent) showChange(op, op.after);
-    if (op.api === "addExpense" && !state.online) {
+    if (QUEUED_API.includes(op.api) && !state.online) {
       // Known to be without signal: keep it on the phone (so it provably never
       // left) and check for signal; the next contact sends it.
       op.status = "queued";
+      settleTicket(op, { saved: false, reason: "queued" });
       saveQueue();
       changed();
       track(checkRev());
@@ -699,6 +732,17 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
   async function runWrite(op) {
     // An undone add is only ever sent by finishUndo.
     if (op.undone && isAdd(op)) return;
+    // A queued picture's data comes back from the keep; lost there, it is dropped and said.
+    // One whose request may have landed is asked about without its data:
+    // the backend answers the first add, or that it never had it.
+    if (op.kind === "ticket" && isAdd(op) && !(await fillTicket(op)) && !op.lost) {
+      removeOp(op);
+      state.notice = TICKET_LOST;
+      settleTicket(op, { saved: false, reason: "lost" });
+      saveQueue();
+      changed();
+      return;
+    }
     op.status = "sending";
     op.inFlight = true;
     if (isAdd(op)) saveQueue();
@@ -715,6 +759,7 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
       if (op.lost) track(checkRev());
       else if (op.logId !== null) stepRev(r.rev);
       if (op.logId === null && !isAdd(op)) op.noop = true; // the backend already had it so
+      settleTicket(op, { saved: true, item: copy(item) });
       const lc = state.lastChange;
       if (op.quiet) {
         showChange(op, item);
@@ -725,8 +770,16 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
       if (fateUnknown(err)) op.lost = true;
       if (op.undone && isAdd(op)) {
         // finishUndo decides what still has to happen
-      } else if (isAdd(op) && noReply(err)) {
+      } else if (isAdd(op) && (noReply(err) || (op.kind === "ticket" && transient(err)))) {
+        // A picture that met a busy trip sheet waits too: nothing else could send it again.
         op.status = "queued"; // the same id resent later is safe
+        settleTicket(op, { saved: false, reason: "queued", busy: codeOf(err) === "busy" });
+      } else if (op.api === "addTicket") {
+        // Refused: gone from the screen. The screen that sent it says why;
+        // one that was waiting on the phone (that screen long closed) is said here.
+        removeOp(op);
+        if (op.settled) state.notice = (err && err.message) || UNCONFIRMED;
+        settleTicket(op, { saved: false, reason: "refused", message: (err && err.message) || UNCONFIRMED });
       } else if (op.api === "addExpense") {
         op.status = "failed";
       } else if (op.quiet) {
@@ -868,6 +921,77 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
     };
   }
 
+  // ---- ticket pictures ----
+
+  // What is kept of a picture's add on the phone: everything but its data.
+  function ticketMeta(t) {
+    const out = { ...(t || {}) };
+    delete out.data;
+    return out;
+  }
+
+  // A picture to add: shown at once (pending), sent as addTicket { ticket },
+  // kept in the stored queue (without its data) until the backend has it. Silent:
+  // no undo bar line per picture (the stop sheet shows each one's progress);
+  // History has each one.
+  function ticketOp(t, { by, at, size } = {}) {
+    const meta = { id: t.id, stop: t.stop, who: t.who || "", seat: t.seat || "", page: t.page, mime: t.mime, w: t.w, h: t.h };
+    const chars = typeof t.data === "string" ? t.data.length : Number(size) || 0;
+    const after = { ...meta, size: chars, chunks: Math.max(1, Math.ceil(chars / 45000)), by: by || null, at: at || new Date(now()).toISOString() };
+    const op = {
+      token: newId(), kind: "ticket", id: t.id, action: "add", api: "addTicket",
+      args: { ticket: typeof t.data === "string" ? { ...meta, data: t.data } : meta }, before: null, after,
+      view: (cur) => ({ ...(cur || {}), ...after }),
+      status: "sending", undone: false, logId: null, inFlight: false, lost: false, actor: by || null, silent: true,
+      settled: false,
+    };
+    op.outcome = new Promise((resolve) => {
+      op.finish = resolve;
+    });
+    return op;
+  }
+
+  // The first word on how a picture went: saved, refused, lost, or waiting on the phone. Once only.
+  function settleTicket(op, out) {
+    if (op.kind !== "ticket" || op.settled || typeof op.finish !== "function") return;
+    op.settled = true;
+    op.finish(out);
+  }
+
+  async function fillTicket(op) {
+    if (typeof op.args.ticket.data === "string" && op.args.ticket.data) return true;
+    let data = null;
+    try {
+      data = await ticketData(op.id);
+    } catch {
+      data = null;
+    }
+    if (typeof data !== "string" || !data) return false;
+    op.args = { ticket: { ...op.args.ticket, data } };
+    return true;
+  }
+
+  // t: { id?, stop, who, seat, page, mime, w, h, data }. Returns the token
+  // (ticketOutcome(token) says how it went); the caller keeps the picture in
+  // the keep first, under t.id, so a resend after a reload can find it.
+  function addTicket(t) {
+    const pic = { ...copy(t), id: typeof t.id === "string" && t.id ? t.id : newId() };
+    return begin(ticketOp(pic, { by: myName }));
+  }
+
+  // { saved: true, item } | { saved: false, reason: "queued" (waiting on the
+  // phone for signal) | "refused" (with the backend's message) | "lost" }.
+  function ticketOutcome(token) {
+    const op = writes.get(token);
+    return op && op.kind === "ticket" ? op.outcome : Promise.resolve(null);
+  }
+
+  // One picture's data, { id, mime, data }, straight from the backend (a read, never queued).
+  async function fetchTicket(id) {
+    const r = await call("ticket", { id });
+    return r.data;
+  }
+
   // ---- the stamp book ----
 
   // A press: shown at once (a stamp of mine, with the seed that wears its
@@ -967,6 +1091,13 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
         }
         if (!contact) return "wait";
         let r;
+        // A picture's data from the keep; lost there, the backend never had more than its id.
+        // Without its data, a picture that may have landed is still asked about:
+        // not_found below means it never did.
+        if (op.kind === "ticket" && !(await fillTicket(op)) && !op.lost) {
+          stopResolving(op);
+          return "done";
+        }
         try {
           r = await call(op.api, op.args, op.actor ? { actor: op.actor } : undefined); // same id: the backend returns the first one
         } catch (err) {
@@ -1070,10 +1201,16 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
           return;
         }
         if (fateUnknown(err)) wantReload();
-        state.notice = fateUnknown(err) ? UNCONFIRMED : UNDO_FAILED;
+        state.notice = fateUnknown(err) ? UNCONFIRMED : refusedWords(err);
       }
       changed();
     });
+  }
+
+  // An undo the backend refused with its own sentence says that sentence
+  // ("A stop can hold at most 8 …").
+  function refusedWords(err) {
+    return err && err.code === "bad_input" && typeof err.message === "string" && err.message ? err.message : UNDO_FAILED;
   }
 
   const plainVal = (v) => JSON.stringify(typeof v === "string" ? v.trim() : v);
@@ -1307,7 +1444,7 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
           return false;
         }
         // No reply: it may have been undone; the next contact shows which.
-        state.notice = noReply(err) ? failNotice(err) : UNDO_FAILED;
+        state.notice = noReply(err) ? failNotice(err) : refusedWords(err);
         changed();
         return false;
       }
@@ -1395,6 +1532,8 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
     boot, refresh, checkRev, flush, idle,
     setMe, setPerson, markSeen, forgot, unsentCount, notify, clearNotice, claudeToken,
     pressStamp,
+    addTicket, ticketOutcome, fetchTicket,
+    removeTicket: (id) => takeBackLive("ticket", id) || change("ticket", id, "remove", "removeTicket", { gone: true }),
     addExpense,
     updateExpense: (id, patch) => change("expense", id, "edit", "updateExpense", patch),
     deleteExpense: (id) => takeBackLive("expense", id) || change("expense", id, "delete", "deleteExpense", { deleted: true }),
