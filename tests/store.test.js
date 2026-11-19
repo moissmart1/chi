@@ -3046,10 +3046,10 @@ import { inPlace } from "../js/plan.js";
 
 test("a stop shown at once carries lat and lng blank until the backend answers; loaded ones carry the Sheet's", async () => {
   const p = phone({ seed: { stops: [SKY] } });
-  p.fake.tables.Stops[0].lat = "41.8917";
-  p.fake.tables.Stops[0].lng = "-87.6086";
+  p.fake.tables.Stops[0].lat = "41.9091";
+  p.fake.tables.Stops[0].lng = "-87.6377";
   await p.store.boot();
-  assert.deepEqual([stopOf(p.store, SKY.id).lat, stopOf(p.store, SKY.id).lng], ["41.8917", "-87.6086"]);
+  assert.deepEqual([stopOf(p.store, SKY.id).lat, stopOf(p.store, SKY.id).lng], ["41.9091", "-87.6377"]);
   const release = p.net.hold("addStop");
   p.store.addStop({ date: "2026-12-28", title: "Tea", time: "16:00" });
   const shown = p.store.state.stops.at(-1);
@@ -3115,7 +3115,7 @@ test("a position never leaves the phone: not in any request, not in storage, eve
     calls: 0,
     getCurrentPosition(ok) {
       this.calls++;
-      ok({ coords: { latitude: 41.8917286, longitude: -87.6086472, accuracy: 25 }, timestamp: p.clock.ms });
+      ok({ coords: { latitude: 41.9090286, longitude: -87.6377472, accuracy: 25 }, timestamp: p.clock.ms });
     },
   };
   const w = createWhere({ storage: p.storage, geolocation: g, now: () => p.clock.ms, doc: { visibilityState: "visible", addEventListener() {} }, every: () => 1, stopEvery() {}, later() {} });
@@ -3125,10 +3125,10 @@ test("a position never leaves the phone: not in any request, not in storage, eve
   const here = w.current();
   assert.ok(here);
   await p.store.boot();
-  p.store.pressStamp("d1", { here: inPlace({ lat: "41.9097", lng: "-87.6086" }, here) });
+  p.store.pressStamp("d1", { here: inPlace({ lat: "41.9270", lng: "-87.6377" }, here) });
   await p.store.idle();
   assert.equal(p.fake.tables.Stamps[0].here, "yes");
   const everything = JSON.stringify(p.net.sent) + JSON.stringify([...p.storage.map.entries()]) + JSON.stringify(p.fake.tables);
-  for (const digits of ["41.8917", "87.6086", "8917286", "6086472"]) assert.equal(everything.includes(digits), false, digits);
+  for (const digits of ["41.9090", "87.6377", "9090286", "6377472"]) assert.equal(everything.includes(digits), false, digits);
   assert.equal(p.net.sent.some((b) => JSON.stringify(b).includes("\"lat\"") || JSON.stringify(b).includes("\"lng\"")), false);
 });

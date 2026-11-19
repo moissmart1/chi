@@ -55,11 +55,11 @@ test("unset at first; nothing is asked until a tap; only the choice is stored", 
   assert.deepEqual(g.calls[0].opts, { enableHighAccuracy: false, maximumAge: 120000, timeout: 8000 });
   assert.deepEqual(OPTIONS, g.calls[0].opts);
   assert.equal(w.current(), null, "nothing waits: no position yet");
-  g.give(0, 41.8781, -87.6298, 40);
-  assert.deepEqual(w.current(), { lat: 41.8781, lng: -87.6298, at: NOW, accuracy: 40 });
+  g.give(0, 41.8954, -87.6589, 40);
+  assert.deepEqual(w.current(), { lat: 41.8954, lng: -87.6589, at: NOW, accuracy: 40 });
   // Only the choice is kept on the phone.
   assert.deepEqual([...s.m.keys()], ["chi.where"]);
-  assert.equal([...s.m.values()].join().includes("41.8781"), false);
+  assert.equal([...s.m.values()].join().includes("41.8954"), false);
   assert.equal(g.watched, 0, "never watchPosition");
 });
 

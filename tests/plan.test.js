@@ -220,7 +220,7 @@ test("R37: other days' tickets are unchanged", () => {
 import { hereLine, nearStops, stayDistance, inPlace, NEAR_M, PLACE_M, STAY_FAR_M } from "../js/plan.js";
 import { metres, walkMinutes } from "../js/geo.js";
 
-const PIERAT = { lat: 41.8917286, lng: -87.6086472 };
+const PIERAT = { lat: 41.9090286, lng: -87.6377472 };
 // A point `m` metres north of p.
 const north = (p, m) => ({ lat: p.lat + m / 111195, lng: p.lng });
 const pierStop = (over = {}) => stop("The pier", "14:00", { lat: String(PIERAT.lat), lng: String(PIERAT.lng), travelMin: 30, ...over });
@@ -253,7 +253,7 @@ test("leave-by falls back to today's line", () => {
   assert.equal(hereLine(pierStop(), 800, north(PIERAT, NEAR_M + 10)), null, "over 3 km: a train, not a walk");
   assert.ok(hereLine(pierStop(), 800, north(PIERAT, NEAR_M - 10)));
   // A stop the geocoder put in another city: far, so it falls back.
-  assert.equal(hereLine(pierStop({ lat: "40.7128", lng: "-74.006" }), 800, near), null);
+  assert.equal(hereLine(pierStop({ lat: "40.7301", lng: "-74.035" }), 800, near), null);
 });
 
 test("nearest stop: distances on open stops to come, the nearest tagged, the order kept", () => {

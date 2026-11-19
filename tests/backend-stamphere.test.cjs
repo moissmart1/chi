@@ -12,8 +12,8 @@ const { createFakeBackend } = require("./fake-backend.cjs");
 
 const KEY = "test-key";
 const DEFS = [
-  { id: "d1", date: "2030-01-05", name_ja: "試験", name_en: "Testville", place: "Test Hall", motif: "lantern", ink: "shu", shape: "round" },
-  { id: "d2", date: "2030-01-06", name_ja: "二", name_en: "Second", place: "Second Place", motif: "tower", ink: "ai", shape: "square" },
+  { id: "d1", date: "2030-01-05", name_ja: "Exam", name_en: "Testville", place: "Test Hall", motif: "lantern", ink: "shu", shape: "round" },
+  { id: "d2", date: "2030-01-06", name_ja: "Two", name_en: "Second", place: "Second Place", motif: "tower", ink: "ai", shape: "square" },
 ];
 // Jan 5 in Chicago is 06:00 UTC on Jan 5 to 09:00 UTC on Jan 6.
 const IN_D1 = "2030-01-05T16:00:00.000Z";

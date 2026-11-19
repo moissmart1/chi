@@ -179,7 +179,7 @@ module.exports = [
       await page.addInitScript(() => {
         globalThis.__geoCalls = 0;
         const stand = {
-          getCurrentPosition(ok) { globalThis.__geoCalls++; ok({ coords: { latitude: 41.8917286, longitude: -87.6086472, accuracy: 20 }, timestamp: Date.now() }); },
+          getCurrentPosition(ok) { globalThis.__geoCalls++; ok({ coords: { latitude: 41.9090286, longitude: -87.6377472, accuracy: 20 }, timestamp: Date.now() }); },
           watchPosition() { globalThis.__geoCalls++; return 1; },
           clearWatch() {},
           standIn: true,
@@ -189,11 +189,11 @@ module.exports = [
         Object.defineProperty(navigator, "permissions", { get: () => perms, configurable: true });
       });
       const backend = makeBackend(WITH_PLAN, { now: NOON28 });
-      for (const r of backend.fake.tables.Stops) { r.lat = "41.9001"; r.lng = "-87.6201"; }
-      for (const r of backend.fake.tables.Stays) { r.lat = "41.8916"; r.lng = "-87.6090"; }
-      for (const r of backend.fake.tables.Days) { r.lat = "41.8781"; r.lng = "-87.6298"; }
+      for (const r of backend.fake.tables.Stops) { r.lat = "41.9174"; r.lng = "-87.6492"; }
+      for (const r of backend.fake.tables.Stays) { r.lat = "41.9089"; r.lng = "-87.6381"; }
+      for (const r of backend.fake.tables.Days) { r.lat = "41.8954"; r.lng = "-87.6589"; }
       await open(page, { backend, nowMs: NOON28, tab: "days" });
-      await until(() => page.evaluate(() => (globalThis.__matTest && globalThis.__matTest.store.state.stops || []).some((s) => s.lat === "41.9001")), "the trip loads, coordinates and all");
+      await until(() => page.evaluate(() => (globalThis.__matTest && globalThis.__matTest.store.state.stops || []).some((s) => s.lat === "41.9174")), "the trip loads, coordinates and all");
       await store(page, () => globalThis.__matTest.store.checkRev());
       await store(page, () => globalThis.__matTest.store.idle());
       await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
@@ -203,9 +203,9 @@ module.exports = [
       const keys = await chiKeys(page);
       assert.equal(keys.includes("chi.where"), false, "no choice stored: nothing asked for one");
       const bodies = JSON.stringify(backend.requests);
-      for (const digits of ["41.8917", "87.6086", "\"lat\"", "\"lng\""]) assert.equal(bodies.includes(digits), false, digits);
+      for (const digits of ["41.9090", "87.6377", "\"lat\"", "\"lng\""]) assert.equal(bodies.includes(digits), false, digits);
       const kept = await page.evaluate(() => JSON.stringify(Object.entries(localStorage)) + JSON.stringify(Object.entries(sessionStorage)));
-      for (const digits of ["41.8917", "87.6086"]) assert.equal(kept.includes(digits), false, digits);
+      for (const digits of ["41.9090", "87.6377"]) assert.equal(kept.includes(digits), false, digits);
     },
   },
 ];

@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { metres, walkMinutes, usable, distanceText, pointFromLink, linkProblem, DIRECTIONS_LINK, point, FRESH_MS, ROUGH_M } from "../js/geo.js";
 
-const LOOP = { lat: 41.8781, lng: -87.6298 };
+const LOOP = { lat: 41.8954, lng: -87.6589 };
 const NOW = Date.parse("2026-12-28T13:20:00-06:00");
 
 test("metres: the haversine distance", () => {
@@ -14,7 +14,7 @@ test("metres: the haversine distance", () => {
   // One degree of latitude is about 111.2 km.
   assert.ok(Math.abs(metres({ lat: 41, lng: -87 }, { lat: 42, lng: -87 }) - 111195) < 20);
   // Two made-up points about 2.3 km apart.
-  const d = metres({ lat: 41.8781, lng: -87.6298 }, { lat: 41.8917, lng: -87.6086 });
+  const d = metres({ lat: 41.8954, lng: -87.6589 }, { lat: 41.9091, lng: -87.6377 });
   assert.ok(d > 2200 && d < 2400, String(d));
   // Numbers as text, as the Sheet keeps them.
   assert.equal(metres({ lat: "41", lng: "-87" }, { lat: 41, lng: -87 }), 0);
@@ -57,23 +57,23 @@ test("distanceText", () => {
 });
 
 test("pointFromLink: the pin, else the map's centre, else nothing", () => {
-  const full = "https://www.google.com/maps/place/Made+Up+Pier/@41.8916,-87.6100,17z/data=!3m1!4b1!4m6!3m5!1s0x6001!8m2!3d41.8917286!4d-87.6086472!16s";
-  assert.deepEqual(pointFromLink(full), { lat: 41.8917286, lng: -87.6086472 });
-  assert.deepEqual(pointFromLink("https://www.google.com/maps/place/Made+Up+Station/@41.8789,-87.6403,15z"), { lat: 41.8789, lng: -87.6403 });
-  assert.deepEqual(pointFromLink("  https://www.google.com/maps/search/pizza/@-33.8688,151.2093,12z "), { lat: -33.8688, lng: 151.2093 });
+  const full = "https://www.google.com/maps/place/Made+Up+Pier/@41.9089,-87.6391,17z/data=!3m1!4b1!4m6!3m5!1s0x6001!8m2!3d41.9090286!4d-87.6377472!16s";
+  assert.deepEqual(pointFromLink(full), { lat: 41.9090286, lng: -87.6377472 });
+  assert.deepEqual(pointFromLink("https://www.google.com/maps/place/Made+Up+Station/@41.8962,-87.6694,15z"), { lat: 41.8962, lng: -87.6694 });
+  assert.deepEqual(pointFromLink("  https://www.google.com/maps/search/pizza/@-33.8515,151.1802,12z "), { lat: -33.8515, lng: 151.1802 });
   for (const none of ["https://maps.app.goo.gl/abc123", "Union Station", "", null, 7, "https://www.google.com/maps/@95.1,-87.1,15z"]) assert.equal(pointFromLink(none), null, String(none));
   assert.deepEqual(point({ lat: "41.1", lng: "-87.2" }), { lat: 41.1, lng: -87.2 });
 });
 
 test("a directions link is refused; the map's centre is read only from a place or search link", () => {
-  const dir = "https://www.google.com/maps/dir/41.8781,-87.6298/Made+Up+Station/@41.88,-87.63,14z/data=!3m1!4b1!4m9!4m8!1m1!4e1!1m5!1m1!1s0x0:0x0!2m2!1d-87.6403!2d41.8789";
+  const dir = "https://www.google.com/maps/dir/41.8954,-87.6589/Made+Up+Station/@41.88,-87.63,14z/data=!3m1!4b1!4m9!4m8!1m1!4e1!1m5!1m1!1s0x0:0x0!2m2!1d-87.6694!2d41.8962";
   assert.equal(DIRECTIONS_LINK, "That’s a directions link. Paste the place’s own link.");
   assert.equal(linkProblem(dir), DIRECTIONS_LINK);
   assert.equal(pointFromLink(dir), null, "never read, it may say where a person was");
   assert.equal(pointFromLink("https://www.google.com/maps/dir/?api=1&destination=x!3d41.1!4d-87.1"), null);
   // A bare map view's centre is where someone was looking (or standing): not read.
-  assert.equal(pointFromLink("https://www.google.com/maps/@41.8789,-87.6403,15z"), null);
-  assert.equal(linkProblem("https://www.google.com/maps/@41.8789,-87.6403,15z"), "");
+  assert.equal(pointFromLink("https://www.google.com/maps/@41.8962,-87.6694,15z"), null);
+  assert.equal(linkProblem("https://www.google.com/maps/@41.8962,-87.6694,15z"), "");
   // The pin is read from any other Maps link, as before.
   assert.deepEqual(pointFromLink("https://www.google.com/maps/@1,2,3z/data=!3d41.5!4d-87.5"), { lat: 41.5, lng: -87.5 });
   assert.equal(linkProblem("https://www.google.com/maps/place/x/@41,-87,17z"), "");
@@ -84,11 +84,11 @@ test("the phone's reader and the backend's agree on every link", async () => {
   const { createRequire } = await import("node:module");
   const P = createRequire(import.meta.url)("../backend/Pure.js");
   const links = [
-    "https://www.google.com/maps/place/Made+Up+Pier/@41.8916,-87.6100,17z/data=!3m1!4b1!4m6!3m5!1s0x6001!8m2!3d41.8917286!4d-87.6086472!16s",
-    "https://www.google.com/maps/place/Made+Up+Station/@41.8789,-87.6403,15z",
+    "https://www.google.com/maps/place/Made+Up+Pier/@41.9089,-87.6391,17z/data=!3m1!4b1!4m6!3m5!1s0x6001!8m2!3d41.9090286!4d-87.6377472!16s",
+    "https://www.google.com/maps/place/Made+Up+Station/@41.8962,-87.6694,15z",
     "https://www.google.com/maps/search/pizza/@41.89,-87.62,12z",
-    "https://www.google.com/maps/@41.8789,-87.6403,15z",
-    "https://www.google.com/maps/dir/41.8781,-87.6298/x/@41.88,-87.63,14z/data=!3d41.1!4d-87.1",
+    "https://www.google.com/maps/@41.8962,-87.6694,15z",
+    "https://www.google.com/maps/dir/41.8954,-87.6589/x/@41.88,-87.63,14z/data=!3d41.1!4d-87.1",
     "https://maps.app.goo.gl/abc123",
     "https://www.google.com/maps/place/x/@95.1,-87.1,17z",
     "",
