@@ -5,7 +5,7 @@
 
 import { dateIn } from "./time.js";
 import { tripCents } from "./money.js";
-import { metres, walkMinutes, distanceText } from "./geo.js";
+import { MILE_M, metres, gridMetres, blocksOf, compass, milesText, walkMinutes } from "./geo.js";
 
 const str = (v) => (typeof v === "string" ? v.trim() : "");
 
@@ -107,13 +107,13 @@ export function isPast(stop, minutes, nextId = null) {
   return m !== null && m < minutes && stop.id !== nextId;
 }
 
-const span = (n) => {
+export const span = (n) => {
   if (n < 60) return n + " min";
   const h = Math.floor(n / 60);
   const r = n % 60;
   return r ? h + " h " + r + " min" : h + " h";
 };
-const clock = (n) => String(Math.floor(n / 60)).padStart(2, "0") + ":" + String(n % 60).padStart(2, "0");
+export const clock = (n) => String(Math.floor(n / 60)).padStart(2, "0") + ":" + String(n % 60).padStart(2, "0");
 
 export function nextLine(stop, minutes) {
   const at = minutesOf(stop.time);
@@ -129,70 +129,99 @@ export function nextLine(stop, minutes) {
 }
 
 // ---- where you are (js/where.js gives the position; it never leaves the phone) ----
-// Ported from the Japan app (its leave-by, nearest stop, lodging distance and
-// stamp in the place). No screen uses these yet.
+// Distances are along the city's grid (north-south plus east-west), eight
+// blocks to a mile, walked at 70 m a minute.
 
-// Past this a straight line says nothing (you would take a train): the
-// leave-by and the stops' distances fall back to today's lines.
-export const NEAR_M = 3000;
-// The stamp is pressed "in the place" within this of the day's coordinates.
-export const PLACE_M = 15000;
+export const LEAVE_M = MILE_M; // leave-by from where you are: up to a mile along the grid
+export const NEAR_M = 3000; // a loose stop's distance: up to 3,000 m along the grid
+export const STAY_FAR_M = 50000; // the hotel card: up to 50 km along the grid
+export const PLACE_M = MILE_M; // the stamp: within a mile, straight line
 
-// Leave by, from where you are: the next stop's distance line and its leave
-// line from the walking minutes, or null when today's line stands (no time,
-// already started, no coordinates, no usable position, or over NEAR_M).
+// What the sign and the words beside it say for one place, or null (no position, no coordinates).
+// -> { m, blocks, dir, miles, min, dist }
+//    m: grid metres. blocks: 0..16, or null past 16. dir: "N" | "S" | "E" | "W" | "".
+export function fromHere(here, place) {
+  if (!here || !place) return null;
+  const m = gridMetres(here, place);
+  if (!Number.isFinite(m)) return null;
+  const b = blocksOf(m);
+  const min = walkMinutes(m);
+  return { m, blocks: b > 16 ? null : b, dir: compass(here, place), miles: milesText(m), min, dist: milesText(m) + " · " + min + " min walk" };
+}
+
+// The answers carry `from` without its raw metres: a redraw is never forced by
+// a metre and no raw distance sits in a redraw key.
+const bare = (from) => {
+  const { m, ...rest } = from;
+  return rest;
+};
+
+// Leave by, from where you are: null when today's line stands (no time,
+// already started, no coordinates, no usable position, or over a mile).
 // `here`: a usable position (js/where.js current()), or null.
-// -> { dist: "1.2 km · 20 min on foot", lead, late }
 export function hereLine(stop, minutes, here) {
   const at = minutesOf(stop && stop.time);
   if (at === null || !here || minutes >= at) return null;
-  const m = metres(here, stop);
-  if (!Number.isFinite(m) || m > NEAR_M) return null;
-  const walk = walkMinutes(m);
+  const f = fromHere(here, stop);
+  if (!f || f.m > LEAVE_M) return null;
+  const from = bare(f);
+  const walk = f.min;
   const spare = at - walk - minutes;
-  const dist = distanceText(m) + " · " + walk + " min on foot";
-  if (spare > 5) return { dist, lead: "Leave by " + clock(at - walk) + ", in " + span(spare) + ".", late: false };
-  if (spare > 0) return { dist, lead: "Leave now. " + spare + " min to spare.", late: false };
-  if (spare === 0) return { dist, lead: "Leave now.", late: false };
-  return { dist, lead: "About " + span(-spare) + " late. Leave now.", late: true };
+  const base = { from, dist: from.dist, leaveBy: clock(at - walk), spare };
+  if (spare > 5) return { ...base, lead: "Leave by " + clock(at - walk) + ", in " + span(spare) + ".", late: false, tone: "ok" };
+  if (spare > 0) return { ...base, lead: "Leave now. " + spare + " min to spare.", late: false, tone: "near" };
+  if (spare === 0) return { ...base, lead: "Leave now.", late: false, tone: "near" };
+  return { ...base, lead: "About " + span(-spare) + " late. Leave now.", late: true, tone: "late" };
 }
 
-// A loose day: each stop still to come with no time and coordinates within
-// NEAR_M gets its distance; the nearest is marked (near: true) when two or
-// more have one. The order never changes. -> { [id]: { dist, near } }
+// A loose day: each stop with no time and coordinates within NEAR_M gets its
+// distance; the nearest is marked (near: true) when two or more have one.
+// The order never changes. -> { [id]: { from, dist, near } }
 export function nearStops(dayStops, here) {
   const out = {};
   if (!here) return out;
+  const ms = {};
   let best = null;
   for (const s of dayStops || []) {
     if (!s || s.deleted || minutesOf(s.time) !== null) continue;
-    const m = metres(here, s);
-    if (!Number.isFinite(m) || m > NEAR_M) continue;
-    out[s.id] = { dist: distanceText(m) + " · " + walkMinutes(m) + " min on foot", near: false, m };
-    if (!best || m < out[best].m) best = s.id;
+    const f = fromHere(here, s);
+    if (!f || f.m > NEAR_M) continue;
+    ms[s.id] = f.m;
+    out[s.id] = { from: bare(f), dist: f.dist, near: false };
+    if (best === null || f.m < ms[best]) best = s.id;
   }
-  const ids = Object.keys(out);
-  if (ids.length > 1) out[best].near = true;
-  for (const id of ids) delete out[id].m;
+  if (Object.keys(out).length > 1) out[best].near = true;
   return out;
 }
 
-// Past this the card says nothing of how far (another city, another day's stay).
-export const STAY_FAR_M = 50000;
-
-// "2.4 km from here" for the stay card, or "".
+// For the hotel card: null, or { from, text: "1.4 mi from here" }.
 export function stayDistance(stay, here) {
-  if (!here || !stay) return "";
-  const m = metres(here, stay);
-  return Number.isFinite(m) && m <= STAY_FAR_M ? distanceText(m) + " from here" : "";
+  if (!here || !stay) return null;
+  const f = fromHere(here, stay);
+  return f && f.m <= STAY_FAR_M ? { from: bare(f), text: f.miles + " from here" } : null;
 }
 
 // Whether a stamp for this day is pressed in the place: a usable position
-// within PLACE_M of the day's coordinates.
-export function inPlace(day, here) {
+// within PLACE_M (straight line) of the day's coordinates or of one of the
+// day's stops that has coordinates.
+export function inPlace(day, stops, here) {
   if (!here || !day) return false;
-  const m = metres(here, day);
-  return Number.isFinite(m) && m <= PLACE_M;
+  const near = (x) => Number.isFinite(metres(here, x)) && metres(here, x) <= PLACE_M;
+  if (near(day)) return true;
+  return (stops || []).some((s) => s && !s.deleted && s.date === day.date && near(s));
+}
+
+// The board's reading of the same four cases nextLine decides, as values.
+export function planLeave(stop, minutes) {
+  const at = minutesOf(stop && stop.time);
+  if (at === null) return null;
+  if (minutes >= at) return { kind: "now" };
+  const travel = travelOf(stop);
+  if (travel > 0) {
+    const leave = Math.max(0, at - travel);
+    return minutes >= leave ? { kind: "go", leaveBy: clock(leave) } : { kind: "leave", leaveBy: clock(leave), in: span(leave - minutes) };
+  }
+  return { kind: "next", in: span(at - minutes) };
 }
 
 export function stayFor(stays, date) {

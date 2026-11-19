@@ -215,84 +215,130 @@ test("R37: other days' tickets are unchanged", () => {
   assert.equal(stayShownFor([X, Y], DEC13, {}).id, "Y");
 });
 
-// ---- where you are (ported from the Japan app: MAT eb3b690, dddb4e5, 9690e02, 6c7d5cc, cb13bce) ----
-// The pure rules the screens will use; no screen calls them yet. Every place here is made up.
-import { hereLine, nearStops, stayDistance, inPlace, NEAR_M, PLACE_M, STAY_FAR_M } from "../js/plan.js";
-import { metres, walkMinutes } from "../js/geo.js";
+// ---- where you are: the rules the screens use (miles, the grid, 70 m a minute) ----
+// Every place here is made up.
+import { hereLine, nearStops, stayDistance, inPlace, planLeave, fromHere, NEAR_M, PLACE_M, STAY_FAR_M, LEAVE_M } from "../js/plan.js";
+import { MILE_M } from "../js/geo.js";
 
-const PIERAT = { lat: 41.9090286, lng: -87.6377472 };
-// A point `m` metres north of p.
-const north = (p, m) => ({ lat: p.lat + m / 111195, lng: p.lng });
-const pierStop = (over = {}) => stop("The pier", "14:00", { lat: String(PIERAT.lat), lng: String(PIERAT.lng), travelMin: 30, ...over });
-
-test("leave-by from where you are: on time, close, late", () => {
-  const here = north(PIERAT, 1200);
-  const m = metres(here, PIERAT);
-  const walk = walkMinutes(m);
-  assert.equal(walk, 20); // 1200 m * 1.3 / 80 = 19.5, up
-  // 13:20; leave at 13:40 -> in 20 min.
-  assert.deepEqual(hereLine(pierStop(), 800, here), { dist: "1.2 km · 20 min on foot", lead: "Leave by 13:40, in 20 min.", late: false });
-  // 13:35: 5 min to spare.
-  assert.deepEqual(hereLine(pierStop(), 815, here), { dist: "1.2 km · 20 min on foot", lead: "Leave now. 5 min to spare.", late: false });
-  assert.equal(hereLine(pierStop(), 819, here).lead, "Leave now. 1 min to spare.");
-  assert.equal(hereLine(pierStop(), 814, here).lead, "Leave by 13:40, in 6 min.");
-  assert.equal(hereLine(pierStop(), 820, here).lead, "Leave now.");
-  // 13:46: six minutes late.
-  assert.deepEqual(hereLine(pierStop(), 826, here), { dist: "1.2 km · 20 min on foot", lead: "About 6 min late. Leave now.", late: true });
-  // Well ahead: hours.
-  assert.equal(hereLine(pierStop(), 600, here).lead, "Leave by 13:40, in 3 h 40 min.");
+const P = { lat: 41.9, lng: -87.7 };
+const DEG = (6371008.8 * Math.PI) / 180;
+const off = (base, n, e) => ({
+  lat: +(base.lat + n / DEG).toFixed(6),
+  lng: +(base.lng + e / (DEG * Math.cos((base.lat * Math.PI) / 180))).toFixed(6),
 });
+const txt = (p) => ({ lat: String(p.lat), lng: String(p.lng) });
+const atOff = (id, time, n, e, more = {}) => stop(id, time, { ...txt(off(P, n, e)), ...more });
 
-test("leave-by falls back to today's line", () => {
-  const near = north(PIERAT, 500);
-  assert.equal(hereLine(pierStop(), 800, null), null, "no usable position");
-  assert.equal(hereLine(pierStop({ lat: "", lng: "" }), 800, near), null, "no coordinates");
-  assert.equal(hereLine(pierStop({ time: "" }), 800, near), null, "no time");
-  assert.equal(hereLine(pierStop(), 840, near), null, "started: Now. stands");
-  assert.equal(hereLine(pierStop(), 850, near), null);
-  assert.equal(hereLine(pierStop(), 800, north(PIERAT, NEAR_M + 10)), null, "over 3 km: a train, not a walk");
-  assert.ok(hereLine(pierStop(), 800, north(PIERAT, NEAR_M - 10)));
-  // A stop the geocoder put in another city: far, so it falls back.
-  assert.equal(hereLine(pierStop({ lat: "40.7301", lng: "-74.035" }), 800, near), null);
-});
-
-test("nearest stop: distances on open stops to come, the nearest tagged, the order kept", () => {
-  const here = PIERAT;
-  const stops = [
-    stop("Train", "09:10", { lat: "41.88", lng: "-87.64" }),
-    stop("Museum", "", { id: "mus", lat: String(north(here, 900).lat), lng: String(here.lng) }),
-    stop("Gallery", "", { id: "gal", lat: String(north(here, 650).lat), lng: String(here.lng) }),
-    stop("Far", "", { id: "far", lat: String(north(here, 5000).lat), lng: String(here.lng) }),
-    stop("Nowhere", "", { id: "now" }),
-    stop("Dinner", "18:30", { lat: String(north(here, 100).lat), lng: String(here.lng), fixed: true }),
-  ];
-  const out = nearStops(stops, here);
-  assert.deepEqual(Object.keys(out).sort(), ["gal", "mus"]);
-  assert.deepEqual(out.gal, { dist: "650 m · 11 min on foot", near: true });
-  assert.deepEqual(out.mus, { dist: "900 m · 15 min on foot", near: false });
-  // One alone is not "nearest".
-  assert.deepEqual(nearStops([stops[1]], here), { mus: { dist: "900 m · 15 min on foot", near: false } });
-  assert.deepEqual(nearStops(stops, null), {});
-  assert.deepEqual(nearStops(stops.map((s) => ({ ...s, deleted: true })), here), {});
-});
-
-test("lodging distance: nothing beyond 50 km", () => {
-  const here = PIERAT;
+test("the constants", () => {
+  assert.equal(LEAVE_M, MILE_M);
+  assert.equal(NEAR_M, 3000);
   assert.equal(STAY_FAR_M, 50000);
-  assert.equal(stayDistance({ lat: String(north(here, 2400).lat), lng: String(here.lng) }, here), "2.4 km from here");
-  assert.equal(stayDistance({ lat: String(north(here, 33360).lat), lng: String(here.lng) }, here), "33 km from here");
-  assert.equal(stayDistance({ lat: String(north(here, 49900).lat), lng: String(here.lng) }, here), "50 km from here");
-  assert.equal(stayDistance({ lat: String(north(here, 51000).lat), lng: String(here.lng) }, here), "");
-  assert.equal(stayDistance({ lat: "", lng: "" }, here), "");
-  assert.equal(stayDistance({ lat: "41", lng: "-87" }, null), "");
-  assert.equal(stayDistance(null, here), "");
+  assert.equal(PLACE_M, MILE_M);
 });
 
-test("the stamp in the place: within 15 km of the day's coordinates", () => {
-  const here = PIERAT;
-  assert.equal(inPlace({ lat: String(north(here, PLACE_M - 50).lat), lng: String(here.lng) }, here), true);
-  assert.equal(inPlace({ lat: String(north(here, PLACE_M + 50).lat), lng: String(here.lng) }, here), false);
-  assert.equal(inPlace({ lat: "", lng: "" }, here), false, "a day with no coordinates");
-  assert.equal(inPlace({ lat: "41", lng: "-87" }, null), false, "no usable position");
-  assert.equal(inPlace(null, here), false, "no such day (the placemat's own stamp)");
+test("fromHere: the sign and the words for one place", () => {
+  const f = fromHere(P, txt(off(P, -805, 0)));
+  assert.deepEqual({ ...f, m: undefined }, { m: undefined, blocks: 4, dir: "S", miles: "0.5 mi", min: 12, dist: "0.5 mi · 12 min walk" });
+  assert.equal(fromHere(P, txt(off(P, 3500, 0))).blocks, null);
+  assert.equal(fromHere(null, P), null);
+  assert.equal(fromHere(P, { lat: "", lng: "" }), null);
+});
+
+test("hereLine: the worked day, stop at 0.5 mi south", () => {
+  const s = atOff("B", "14:30", -805, 0);
+  const from = { blocks: 4, dir: "S", miles: "0.5 mi", min: 12, dist: "0.5 mi · 12 min walk" };
+  const rows = [
+    [600, "Leave by 14:18, in 4 h 18 min.", "ok", 258],
+    [832, "Leave by 14:18, in 26 min.", "ok", 26],
+    [852, "Leave by 14:18, in 6 min.", "ok", 6],
+    [853, "Leave now. 5 min to spare.", "near", 5],
+    [857, "Leave now. 1 min to spare.", "near", 1],
+    [858, "Leave now.", "near", 0],
+    [864, "About 6 min late. Leave now.", "late", -6],
+    [869, "About 11 min late. Leave now.", "late", -11],
+  ];
+  for (const [minutes, lead, tone, spare] of rows) {
+    const h = hereLine(s, minutes, P);
+    assert.equal(h.lead, lead, String(minutes));
+    assert.equal(h.tone, tone);
+    assert.equal(h.spare, spare);
+    assert.equal(h.late, tone === "late");
+    assert.equal(h.dist, "0.5 mi · 12 min walk");
+    assert.equal(h.leaveBy, "14:18");
+    assert.deepEqual(h.from, from, "no raw metres in the answer");
+  }
+  assert.equal(hereLine(s, 870, P), null);
+  assert.equal(hereLine(s, 880, P), null);
+});
+
+test("hereLine: a mile along the grid, no more", () => {
+  assert.equal(hereLine(atOff("x", "14:30", 1600, 0), 832, P).lead, "Leave by 14:07, in 15 min.");
+  assert.equal(hereLine(atOff("x", "14:30", 1600, 0), 832, P).from.dist, "1.0 mi · 23 min walk");
+  assert.equal(hereLine(atOff("x", "14:30", 1600, 0), 832, P).from.blocks, 8);
+  assert.equal(hereLine(atOff("x", "14:30", 1620, 0), 832, P), null);
+  assert.equal(hereLine(atOff("x", "14:30", -1000, 1000), 832, P), null, "2,000 m on the grid though 1,414 m straight");
+  assert.equal(hereLine(atOff("x", "14:30", -805, 0), 832, null), null);
+  assert.equal(hereLine(stop("x", "14:30"), 832, P), null, "no coordinates");
+  assert.equal(hereLine(atOff("x", "", -805, 0), 832, P), null, "no time");
+});
+
+test("nearStops: loose stops within 3,000 m on the grid; the nearest is marked", () => {
+  const a = atOff("a", "", 0, 320), b = atOff("b", "", 160, 0), c = atOff("c", "", 600, -200);
+  const d = atOff("d", "", 3010, 0), timed = atOff("t", "10:00", 100, 0), gone = atOff("g", "", 50, 0, { deleted: true });
+  const out = nearStops([a, b, c, d, timed, gone], P);
+  assert.deepEqual(out, {
+    a: { from: { blocks: 2, dir: "E", miles: "0.2 mi", min: 5, dist: "0.2 mi · 5 min walk" }, dist: "0.2 mi · 5 min walk", near: false },
+    b: { from: { blocks: 1, dir: "N", miles: "0.1 mi", min: 3, dist: "0.1 mi · 3 min walk" }, dist: "0.1 mi · 3 min walk", near: true },
+    c: { from: { blocks: 4, dir: "N", miles: "0.5 mi", min: 12, dist: "0.5 mi · 12 min walk" }, dist: "0.5 mi · 12 min walk", near: false },
+  });
+  assert.deepEqual(Object.keys(out), ["a", "b", "c"], "the order never changes");
+  assert.deepEqual(nearStops([a], P), { a: { ...out.a, near: false } });
+  assert.deepEqual(nearStops([a, b], null), {});
+  const w = nearStops([atOff("w", "", 0, -60)], P).w;
+  assert.deepEqual(w.from, { blocks: 0, dir: "W", miles: "under 0.1 mi", min: 1, dist: "under 0.1 mi · 1 min walk" });
+});
+
+test("stayDistance: up to 50 km along the grid", () => {
+  const at = (n) => stayDistance(txt(off(P, n, 0)), P);
+  assert.equal(at(2250).text, "1.4 mi from here");
+  assert.equal(at(2250).from.blocks, 11);
+  assert.equal(at(2250).from.dir, "N");
+  assert.equal(at(3300).text, "2.1 mi from here");
+  assert.equal(at(3300).from.blocks, 16);
+  assert.equal(at(3500).text, "2.2 mi from here");
+  assert.equal(at(3500).from.blocks, null);
+  assert.equal(at(3500).from.dir, "N");
+  assert.equal(at(16500).text, "10 mi from here");
+  assert.equal(at(16500).from.blocks, null);
+  assert.equal(at(49000).text, "30 mi from here");
+  assert.equal(at(50100), null);
+  assert.equal("m" in at(2250).from, false);
+  assert.equal(stayDistance(txt(off(P, 2250, 0)), null), null);
+  assert.equal(stayDistance({ lat: "", lng: "" }, P), null);
+  assert.equal(stayDistance(null, P), null);
+});
+
+test("inPlace: within a mile, straight line, of the day or one of its stops", () => {
+  const day = (n, e, date = "2026-12-28") => ({ date, ...txt(off(P, n, e)) });
+  assert.equal(inPlace(day(1600, 0), [], P), true);
+  assert.equal(inPlace(day(1620, 0), [], P), false);
+  assert.equal(inPlace(day(1200, 1200), [], P), false, "1,697 m straight");
+  const far = day(9000, 0);
+  const s = (more) => ({ id: "s", date: "2026-12-28", deleted: false, ...txt(off(P, 0, 320)), ...more });
+  assert.equal(inPlace(far, [s()], P), true);
+  assert.equal(inPlace(far, [s({ deleted: true })], P), false);
+  assert.equal(inPlace(far, [s({ date: "2026-12-29" })], P), false);
+  assert.equal(inPlace(far, [s({ lat: "", lng: "" })], P), false);
+  assert.equal(inPlace({ date: "2026-12-28" }, [], P), false);
+  assert.equal(inPlace(far, [s()], null), false);
+  assert.equal(inPlace(null, [s()], P), false);
+});
+
+test("planLeave rebuilds nextLine for every minute", () => {
+  const sentence = (p) => (!p ? "" : p.kind === "now" ? "Now." : p.kind === "go" ? "Leave now." : p.kind === "leave" ? "Leave by " + p.leaveBy + ", in " + p.in + "." : "Next, in " + p.in + ".");
+  for (const s of [stop("t", "14:30", { travelMin: 25 }), stop("u", "14:30")]) {
+    for (let m = 600; m <= 900; m++) assert.equal(sentence(planLeave(s, m)), nextLine(s, m), s.id + " " + m);
+  }
+  assert.equal(planLeave(stop("n", ""), 600), null);
+  assert.deepEqual(planLeave(stop("t", "14:30", { travelMin: 25 }), 600), { kind: "leave", leaveBy: "14:05", in: "4 h 5 min" });
 });
