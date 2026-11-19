@@ -913,7 +913,10 @@ function stampDefById_(defs, id) {
 // backend's own clock for how late it arrived: see pressRefusal. Pressed
 // twice, it is one stamp (a resend answers the first). A lifted stamp is
 // pressed again, with a new time and seed, while its window is open. Never
-// through Claude.
+// through Claude. here: true when the phone was in the day's place as it
+// pressed (the app decides; no position is ever sent): kept as "yes" in
+// `here`, which a later press sets anew. Anything else is no mark; it never
+// refuses a press, and History and undo do not carry it.
 function pressStamp_(args, ctx) {
   if (ctx.via === "claude") return err_("bad_input", MSG_.claudeStamp);
   if (!stampsReady_()) return err_("needs_migrate", MSG_.needsMigrate);
@@ -935,10 +938,11 @@ function pressStamp_(args, ctx) {
   var seed = typeof args.seed === "number" && args.seed % 1 === 0 && args.seed >= 1 && args.seed <= 4294967295 ? args.seed : randomStampSeed_();
   var before = row ? stampSnap_(stampFromRow(row), def.date) : null;
   if (before && before.seed === seed) seed = seed === 4294967295 ? 1 : seed + 1;
+  var here = args.here === true ? "yes" : "";
   var savedRow;
-  if (row) savedRow = updateById_("Stamps", id, { at: at, seed: seed, gone: "" });
+  if (row) savedRow = updateById_("Stamps", id, { at: at, seed: seed, gone: "", here: here });
   else {
-    appendObj_("Stamps", { id: id, def: def.id, who: ctx.actor, at: at, seed: seed, gone: "" });
+    appendObj_("Stamps", { id: id, def: def.id, who: ctx.actor, at: at, seed: seed, gone: "", here: here });
     savedRow = findRow_("Stamps", id);
   }
   var saved = stampFromRow(savedRow);

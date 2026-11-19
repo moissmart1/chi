@@ -40,7 +40,8 @@ var TABS = {
   Settlements: ["id", "from", "to", "cad", "stamped_by", "stamped_at", "seed", "rot", "removed_at"],
   Log: ["id", "at", "who", "via", "action", "kind", "ref", "summary", "before", "after", "undoes", "undone_by"],
   StampDefs: ["id", "date", "name_ja", "name_en", "place", "motif", "ink", "shape"],
-  Stamps: ["id", "def", "who", "at", "seed", "gone"],
+  // here (the stamp in the place) came last, so it sits at the end, where migrate adds it.
+  Stamps: ["id", "def", "who", "at", "seed", "gone", "here"],
   // The real ticket on a stop: one row per picture (no data), and the
   // pictures' base64 in chunks, one cell each (README, The ticket on a stop).
   Tickets: ["id", "stop", "who", "seat", "page", "mime", "w", "h", "size", "chunks", "by", "at", "gone"],
@@ -1076,6 +1077,8 @@ function stampDefFromRow(o) {
 function stampFromRow(o) {
   var s = { def: cellText_(o.def), who: cellText_(o.who), at: cellStamp_(o.at), seed: cellNum_(o.seed) };
   if (cellText_(o.gone) === "yes") s.gone = true;
+  // Pressed with the phone in the place: only this yes is ever kept, never where.
+  if (cellText_(o.here) === "yes") s.here = true;
   return s;
 }
 
