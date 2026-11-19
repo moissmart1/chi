@@ -26,7 +26,8 @@
 // Properties), fake.propReads (every Script Properties key read, in order),
 // fake.setRate(rate, source) (today's rate and where it came from: "live",
 // "last" or "fallback"; default 0.72, "live"), fake.tableReads
-// (readTable_ calls per tab).
+// (readTable_ calls per tab), fake.geocoder ({ answer(query, region) }: the
+// stand-in for Apps Script's geocoder; default finds nothing).
 
 const fs = require("fs");
 const path = require("path");
@@ -107,6 +108,8 @@ function createFakeBackend(seed, { clock, lockFails, keepsApostrophe = false } =
   const deskPosts = [];
   const fakeDesk = { answer: () => ({ ok: true }) };
   const consoleLines = [];
+  // The stand-in geocoder (Env.js geocode_): answer(query, region) -> { lat, lng } | null, or throws.
+  const geocoder = { answer: () => null };
 
   const headers = (tab) => {
     const h = P.TABS[tab];
@@ -263,6 +266,7 @@ function createFakeBackend(seed, { clock, lockFails, keepsApostrophe = false } =
         held.owner = false;
       }
     },
+    geocode_: (q, region) => geocoder.answer(q, region),
     clockMs_: () => Date.now() + lockWaited,
     getRate_: () => rate.rate,
     getRateInfo_: () => ({ rate: rate.rate, source: rate.source }),
@@ -328,6 +332,7 @@ function createFakeBackend(seed, { clock, lockFails, keepsApostrophe = false } =
   fake.tables = tables;
   fake.requests = requests;
   fake.primitives = primitives;
+  fake.geocoder = geocoder;
   fake.world = world; // test-only: replace a helper (e.g. make updateById_ throw)
   fake.lockWaitedMs = () => lockWaited;
   // Test-only: what the Plan 1 backend (0a66cbd) answered to load, for a

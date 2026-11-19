@@ -318,7 +318,7 @@ const STOP = { id: "stopAAAA0001", date: "2026-12-28", title: " Shibuya Sky ", t
 
 test("validateStop fills the blanks and trims", () => {
   const v = P.validateStop(STOP, DATES);
-  assert.deepEqual(v.value, { id: "stopAAAA0001", date: "2026-12-28", time: "14:00", title: "Shibuya Sky", detail: "", gettingThere: "", travelMin: 0, fixed: false, place: "", signJp: "", booked: false, link: "", photo: "", note: "", tkRef: "", tkName: "", tkPeople: "", tkSeat: "" });
+  assert.deepEqual(v.value, { id: "stopAAAA0001", date: "2026-12-28", time: "14:00", title: "Shibuya Sky", detail: "", gettingThere: "", travelMin: 0, fixed: false, place: "", signJp: "", booked: false, link: "", photo: "", note: "", lat: "", lng: "", tkRef: "", tkName: "", tkPeople: "", tkSeat: "" });
 });
 test("validateStop refuses what it must", () => {
   const bad = (patch, message) => assert.deepEqual(P.validateStop({ ...STOP, ...patch }, DATES), { ok: false, message });
@@ -425,7 +425,8 @@ test("validateStay: an optional https photo, like a stop's", () => {
 test("stay photo: column after link, read through safeUrl, written by stayToRow", () => {
   const t = P.TABS.Stays;
   assert.equal(t[t.indexOf("link") + 1], "photo");
-  assert.equal(t[t.length - 1], "deleted_at");
+  // lat and lng came later: after deleted_at, where migrate adds them.
+  assert.deepEqual(t.slice(-3), ["deleted_at", "lat", "lng"]);
   assert.equal(P.isTextColumn("Stays", "photo"), P.isTextColumn("Stops", "photo"));
   assert.equal(P.stayFromRow({ id: "s", photo: "https://example.org/a.jpg" }).photo, "https://example.org/a.jpg");
   for (const bad of ["=HYPERLINK(\"https://example.org/a.jpg\")", "http://example.org/a.jpg", "javascript:x", undefined]) {
@@ -435,11 +436,11 @@ test("stay photo: column after link, read through safeUrl, written by stayToRow"
 });
 test("stay rows round-trip and read safely", () => {
   const stay = P.validateStay({ id: "stayAAAA0001", name: "Asakusa hotel", firstNight: "2026-12-26", lastNight: "2026-12-28", link: "https://x.test" }).value;
-  assert.deepEqual(P.stayFromRow(P.stayToRow(stay)), { ...stay, deleted: false });
+  assert.deepEqual(P.stayFromRow(P.stayToRow(stay)), { ...stay, deleted: false, lat: "", lng: "" });
   assert.equal("deleted_at" in P.stayToRow(stay), false);
   assert.equal(P.stayFromRow({ id: "s", name: "N", link: "javascript:x", deleted_at: "x" }).link, "");
   assert.equal(P.stayFromRow({ id: "s", deleted_at: "x" }).deleted, true);
-  assert.equal(P.TABS.Stays[P.TABS.Stays.length - 1], "deleted_at");
+  assert.deepEqual(P.TABS.Stays.slice(-3), ["deleted_at", "lat", "lng"]);
 });
 test("validateDayPatch", () => {
   assert.deepEqual(P.validateDayPatch({ city: " Tokyo ", lineColour: "#2fb6e8" }).value, { city: "Tokyo", lineColour: "#2fb6e8" });
@@ -452,7 +453,7 @@ test("validateDayPatch", () => {
   assert.deepEqual(P.validateDayPatch({ lineColour: "" }).value, { lineColour: "" });
 });
 test("day rows, labels and links", () => {
-  const d = { date: "2026-12-28", city: "Tokyo", title: "", lineJp: "山手線", lineEn: "Yamanote", lineColour: "#9ACD32", fromJp: "", fromEn: "", toJp: "", toEn: "" };
+  const d = { date: "2026-12-28", city: "Tokyo", title: "", lineJp: "山手線", lineEn: "Yamanote", lineColour: "#9ACD32", fromJp: "", fromEn: "", toJp: "", toEn: "", lat: "", lng: "" };
   assert.deepEqual(P.dayFromRow(P.dayToRow(d)), d);
   assert.equal(P.dayFromRow({ date: "2026-12-28", line_colour: "not a colour" }).lineColour, "");
   assert.equal(P.dayLabel("2026-12-28"), "Mon Dec 28");

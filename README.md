@@ -128,6 +128,14 @@ The workings of the Japan app's tickets (its versions 29 to 31) are here; the sc
 
 **The pure parts the screens will use.** `js/tickets.js` (`ticketKinds`, `ticketMark`: a stop's codes, pages or reference), `js/passcase.js` (which ticket is next, today's, later and used, on Chicago's clock) and `js/bulk.js` (many files at once: the planner list's CSV, file to line to stop, limits, already there, facts only where empty).
 
+## Where things are (no screen yet)
+
+The workings of the Japan app's location features are here; the screens are not. Nothing on the phone asks for its position yet, so no position is ever requested.
+
+**The Sheet.** `Stops`, `Stays` and `Days` each have `lat` and `lng` at the end (numbers kept as text, empty when not known). `migrate` adds the columns (`npm run ship -- --migrate`).
+
+**locate.** It fills `lat` and `lng` in with Apps Script's own geocoder (the Maps service: no key, no Cloud project; region `us`) for every stop, stay and day that has none: a stop by its `place`, else its `title`, each with its day's `city` (a `place` that is a Google Maps link with a position in it is read without asking; when the day has a position, an answer more than 30 km from it counts as not found); a stay by its `name` with its `place`; a day by its `city`. At most 40 lookups a call, one a row; it answers `{"found":n,"missing":n,"more":true|false}`. Run it after `migrate`, the same way but with your own key (the check key only reads), with `"action":"locate"`, and again while `more` is true. A lookup that finds nothing leaves the cells empty and is tried again, in its other form, on a later call (`LOCATE_TRIED` in Script Properties keeps which rows were tried). It writes no History; phones pick the positions up on their next check. A stop's position is cleared when its place changes, a stay's when its place or address changes, a day's when its city changes; undo puts a position back only when that change moved it. The Claude connector shows positions but cannot set them, and cannot run `locate`. These are places' positions only: the phone's own position never leaves the phone.
+
 ## You
 
 **Your picture.** "Your picture" opens the phone's own picker. The phone crops it to a centred square, shrinks it to 128 × 128 and sends it as a small JPEG; it then shows inside your seal on every phone. Each person sets only their own.

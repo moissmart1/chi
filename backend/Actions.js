@@ -64,16 +64,16 @@ function planKind_(kind) {
   if (kind === "stop") {
     return {
       tab: "Stops", key: "id", deletable: true, fromRow: stopFromRow, toRow: stopToRow, missing: MSG_.noStop,
-      fields: ["date", "time", "title", "detail", "gettingThere", "travelMin", "fixed", "place", "signJp", "booked", "link", "photo", "note", "tkRef", "tkName", "tkPeople", "tkSeat"],
+      fields: ["date", "time", "title", "detail", "gettingThere", "travelMin", "fixed", "place", "signJp", "booked", "link", "photo", "note", "lat", "lng", "tkRef", "tkName", "tkPeople", "tkSeat"],
     };
   }
   if (kind === "stay") {
     return {
       tab: "Stays", key: "id", deletable: true, fromRow: stayFromRow, toRow: stayToRow, missing: MSG_.noStay,
-      fields: ["name", "nameJp", "addressJp", "firstNight", "lastNight", "note", "place", "link", "photo"],
+      fields: ["name", "nameJp", "addressJp", "firstNight", "lastNight", "note", "place", "link", "photo", "lat", "lng"],
     };
   }
-  if (kind === "day") return { tab: "Days", key: "date", deletable: false, fromRow: dayFromRow, toRow: dayToRow, missing: MSG_.noDay, fields: DAY_PATCH_KEYS };
+  if (kind === "day") return { tab: "Days", key: "date", deletable: false, fromRow: dayFromRow, toRow: dayToRow, missing: MSG_.noDay, fields: DAY_PATCH_KEYS.concat(["lat", "lng"]) };
   return null;
 }
 
@@ -161,6 +161,9 @@ function dispatch_(body, holder) {
       return ok_({ added: added }, rev_());
     });
   }
+  // Where things are: run from a terminal like migrate (a person's key; the
+  // check key and the connector never get here: neither list names it).
+  if (action === "locate") return withLock_(locate_);
   // The Claude connector's token, for Settings to copy into a link. Never
   // logged. Only for the trip's first person (the owner), on their own key.
   if (action === "claudeLink") {
@@ -624,7 +627,14 @@ function planReply_(kind, item, logId) {
   return data;
 }
 
+// Coordinates come only from the app (a pasted Maps link) or locate: the
+// connector reads them but cannot set them.
+function claudeCoords_(input, ctx) {
+  return ctx.via === "claude" && isObj_(input) && (input.lat !== undefined || input.lng !== undefined);
+}
+
 function addStop_(args, ctx) {
+  if (claudeCoords_(args.stop, ctx)) return err_("bad_input", MSG_.stopPatchKey);
   var v = validateStop(args.stop, tripDates_());
   if (!v.ok) return err_("bad_input", v.message);
   if (factsNeedMigrate_(v.value)) return err_("needs_migrate", MSG_.needsMigrate);
@@ -637,6 +647,7 @@ function updateStop_(args, ctx) {
   if (!id) return err_("bad_input", MSG_.badId);
   var patch = args.patch;
   if (!isObj_(patch)) return err_("bad_input", MSG_.badPatch);
+  if (claudeCoords_(patch, ctx)) return err_("bad_input", MSG_.stopPatchKey);
   var keys = Object.keys(patch);
   for (var i = 0; i < keys.length; i++) {
     if (plan.fields.indexOf(keys[i]) === -1) return err_("bad_input", MSG_.stopPatchKey);
@@ -653,7 +664,141 @@ function updateStop_(args, ctx) {
   var v = validateStop(merged, tripDates_());
   if (!v.ok) return err_("bad_input", v.message);
   if (factsNeedMigrate_(v.value)) return err_("needs_migrate", MSG_.needsMigrate);
+  // A new place: the old coordinates were for the old one (unless new ones came with it).
+  if (v.value.place !== cur.place && patch.lat === undefined && patch.lng === undefined) {
+    v.value.lat = "";
+    v.value.lng = "";
+  }
   return editPlanItem_("stop", id, cur, v.value, ctx);
+}
+
+// ---- where things are: locate ----
+// For each stop, stay and day with no coordinates, asks Apps Script's own
+// geocoder (Env.js geocode_, region us). Each row has its forms of question:
+// a stop its place with its day's city, then its title with its day's city
+// (and when the day has coordinates, an answer more than LOCATE_NEAR_M_ from
+// them counts as not found: a common name in another city); a stay its name
+// with its place; a day its city. A stop whose place is a Maps link with a
+// position is read without asking. (The Japan app asks for a stay's
+// Japanese address first; Chicago's stays are asked by name and place only.)
+// Fair to every row: a row costs at most one lookup a call; rows never tried
+// go first, rows tried before go last (the longest ago first), each trying
+// its next form. Which rows found nothing, and how often, is kept in one
+// Script Property, LOCATE_TRIED ({ "stop:<id>": { d: day, n: tries } }),
+// pruned to rows still without coordinates. At most LOCATE_MAX_ lookups a
+// call (the same question twice in a call is asked once). No History line;
+// rev moves when something was found, so phones fetch it.
+// -> { found, missing, more } (more: rows never tried remain).
+
+var LOCATE_MAX_ = 40;
+var LOCATE_KEY_ = "LOCATE_TRIED";
+var LOCATE_NEAR_M_ = 30000;
+var LOCATE_REGION_ = "us";
+
+function locate_() {
+  var tabs = ["Stops", "Stays", "Days"];
+  for (var t = 0; t < tabs.length; t++) {
+    if (!hasColumn_(tabs[t], "lat") || !hasColumn_(tabs[t], "lng")) return err_("needs_migrate", MSG_.needsMigrate);
+  }
+  var tried = {};
+  try {
+    var kept = JSON.parse(getProp_(LOCATE_KEY_) || "{}");
+    if (kept && typeof kept === "object" && !Array.isArray(kept)) tried = kept;
+  } catch (e) {
+    tried = {};
+  }
+  var placeText = function (v) { var s = cellText_(v).trim(); return safeUrl(s) ? "" : s; };
+  var clean = function (list) {
+    var out = [];
+    list.forEach(function (q) {
+      q = String(q || "").replace(/\s+/g, " ").trim();
+      if (q !== "" && out.indexOf(q) === -1) out.push(q);
+    });
+    return out;
+  };
+  // Every row still without coordinates: { key, tab, col, ref, queries, pin }.
+  var rows = [];
+  var days = readTable_("Days");
+  var cityOf = {};
+  var dayAt = {}; // a day's coordinates, as known so far
+  days.forEach(function (r) {
+    cityOf[cellDate_(r.date)] = cellText_(r.city).trim();
+    if (coordsOf_(r).lat !== "") dayAt[cellDate_(r.date)] = coordsOf_(r);
+  });
+  days.forEach(function (r) {
+    var date = cellDate_(r.date);
+    if (date === "" || coordsOf_(r).lat !== "") return;
+    rows.push({ key: "day:" + date, tab: "Days", col: "date", ref: date, day: date, queries: clean([cityOf[date]]) });
+  });
+  readTable_("Stays").forEach(function (r) {
+    var id = cellText_(r.id);
+    if (id === "" || cellSet_(r.deleted_at) || coordsOf_(r).lat !== "") return;
+    rows.push({ key: "stay:" + id, tab: "Stays", col: "id", ref: id, queries: clean([cellText_(r.name) + " " + placeText(r.place)]) });
+  });
+  readTable_("Stops").forEach(function (r) {
+    var id = cellText_(r.id);
+    if (id === "" || cellSet_(r.deleted_at) || coordsOf_(r).lat !== "") return;
+    var city = cityOf[cellDate_(r.date)] || "";
+    var place = placeText(r.place);
+    rows.push({
+      key: "stop:" + id, tab: "Stops", col: "id", ref: id, pin: pointFromLink(cellText_(r.place)), on: cellDate_(r.date),
+      queries: clean([place ? place + " " + city : "", cellText_(r.title).trim() + " " + city]),
+    });
+  });
+  // Keep only rows still waiting; untried first (in sheet order), then the longest ago.
+  var still = {};
+  rows.forEach(function (row) { if (tried[row.key]) still[row.key] = tried[row.key]; });
+  tried = still;
+  var order = rows.map(function (row, i) { return { row: row, i: i, t: tried[row.key] || null }; });
+  order.sort(function (x, y) {
+    if (!x.t !== !y.t) return x.t ? 1 : -1;
+    if (x.t && y.t && x.t.d !== y.t.d) return x.t.d < y.t.d ? -1 : 1;
+    return x.i - y.i;
+  });
+  var left = LOCATE_MAX_;
+  var asked = {};
+  var found = 0;
+  var missing = 0;
+  var more = false;
+  var day = today_();
+  order.forEach(function (o) {
+    var row = o.row;
+    var p = row.pin || null;
+    if (!p) {
+      if (!row.queries.length) return;
+      var n = o.t ? Number(o.t.n) || 0 : 0;
+      var q = row.queries[n % row.queries.length];
+      if (!Object.prototype.hasOwnProperty.call(asked, q)) {
+        if (left <= 0) {
+          if (!o.t) more = true;
+          return;
+        }
+        left--;
+        var got = null;
+        try {
+          got = geocode_(q, LOCATE_REGION_);
+        } catch (e) {
+          got = null;
+        }
+        asked[q] = got ? coordsOf_(got) : null;
+        if (asked[q] && asked[q].lat === "") asked[q] = null;
+      }
+      p = asked[q];
+      // A stop's answer far from its day's place is another place of that name.
+      if (p && row.on && dayAt[row.on] && !(metresBetween_(p, dayAt[row.on]) <= LOCATE_NEAR_M_)) p = null;
+    }
+    if (!p) {
+      missing++;
+      tried[row.key] = { d: day, n: (o.t ? Number(o.t.n) || 0 : 0) + 1 };
+      return;
+    }
+    updateWhere_(row.tab, row.col, row.ref, { lat: p.lat, lng: p.lng });
+    if (row.day) dayAt[row.day] = p;
+    delete tried[row.key];
+    found++;
+  });
+  setProp_(LOCATE_KEY_, JSON.stringify(tried));
+  return ok_({ found: found, missing: missing, more: more }, found > 0 ? bumpRev_() : rev_());
 }
 
 // A new id adds the stay; a known one edits it. With merge: true (the Claude
@@ -682,6 +827,11 @@ function saveStay_(args, ctx) {
   if (!row) return addPlanItem_("stay", v.value, ctx);
   var cur = plan.fromRow(row);
   if (cur.deleted) return err_("bad_input", MSG_.editDeleted);
+  // A new address or place: the old coordinates were for the old one. A new name alone is no move.
+  if (v.value.addressJp !== cur.addressJp || v.value.place !== cur.place) {
+    v.value.lat = "";
+    v.value.lng = "";
+  }
   return editPlanItem_("stay", cur.id, cur, v.value, ctx);
 }
 
@@ -709,6 +859,11 @@ function setDay_(args, ctx) {
   var cur = plan.fromRow(row);
   var next = planFields_(plan, cur);
   Object.keys(v.value).forEach(function (k) { next[k] = v.value[k]; });
+  // A new city: the old coordinates were for the old one.
+  if (next.city !== cur.city) {
+    next.lat = "";
+    next.lng = "";
+  }
   return editPlanItem_("day", cur.date, cur, next, ctx);
 }
 
@@ -992,6 +1147,13 @@ function undoTicket_(entry, rows, ctx) {
 
 // ---- undo ----
 
+// Whether a logged change moved an item's coordinates (both sides known and different).
+function movedCoords_(entry) {
+  var b = entry.before, a = entry.after;
+  if (!b || !a || b.lat === undefined || a.lat === undefined) return false;
+  return b.lat !== a.lat || b.lng !== a.lng;
+}
+
 function undo_(args, ctx) {
   var raw = args.logId;
   var logId = typeof raw === "number" ? raw : typeof raw === "string" && raw.trim() !== "" ? Number(raw) : NaN;
@@ -1023,6 +1185,19 @@ function undo_(args, ctx) {
   if (plan) {
     cur = plan.fromRow(curRow);
     patch = changedCols_(plan, cur, target);
+    // Coordinates are written back only when that change itself moved them:
+    // an older entry (or one from before locate ran) must not wipe them.
+    if (!movedCoords_(entry)) {
+      delete patch.lat;
+      delete patch.lng;
+      // But a restored place, address or city is not where the coordinates now
+      // are (locate may have found the new one since): clear them so locate asks again.
+      var posCols = { stop: ["place"], stay: ["address_jp", "place"], day: ["city"] }[entry.kind] || [];
+      if (posCols.some(function (c) { return patch[c] !== undefined; })) {
+        patch.lat = "";
+        patch.lng = "";
+      }
+    }
     if (plan.deletable) patch.deleted_at = target.deleted ? (cur.deleted ? undefined : nowIso_()) : "";
     saved = writePlan_(plan, entry.ref, patch);
   } else if (isExpense) {
