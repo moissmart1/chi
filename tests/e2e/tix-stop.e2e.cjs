@@ -277,6 +277,8 @@ cases.push({
     await ready(page, { backend });
     await showTicket(page, S.hawks);
     assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector("#tix .f-tk")).animationName), "none");
+    // Both pictures are here first: one arriving redraws the ticket and moves its corner.
+    await until(() => page.evaluate(() => document.querySelectorAll("#tix img.code").length === 2 && [...document.querySelectorAll("#tix img.code")].every((i) => i.complete)), "the pictures are drawn");
     await flipUp(page);
     assert.equal(await onTop(page), "Izzah");
     assert.equal(await page.evaluate(() => document.getElementById("tix").getAnimations({ subtree: true }).filter((a) => (a.animationName === "lift" || a.animationName === "flip") && a.playState === "running").length), 0);
