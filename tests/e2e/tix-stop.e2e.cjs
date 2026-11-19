@@ -434,6 +434,35 @@ cases.push({
   },
 });
 
+// A picture arriving under the finger on the Days check's Show ticket key
+// replaces the key: the tap is still a tap.
+cases.push({
+  name: "Show ticket on a stop: a picture arriving between finger down and finger up still holds the ticket up",
+  async run({ page }) {
+    const backend = await ticketed({ kinds: ["hawks"] });
+    let release;
+    const gate = new Promise((r) => { release = r; });
+    const handle = backend.handle.bind(backend);
+    backend.handle = async (b) => { if (b.action === "ticket") await gate; return handle(b); };
+    await ready(page, { backend });
+    await openRow(page, S.hawks);
+    const k = row(S.hawks) + " .r-tk";
+    const b = await page.evaluate((sel) => {
+      const e = document.querySelector(sel);
+      e.scrollIntoView({ block: "center" });
+      e.dataset.mark = "1";
+      const r = e.getBoundingClientRect();
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    }, k);
+    await page.mouse.move(b.x, b.y);
+    await page.mouse.down();
+    release();
+    await until(() => page.evaluate(() => !document.querySelector("#rail .r-tk[data-mark]")), "the picture arrives and the key is replaced under the finger");
+    await page.mouse.up();
+    await until(() => page.evaluate(() => !document.getElementById("tix").hidden), "the ticket is held up");
+  },
+});
+
 cases.push({
   name: "no ticket anywhere (or before migrate): no stub, no Show ticket, the stop as it was; no Ticket pictures row",
   async run({ page, newPhone }) {

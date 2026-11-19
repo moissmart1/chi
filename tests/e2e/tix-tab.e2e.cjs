@@ -313,6 +313,35 @@ cases.push({
   },
 });
 
+// A picture arriving under the finger redraws the tab and replaces the key
+// pressed; the tap is still a tap.
+for (const [name, sel] of [["Show ticket", "#ttShow"], ["the big stub", "#ttWin"]]) {
+  cases.push({
+    name: "Tickets tab: a picture arriving between finger down and finger up on " + name + " still holds the ticket up",
+    async run({ page }) {
+      const backend = await ticketed({ kinds: ["hawks"] });
+      let release;
+      const gate = new Promise((r) => { release = r; });
+      const handle = backend.handle.bind(backend);
+      backend.handle = async (b) => { if (b.action === "ticket") await gate; return handle(b); };
+      await ready(page, { backend });
+      await goTickets(page);
+      const b = await page.evaluate((s) => {
+        const e = document.querySelector(s);
+        e.dataset.mark = "1";
+        const r = e.getBoundingClientRect();
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      }, sel);
+      await page.mouse.move(b.x, b.y);
+      await page.mouse.down();
+      release();
+      await until(() => page.evaluate(() => !document.querySelector("#vTickets [data-mark]")), "the picture arrives and the tab redraws under the finger");
+      await page.mouse.up();
+      await until(() => page.evaluate(() => !document.getElementById("tix").hidden), "the ticket is held up");
+    },
+  });
+}
+
 cases.push({
   name: "a refused key: the tab is emptied and its key leaves the bar",
   async run({ page }) {

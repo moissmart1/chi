@@ -25,6 +25,7 @@
 import { passCase } from "../passcase.js";
 import { dayHead } from "../format.js";
 import { checkDate } from "../plan.js";
+import { tapOnRelease } from "./tap.js";
 import { el, tixInfo, stubEl, resvEl, bigStubEl, staple, tclock, thumbEl, kindWord, bandDay, statusWords } from "./stubs.js";
 
 // How often the tab looks again while the app is on screen: a ticket's time
@@ -251,7 +252,20 @@ export function mountTicketTab(root, store, { clock, keep, onTicket = () => {}, 
     draw(c);
   }
 
+  // A picture arriving under the finger redraws every button here: the tap is
+  // done on finger up on the button now in its place (js/views/tap.js).
+  const tap = tapOnRelease(section, {
+    pick: (t) => {
+      const b = t.closest("button[data-act]");
+      return b && b.dataset.id ? { act: b.dataset.act, id: b.dataset.id } : null;
+    },
+    act: ({ act, id }) => {
+      const b = section.querySelector('button[data-act="' + act + '"][data-id="' + CSS.escape(id) + '"]') || section.querySelector('button[data-id="' + CSS.escape(id) + '"]');
+      if (b) onTicket(id, b);
+    },
+  });
   section.addEventListener("click", (ev) => {
+    if (tap.skip(ev)) return;
     const b = ev.target.closest("button[data-act]");
     if (!b || !section.contains(b) || !b.dataset.id) return;
     onTicket(b.dataset.id, b);

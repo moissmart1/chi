@@ -52,6 +52,7 @@ import { TRIP_TZ } from "../trip.js";
 import { ticketEl } from "./ticket.js";
 import { summary as bookSummary, countText } from "../stampbook.js";
 import { isPhone } from "../shape.js";
+import { tapOnRelease } from "./tap.js";
 
 const TICK_MS = 15000;
 // While a demo runs, a trip minute passes every half second.
@@ -380,7 +381,21 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
     openId = was === r.dataset.id ? null : r.dataset.id;
     applyOpen();
   }
+  // A picture arriving under the finger can replace the Show ticket key: the
+  // tap is done on finger up on the key now in its place (js/views/tap.js).
+  const tap = tapOnRelease(rail, {
+    pick: (t) => {
+      const k = t.closest(".r-tk");
+      const r = k && k.closest(".r[data-id]");
+      return r ? r.dataset.id : null;
+    },
+    act: (id) => {
+      const k = rail.querySelector('.r[data-id="' + CSS.escape(id) + '"] .r-tk');
+      if (k) onTicket(id, k);
+    },
+  });
   rail.addEventListener("click", (ev) => {
+    if (tap.skip(ev)) return;
     if (ev.target.closest(".tk-stampline")) {
       onStampBook();
       return;
