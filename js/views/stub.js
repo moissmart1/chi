@@ -418,7 +418,28 @@ export function mountStub(root, store, keep) {
     if (restoreFocus && back && back.isConnected) back.focus({ preventScroll: true });
   }
 
+  let lastDown = null; // what the finger went down on: { in, flip, seal, close }
+  host.addEventListener("pointerdown", (ev) => {
+    const w = ev.target.closest(".who button");
+    lastDown = {
+      in: !!ev.target.closest(".f-tk, .who, .tb"),
+      flip: !!ev.target.closest("[data-flip]"),
+      seal: w ? Number(w.dataset.k) : null,
+      close: !!ev.target.closest("[data-close]"),
+    };
+  });
   host.addEventListener("click", (ev) => {
+    // A picture arriving between finger down and finger up repaints the ticket and
+    // replaces what the finger went down on: the click then lands on the host. It
+    // is the tap it was (the corner, a seal, Back), never a tap on the dark.
+    const down = lastDown;
+    lastDown = null;
+    if (ev.target === host && down && down.in) {
+      if (down.flip) show(at + 1, true);
+      else if (down.seal !== null && down.seal !== at) show(down.seal, true);
+      else if (down.close) close();
+      return;
+    }
     if (ev.target.closest(".zoom")) {
       zoomOut();
       return;

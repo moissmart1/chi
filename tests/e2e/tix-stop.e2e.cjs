@@ -18,8 +18,8 @@ const closeTicket = async (page) => {
   await page.click("#tix [data-close]");
   await until(() => page.evaluate(() => document.getElementById("tix").hidden), "the ticket goes back");
 };
-// Taps the corner of the ticket stapled underneath (the part that shows below the top one).
-async function flipUp(page) {
+// A point on the corner of the ticket stapled underneath (the part that shows below the top one).
+async function cornerPoint(page) {
   // A point where the corner itself is the top thing (it is tilted under the
   // ticket on top): the middle of the strip of it that shows.
   await page.evaluate(() => document.querySelector("#tix .nx").scrollIntoView({ block: "end" }));
@@ -35,6 +35,11 @@ async function flipUp(page) {
     return hits.length ? { x, y: hits[Math.floor(hits.length / 2)] } : null;
   });
   assert.ok(b, "the corner underneath shows");
+  return b;
+}
+// Taps the corner of the ticket stapled underneath.
+async function flipUp(page) {
+  const b = await cornerPoint(page);
   await page.mouse.click(b.x, b.y);
 }
 // The ticket on top (per person: the one not hidden).
@@ -278,6 +283,37 @@ cases.push({
     assert.equal(await page.evaluate(() => [...document.querySelectorAll("#tix .pp-pg")].some((p) => p.classList.contains("is-flip"))), false);
   },
 });
+
+// A picture arriving while a finger is on the corner repaints the ticket (the
+// corner it went down on is replaced). The tap still flips, and the ticket
+// stays up. (This was the "reduced motion" case's rare failure: the repaint
+// turned the tap into a tap on the dark, which put the ticket away.)
+for (const calmMotion of [true, false]) {
+  cases.push({
+    name: "a picture arriving between finger down and finger up neither closes the ticket nor loses the flip (" + (calmMotion ? "reduced" : "normal") + " motion)",
+    async run({ page }) {
+      if (calmMotion) await page.emulateMedia({ reducedMotion: "reduce" });
+      const backend = await ticketed({ kinds: ["hawks"] });
+      let release;
+      const gate = new Promise((r) => { release = r; });
+      const handle = backend.handle.bind(backend);
+      backend.handle = async (b) => { if (b.action === "ticket") await gate; return handle(b); };
+      await ready(page, { backend });
+      await showTicket(page, S.hawks);
+      assert.equal(await page.evaluate(() => document.querySelectorAll("#tix img.code").length), 0, "the pictures are not here yet");
+      const first = await onTop(page);
+      const b = await cornerPoint(page);
+      await page.evaluate(() => { document.querySelector("#tix .ov").dataset.mark = "1"; });
+      await page.mouse.move(b.x, b.y);
+      await page.mouse.down();
+      release();
+      await until(() => page.evaluate(() => !document.querySelector("#tix .ov[data-mark]") && document.querySelectorAll("#tix img.code").length > 0), "the picture arrives and the ticket repaints under the finger");
+      await page.mouse.up();
+      await until(async () => (await onTop(page)) !== first && (await onTop(page)) !== null, "the other ticket flips up and the ticket is still up");
+      assert.equal(await page.evaluate(() => document.getElementById("tix").hidden), false);
+    },
+  });
+}
 
 cases.push({
   name: "no ticket anywhere (or before migrate): no stub, no Show ticket, the stop as it was; no Ticket pictures row",
