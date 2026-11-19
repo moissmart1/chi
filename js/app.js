@@ -1,6 +1,6 @@
 /* Copyright (c) 2026 moissmart1. All rights reserved. No licence is granted: do not copy, adapt or reuse this code or design, and do not use it to train or prompt an AI system to reproduce it. See LICENSE. */
 // Starts the app: takes the trip key from the invite link, builds the api and
-// the store, mounts the screens (Days and Money) and boots.
+// the store, mounts the screens (Days, Tickets and Money) and boots.
 
 import { API_URL, STORAGE_PREFIX, NEW_VERSION_MESSAGE } from "./config.js";
 import { TRIP_TZ } from "./trip.js";
@@ -25,6 +25,10 @@ import { mountStampBook } from "./views/stampbook.js";
 import { createUpdater } from "./update.js";
 import { isWide, onWide } from "./shape.js";
 import { createKeep, fetchMissing, toBase64, fetchesAll, pruneKeep } from "./tickets.js";
+import { mountStub } from "./views/stub.js";
+import { tixInfo, forgetThumbs } from "./views/stubs.js";
+import { mountTicketTab } from "./views/tickettab.js";
+import { mountBulkAdd } from "./views/bulkadd.js";
 
 // How often a visible phone asks the backend whether anything changed.
 const CHECK_MS = 20000;
@@ -119,8 +123,10 @@ function withKey(storage, keyHere) {
 // The screens. showTab(tab) shows one, marks its button and makes the
 // others inert; with `remember` it keeps the choice (the stored tab) and the trip day
 // it was made on (the stored tabDay, by the real time, never the demo clock).
+// Tickets comes and goes with the trip (from its first day): it is never
+// what the app opens on, and is not remembered.
 function mountTabs(store, storage) {
-  const views = { days: document.getElementById("vDays"), money: document.getElementById("vMoney") };
+  const views = { days: document.getElementById("vDays"), tickets: document.getElementById("vTickets"), money: document.getElementById("vMoney") };
   const nav = document.getElementById("nav");
   const read = (k) => {
     try {
@@ -135,10 +141,13 @@ function mountTabs(store, storage) {
   let settled = false; // the opening screen has been decided with the trip known
   const shownHooks = []; // called with the tab's name each time a tab is shown
 
-  // A computer's window (WIDE) shows Money and Days side by side. `tab`
+  // A computer's window (WIDE) shows Money and Days side by side, Tickets
+  // over the Days pane while it is the tab (as the Japan app does). `tab`
   // stays what a phone would show, so a narrower window goes back to it.
   let wide = isWide();
-  const shows = (name, t) => (wide ? true : name === t);
+  let cameFrom = null; // WIDE: the tab Tickets was opened from
+  const inPane = (t) => t === "tickets";
+  const shows = (name, t) => (wide ? name === "money" || name === (inPane(t) ? t : "days") : name === t);
 
   function showTab(t, remember = true) {
     const changed = t !== tab;
@@ -146,8 +155,8 @@ function mountTabs(store, storage) {
     for (const b of nav.querySelectorAll("button[data-tab]")) {
       const on = b.dataset.tab === t;
       b.classList.toggle("is-active", on);
-      // WIDE hides the Days and Money keys (the panes are both there): no key is the current one.
-      if (on && !wide) b.setAttribute("aria-current", "page");
+      // WIDE hides the Days and Money keys (the panes are both there): only Tickets can be the current key.
+      if (on && !(wide && !inPane(b.dataset.tab))) b.setAttribute("aria-current", "page");
       else b.removeAttribute("aria-current");
     }
     for (const [name, view] of Object.entries(views)) {
@@ -158,7 +167,8 @@ function mountTabs(store, storage) {
     // The hooks are for arriving: a tap on the tab already showing leaves it as it is.
     if (changed) for (const f of shownHooks) f(t);
     // In WIDE there is nothing to choose between, so what is remembered is left as it was.
-    if (!remember || wide) return;
+    // Tickets comes and goes with the trip: it is not what the app opens on.
+    if (!remember || wide || inPane(t)) return;
     const trip = store.state.trip;
     try {
       storage.setItem(STORAGE_PREFIX + "tab", t);
@@ -197,6 +207,10 @@ function mountTabs(store, storage) {
     const b = ev.target.closest("button[data-tab]");
     if (!b) return;
     settled = true;
+    // WIDE: Tickets takes the Days pane and the Days key brings back the tab
+    // it was opened from (Money's pane never went away).
+    if (wide && inPane(b.dataset.tab) && !inPane(tab)) cameFrom = tab;
+    else if (wide && b.dataset.tab === "days" && inPane(tab)) return showTab(cameFrom || "days");
     showTab(b.dataset.tab);
   });
   return { showTab, tab: () => tab, onShown: (f) => shownHooks.push(f) };
@@ -219,8 +233,9 @@ function start() {
   // Ticket pictures kept on this phone (IndexedDB "chi-tickets"): every phone
   // fetches every one after each load with signal, so it opens with none
   // (js/tickets.js), unless the Ticket pictures setting (chi.tixFetch) says
-  // only when one is opened. No screen shows them yet: the ticket screens
-  // plug in here (keep, store.addTicket, store.removeTicket, ticketMark).
+  // only when one is opened. The screens (look F, stapled to the check): the
+  // stub on a stop's line (js/views/ticket.js), the ticket held up
+  // (js/views/stub.js) and the Ticket part of a stop's Edit sheet.
   const keep = createKeep();
   const fetchAll = () => fetchesAll(raw);
   // A refused key takes the trip off the phone (js/store.js): the stored
@@ -269,10 +284,17 @@ function start() {
   // The Days sheets: the hotel card, the list of every day and the stop sheet.
   const stayCard = mountStayCard(phone, store);
   const allDays = mountAllDays(phone, store, { clock, onPick: (i) => days.goDay(i) });
-  const stopSheet = mountStopSheet(phone, store);
+  const stopSheet = mountStopSheet(phone, store, { keep });
   // The stamp book, a panel like History, opened from the Days bar or today's ticket.
   const book = mountStampBook(phone, store);
+  // The ticket, lifted off its stop's line and held up (js/views/stub.js).
+  const stub = mountStub(phone, store, keep);
+  // The trip taken off this phone: the small pictures drawn from the keep go too.
+  store.subscribe((s) => {
+    if (s.status === "nokey") forgetThumbs();
+  });
   const closeDaySheets = () => {
+    stub.close(false);
     stayCard.close(false);
     allDays.close(false);
     stopSheet.close(false);
@@ -320,7 +342,7 @@ function start() {
   const you = mountYou(phone, store, {
     demo: clock,
     getKey: () => storage.getItem(STORAGE_PREFIX + "key"),
-    screen: () => (tabs.tab() === "days" ? "Days" : "Money"),
+    screen: () => (tabs.tab() === "tickets" ? "Tickets" : isWide() ? "Days and Money" : tabs.tab() === "days" ? "Days" : "Money"),
     // Try another day: Days follows the demo clock from the picked day's
     // 07:00. Nothing is stored, so a reload ends it.
     onDemo: (date) => {
@@ -339,6 +361,15 @@ function start() {
       you.close(false);
       history.open();
     },
+    // Add tickets: its own sheet, where You stands (the Money pane on a computer).
+    onBulk: () => {
+      you.close(false);
+      bulk.open();
+    },
+    // Ticket pictures: back to every one, the fetching starts at once.
+    onTixMode: (mode) => {
+      if (mode === "all" && store.state.ticketsReady) fetchMissing(store, keep, { allowed: fetchAll });
+    },
     // Forget this phone (forgetAll, below). Kept while it runs, so a link pasted on the no-key screen meanwhile
     // (it shows as soon as the store forgets) waits for it to finish and is
     // never wiped by it.
@@ -356,6 +387,7 @@ function start() {
     // The store is marked wiped first (nothing is written or sent after it),
     // then the ticket pictures: their open database would hold up its deletion.
     store.forgot();
+    stub.close(false);
     await keep.wipe();
     let session = null;
     try {
@@ -373,6 +405,27 @@ function start() {
     });
     you.close(false);
   }
+  // Bulk add of tickets (js/views/bulkadd.js), opened from You. Whatever
+  // closes You closes it too (a tab, another sheet, Forget); what it sorted, or
+  // its adding, carries on behind and is there when it is opened again.
+  const bulk = mountBulkAdd(phone, store, keep, {
+    onOpenDay: (date) => {
+      register.close();
+      borrowed = false;
+      closeDaySheets();
+      tabs.showTab("days", false);
+      days.goDay(Math.max(0, (store.state.days || []).findIndex((d) => d && d.date === date)));
+    },
+    onClose: (restoreFocus) => {
+      const b = document.getElementById("youBtn");
+      if (restoreFocus && b) b.focus({ preventScroll: true });
+    },
+  });
+  const closeYou = you.close;
+  you.close = (restoreFocus) => {
+    bulk.close(false);
+    closeYou(restoreFocus);
+  };
   const line = mountLine(phone, store, {
     onEdit: (id) => {
       line.close(false);
@@ -422,8 +475,41 @@ function start() {
       closeForDays();
       stopSheet.edit(id);
     },
-    // A stop being added or changed is being looked at: the rail stays put.
-    held: () => stopSheet.isOpen(),
+    // A stop being added or changed, or a ticket held up, is being looked at: the rail stays put.
+    held: () => stopSheet.isOpen() || stub.isOpen(),
+    tickets: { info: (stop, s) => (s.ticketsReady ? tixInfo(stop, s.tickets, keep.have, s.me) : null), keep, subscribe: (fn) => keep.subscribe(fn) },
+    onTicket: (id, button) => {
+      closeForDays();
+      stub.open(id, button);
+    },
+  });
+  // The Tickets tab (js/views/tickettab.js): its key is in the bar from the
+  // trip's first day, beside Days; its count is today's tickets still to come.
+  const ticketsBtn = document.getElementById("ticketsBtn");
+  const ticketsN = document.getElementById("ticketsN");
+  const focusAway = () => {
+    const keys = [...document.querySelectorAll("#nav button")];
+    const daysBtn = document.querySelector('#nav button[data-tab="days"]');
+    const to = daysBtn && daysBtn.getClientRects().length ? daysBtn : keys.find((k) => k.getClientRects().length);
+    if (to) to.focus({ preventScroll: true });
+  };
+  function layTickets({ on, todayLeft }) {
+    const hadFocus = !on && document.activeElement === ticketsBtn;
+    ticketsBtn.hidden = !on;
+    ticketsN.hidden = !on || todayLeft < 1;
+    ticketsN.textContent = todayLeft > 0 ? String(todayLeft) : "";
+    ticketsBtn.setAttribute("aria-label", todayLeft > 0 ? "Tickets, " + todayLeft + " still to come today" : "Tickets");
+    if (!on && tabs.tab() === "tickets") tabs.showTab("days", false);
+    if (hadFocus) focusAway();
+  }
+  mountTicketTab(document.getElementById("vTickets"), store, {
+    clock,
+    keep,
+    onTicket: (id, button) => {
+      closeForDays();
+      stub.open(id, button);
+    },
+    onState: layTickets,
   });
   mountMoney(document.getElementById("vMoney"), store, {
     onRing: ring,
@@ -474,6 +560,7 @@ function start() {
     line.close(false);
     history.close(false);
     closeDaySheets();
+    bulk.close(false);
     you.open();
   });
 
@@ -521,8 +608,9 @@ function start() {
     if (store.state.status === "ready") store.loadHistory();
   });
   // A new release reloads the page only when nothing would be lost (js/update.js).
-  // Nothing unsent or still sending, and no notice waiting to be read (it would be wiped).
-  nothingUnsent = () => store.outbox().unsent === 0 && !store.busy() && !store.state.notice;
+  // Nothing unsent or still sending, no notice waiting to be read (it would be
+  // wiped), and Add tickets not reading or adding, open or closed.
+  nothingUnsent = () => store.outbox().unsent === 0 && !store.busy() && !store.state.notice && !bulk.isBusy();
   if (document.visibilityState !== "hidden") startChecking();
 }
 

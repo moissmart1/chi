@@ -219,7 +219,7 @@ i{font-style:normal}
   .phone{width:min(100%, calc(1000px + var(--rail)))}
   .views{right:var(--rail)}
   .view{padding-bottom:28px}
-  #vDays{right:50%}
+  #vDays,#vTickets{right:50%}
   #vMoney{left:50%}
   /* A tear line between the two panes, as the check's stub. */
   .views::after{content:"";position:absolute;top:0;bottom:0;left:50%;border-left:2px dashed rgba(19,38,31,.3);pointer-events:none}

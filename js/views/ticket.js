@@ -34,10 +34,17 @@
 // Every row is drawn closed: the Days view opens one (.is-open on the .r, and
 // aria-expanded on its [role=button], and un-inerts its .r-more).
 // A used day's SERVED print is made once per day, place and mark, and reused.
+// - tix: { [stopId]: tixInfo(...) } (js/views/stubs.js) for the stops that
+//   have a ticket (look F): its stub (or the Reserved card) stapled under the
+//   stop's name, with the time clock's USED print once the stop is over, and,
+//   when the stop is open, the big stub (.r-tk) above the links: Show ticket.
+//   Absent, a stop reads exactly as it did. ticketEl's second argument,
+//   { keep }, is where the big stub's small picture of the code comes from.
 
 import { minutesOf, issueLine, isPast, nextLine, originFor, mapsUrl, safeHref, gateDate, checkDate } from "../plan.js";
 import { dayHead, tripMoney, dollars } from "../format.js";
 import { rng, gateStampSVG } from "../stamp.js";
+import { onCheckEl, bigStubEl, kindWord, bandDay, thumbEl, statusWords } from "./stubs.js";
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
@@ -64,7 +71,7 @@ const failedPhotos = new Set();
 
 // What shows when the stop is open: the photo, how to get there, the note,
 // and the buttons (directions, and the stop's own link).
-function more(stop, origin) {
+function more(stop, origin, tix, keep) {
   const wrap = el("div", "r-more");
   wrap.inert = true;
   const inner = el("div");
@@ -86,6 +93,8 @@ function more(stop, origin) {
   if (go) inner.append(el("div", "r-go", go));
   const note = str(stop.note);
   if (note) inner.append(el("div", "r-note", note));
+  // Show ticket: the ticket itself, stapled to the line (the Days view opens it).
+  if (tix) inner.append(showKey(stop, tix, keep));
   const btns = el("div", "r-btns");
   const link = (cls, text, href) => {
     const a = el("a", cls, text);
@@ -107,7 +116,36 @@ function more(stop, origin) {
   return wrap;
 }
 
-function row(stop, i, model) {
+// The big stub on an open stop, a button: Show ticket.
+function showKey(stop, tix, keep) {
+  const b = el("button", "r-tk");
+  b.type = "button";
+  b.setAttribute("aria-label", "Show ticket: " + statusWords(tix, tix.count));
+  if (tix.kind === "ref") {
+    const c = el("span", "resv is-big");
+    const l = el("span", "resv-l");
+    l.append(el("span", "ts-k", "Reserved"), el("span", "ts-n", "Show ticket"));
+    const r = el("span", "resv-r", "Reference only");
+    if (tix.ref) r.append(el("b", "", tix.ref));
+    c.append(l, r);
+    const pin = el("span", "staple");
+    pin.setAttribute("aria-hidden", "true");
+    b.append(pin, c);
+    return b;
+  }
+  b.append(bigStubEl({
+    stock: tix.stock,
+    band: kindWord(tix.stock) + " · " + bandDay(stop.date, stop.time),
+    name: "Show ticket",
+    sub: tix.count + " · " + (tix.saved ? "on this phone" : "needs signal once"),
+    seat: tix.seat,
+    thumb: tix.first ? thumbEl(keep, tix.first) : null,
+    ghost: !tix.saved,
+  }));
+  return b;
+}
+
+function row(stop, i, model, keep) {
   const { state, minutes, nextId, stops, stays, day } = model;
   const next = state === "today" && stop.id === nextId;
   const r = el("div", "r");
@@ -134,6 +172,7 @@ function row(stop, i, model) {
     body.append(fx);
   }
   const lead = next ? nextLine(stop, minutes) : "";
+  const tix = model.tix && model.tix[stop.id] ? model.tix[stop.id] : null;
   const detail = str(stop.detail);
   if (lead || detail) {
     const s = el("div", "r-s");
@@ -142,11 +181,17 @@ function row(stop, i, model) {
     if (detail) s.append(detail);
     body.append(s);
   }
+  // The ticket, stapled under the name; once the stop is over, the time clock's USED print across it.
+  if (tix) {
+    const used = r.classList.contains("is-done");
+    body.append(onCheckEl(tix, { used, usedText: "USED", sm: true }));
+    r.classList.add("has-tix");
+  }
   // The price column of the check: a stop carries no price of its own (what
   // was paid is rung up on Money), so it holds the check's blank dot.
   const price = el("div", "r-j", "·");
   price.setAttribute("aria-hidden", "true");
-  r.append(el("div", "r-t", minutesOf(stop.time) === null ? "—" : stop.time), body, price, more(stop, originFor(stops, i, stays, day.date)));
+  r.append(el("div", "r-t", minutesOf(stop.time) === null ? "—" : stop.time), body, price, more(stop, originFor(stops, i, stays, day.date), tix, keep));
   return r;
 }
 
@@ -206,7 +251,7 @@ function box(label, value, cls) {
   return d;
 }
 
-export function ticketEl(model) {
+export function ticketEl(model, { keep = null } = {}) {
   const { day, number, header: h, stops, mark, tripName, state, total, toGo } = model;
   const date = day.date;
   const tk = el("article", "tk");
@@ -227,7 +272,7 @@ export function ticketEl(model) {
   if (model.stampOpen) head.append(stampLine());
 
   const rows = el("div", "rows");
-  if (stops.length) rows.append(...stops.map((stop, i) => row(stop, i, model)));
+  if (stops.length) rows.append(...stops.map((stop, i) => row(stop, i, model, keep)));
   else rows.append(el("div", "r-none", "Nothing planned yet."));
 
   // The double rule under the heading; a used day's check has been on the spindle: a hole through it.
