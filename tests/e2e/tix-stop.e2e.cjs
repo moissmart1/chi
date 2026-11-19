@@ -13,7 +13,7 @@ const solid = (page, id, date) => page.evaluate((sel) => {
   const t = document.querySelector(sel + " .ts");
   return !!t && !t.classList.contains("is-ghost");
 }, row(id, date));
-const allKept = (page) => until(async () => (await Promise.all([[S.hawks], [S.art]].map(([id]) => solid(page, id)))).every(Boolean), "every picture of the day is on this phone", 10000);
+const allKept = (page) => until(async () => (await Promise.all([[S.hawks], [S.sci]].map(([id]) => solid(page, id)))).every(Boolean), "every picture of the day is on this phone", 10000);
 const closeTicket = async (page) => {
   await page.click("#tix [data-close]");
   await until(() => page.evaluate(() => document.getElementById("tix").hidden), "the ticket goes back");
@@ -57,10 +57,10 @@ for (const size of SIZES) {
       await ready(page, { backend, me: "Izzah" });
       await allKept(page);
       // Used: the stub stays on the line with the time clock's print.
-      await expectText(page, row(S.art) + " .ts-on", "ADMIT2ADMISSION2 ticketsUSED");
-      assert.equal(await page.evaluate((sel) => getComputedStyle(document.querySelector(sel + " .tclock")).color, row(S.art)), "rgb(107, 42, 140)");
+      await expectText(page, row(S.sci) + " .ts-on", "ADMIT2ADMISSION2 ticketsUSED");
+      assert.equal(await page.evaluate((sel) => getComputedStyle(document.querySelector(sel + " .tclock")).color, row(S.sci)), "rgb(107, 42, 140)");
       // Reference only: the Reserved card, the reference large.
-      await expectText(page, row(S.jazz) + " .ts-on", "ReservedReference onlyJZ-5512");
+      await expectText(page, row(S.late) + " .ts-on", "ReservedReference onlyCS-5512");
       // The next stop is open: its big stub is Show ticket.
       await openRow(page, S.hawks);
       await expectText(page, row(S.hawks) + " .r-tk .bigst-t", "TICKET · MON DEC 28 · 19:30");
@@ -166,12 +166,12 @@ for (const size of SIZES) {
     name: size.tag + ": reference only: the Reserved card, the reference large and a sentence for staff",
     ...sized(size),
     async run({ page }) {
-      const backend = await ticketed({ kinds: ["jazz"] });
+      const backend = await ticketed({ kinds: ["late"] });
       await ready(page, { backend });
-      await openRow(page, S.jazz);
-      assert.equal(await page.evaluate((sel) => document.querySelector(sel + " .r-tk").getAttribute("aria-label"), row(S.jazz)), "Show ticket: reservation, reference only");
-      await showTicket(page, S.jazz);
-      await expectText(page, "#tix .ref-big", "Reserved · reference onlyJZ-5512We have a booking for 2 at 22:15 under MO.");
+      await openRow(page, S.late);
+      assert.equal(await page.evaluate((sel) => document.querySelector(sel + " .r-tk").getAttribute("aria-label"), row(S.late)), "Show ticket: reservation, reference only");
+      await showTicket(page, S.late);
+      await expectText(page, "#tix .ref-big", "Reserved · reference onlyCS-5512We have a booking for 2 at 22:15 under MO.");
       await expectText(page, "#tix .f-band", "RESERVED · 22:15No. 0003");
       await expectText(page, "#tix .f-nm", "MO");
       await expectText(page, "#tix .f-kt", "TEXTText only, always on this phone.");
@@ -220,7 +220,7 @@ for (const size of SIZES) {
 cases.push({
   name: "after one fetch it opens with no signal",
   async run({ page }) {
-    const backend = await ticketed({ kinds: ["hawks", "art"] });
+    const backend = await ticketed({ kinds: ["hawks", "sci"] });
     await ready(page, { backend });
     await allKept(page);
     backend.failWith = "network";
@@ -316,7 +316,7 @@ cases.push({
 cases.push({
   name: "You: Ticket pictures says how it fetches, and one tap changes it (kept on the phone as chi.tixFetch)",
   async run({ page }) {
-    const backend = await ticketed({ kinds: ["jazz"] });
+    const backend = await ticketed({ kinds: ["late"] });
     await ready(page, { backend });
     await page.dispatchEvent("#youBtn", "click");
     await until(() => page.evaluate(() => document.getElementById("you").classList.contains("is-open")), "You opens");
@@ -333,7 +333,7 @@ cases.push({
 cases.push({
   name: "Only when I open one: nothing is fetched in the background; Show ticket fetches its own, and only those",
   async run({ page }) {
-    const backend = await ticketed({ kinds: ["hawks", "art"] });
+    const backend = await ticketed({ kinds: ["hawks", "sci"] });
     await ready(page, { backend, storage: { "chi.tixFetch": "open" } });
     await advance(page, backend, 21000);
     await until(() => page.evaluate((sel) => !!document.querySelector(sel + " .ts.is-ghost"), row(S.hawks)), "not printed yet");
@@ -344,7 +344,7 @@ cases.push({
     assert.deepEqual(asked, backend.fake.tables.Tickets.filter((t) => t.stop === S.hawks).map((t) => t.id).sort());
     await closeTicket(page);
     await until(() => solid(page, S.hawks), "its stub is printed");
-    assert.equal(await page.evaluate((sel) => !!document.querySelector(sel + " .ts.is-ghost"), row(S.art)), true, "the others still need signal once");
+    assert.equal(await page.evaluate((sel) => !!document.querySelector(sel + " .ts.is-ghost"), row(S.sci)), true, "the others still need signal once");
   },
 });
 
@@ -407,7 +407,7 @@ const keptCount = (page) => page.evaluate(async () => {
 cases.push({
   name: "a refused key: the ticket closes, every check and its stubs leave the page, no picture is drawn",
   async run({ page }) {
-    const backend = await ticketed({ kinds: ["hawks", "jazz"] });
+    const backend = await ticketed({ kinds: ["hawks", "late"] });
     await ready(page, { backend, own: "Izzah" });
     await until(() => solid(page, S.hawks), "kept");
     await showTicket(page, S.hawks);
@@ -417,7 +417,7 @@ cases.push({
     await until(async () => (await keptCount(page)) === 0, "no picture is left on the phone");
     assert.equal(await page.evaluate(() => document.getElementById("tix").hidden), true);
     assert.equal(await page.evaluate(() => document.querySelectorAll("#rail .tk, img[src^='blob:']").length), 0);
-    assert.equal(await page.evaluate(() => document.body.textContent.includes("JZ-5512") || document.body.textContent.includes("ZX4K9Q")), false, "no reference stays in the page");
+    assert.equal(await page.evaluate(() => document.body.textContent.includes("CS-5512") || document.body.textContent.includes("ZX4K9Q")), false, "no reference stays in the page");
   },
 });
 

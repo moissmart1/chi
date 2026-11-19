@@ -3,7 +3,7 @@
 // reference, seat and picture is invented (pictures are drawn by
 // tests/e2e/pictures.cjs and scan as nothing).
 //
-// It is 18:40 on Mon Dec 28 (Day 3) in Chicago: the Art Institute (11:00)
+// It is 18:40 on Mon Dec 28 (Day 3) in Chicago: the Science hall visit (10:15)
 // is over, the hockey (19:30) is next.
 
 const assert = require("node:assert/strict");
@@ -16,8 +16,8 @@ const D28 = "2026-12-28";
 const KEY = "test-key";
 
 const S = {
-  breakfast: "tixstop0001", art: "tixstop0002", ribbon: "tixstop0003", hawks: "tixstop0004", jazz: "tixstop0005",
-  boat: "tixstop0006", sunset: "tixstop0007", field: "tixstop0008", fly: "tixstop0009", ohare: "tixstop0010", comedy: "tixstop0011",
+  breakfast: "tixstop0001", sci: "tixstop0002", ribbon: "tixstop0003", hawks: "tixstop0004", late: "tixstop0005",
+  boat: "tixstop0006", sunset: "tixstop0007", hall: "tixstop0008", fly: "tixstop0009", arrive: "tixstop0010", comedy: "tixstop0011",
 };
 
 const PLAN = {
@@ -25,21 +25,21 @@ const PLAN = {
     "2026-12-26": { city: "Chicago", title: "Arrival" },
     "2026-12-28": { city: "Chicago", title: "Hawks night" },
     "2026-12-29": { city: "Chicago", title: "River day" },
-    "2026-12-30": { city: "Chicago", title: "Museum Campus" },
+    "2026-12-30": { city: "Chicago", title: "Science Campus" },
     "2027-01-01": { city: "Chicago", title: "Home" },
   },
   stops: [
-    { id: S.ohare, date: "2026-12-26", time: "08:00", title: "Flight to O’Hare" },
+    { id: S.arrive, date: "2026-12-26", time: "08:00", title: "Flight in" },
     { id: S.breakfast, date: D28, time: "08:30", title: "Breakfast", detail: "West Loop diner" },
-    { id: S.art, date: D28, time: "11:00", title: "The Art Institute", detail: "Museum day" },
+    { id: S.sci, date: D28, time: "10:15", title: "Science hall", detail: "Museum day" },
     { id: S.ribbon, date: D28, time: "15:30", title: "The Ribbon", detail: "Skates, Maggie Daley Park" },
     { id: S.hawks, date: D28, time: "19:30", title: "Blackhawks v. Blues", detail: "United Center", travelMin: 35, gettingThere: "Green Line from Clark/Lake to Ashland, then the 20 Madison bus west. About 25 min." },
-    { id: S.jazz, date: D28, time: "22:15", title: "Jazz, late set", detail: "Uptown" },
+    { id: S.late, date: D28, time: "22:15", title: "Comedy, late set", detail: "Late room" },
     { id: S.boat, date: "2026-12-29", time: "10:00", title: "Architecture river cruise" },
-    { id: S.field, date: "2026-12-30", time: "11:00", title: "Field Museum" },
+    { id: S.hall, date: "2026-12-30", time: "10:15", title: "Science hall annex", detail: "Admission" },
     { id: S.comedy, date: "2026-12-30", time: "20:00", title: "Comedy show" },
     { id: S.sunset, date: "2026-12-31", time: "16:30", title: "River cruise, sunset" },
-    { id: S.fly, date: "2027-01-01", time: "13:05", title: "Flight to Toronto" },
+    { id: S.fly, date: "2027-01-01", time: "15:40", title: "Flight home" },
   ],
   stays: [],
 };
@@ -63,11 +63,11 @@ async function ticketed({ now = NOW, kinds = null } = {}) {
     await add(S.hawks, "Mo", "Sec 112 Row 8 Seat 4", 1, 11);
     await add(S.hawks, "Izzah", "Sec 112 Row 8 Seat 5", 1, 23);
   }
-  if (want("art")) {
-    await add(S.art, "Mo", "", 1, 31);
-    await add(S.art, "Izzah", "", 1, 32);
+  if (want("sci")) {
+    await add(S.sci, "Mo", "", 1, 31);
+    await add(S.sci, "Izzah", "", 1, 32);
   }
-  if (want("jazz")) await as(backend, "updateStop", { id: S.jazz, patch: { tkRef: "JZ-5512", tkName: "MO", tkPeople: "2" } });
+  if (want("late")) await as(backend, "updateStop", { id: S.late, patch: { tkRef: "CS-5512", tkName: "MO", tkPeople: "2" } });
   if (want("boat")) {
     await as(backend, "updateStop", { id: S.boat, patch: { tkRef: "RC-2291", tkPeople: "2 adults" } });
     await add(S.boat, "", "", 1, 51);
@@ -76,17 +76,17 @@ async function ticketed({ now = NOW, kinds = null } = {}) {
     await add(S.sunset, "", "", 1, 61, 300, 424);
     await add(S.sunset, "", "", 2, 62, 300, 424);
   }
-  if (want("field")) {
-    await add(S.field, "Mo", "", 1, 71);
-    await add(S.field, "Izzah", "", 1, 72);
+  if (want("hall")) {
+    await add(S.hall, "Mo", "", 1, 71);
+    await add(S.hall, "Izzah", "", 1, 72);
   }
   if (want("fly")) {
     await add(S.fly, "Mo", "Seat 14A", 1, 81);
     await add(S.fly, "Izzah", "Seat 14B", 1, 82);
   }
-  if (want("ohare")) {
-    await add(S.ohare, "Mo", "", 1, 91);
-    await add(S.ohare, "Izzah", "", 1, 92);
+  if (want("arrive")) {
+    await add(S.arrive, "Mo", "", 1, 91);
+    await add(S.arrive, "Izzah", "", 1, 92);
   }
   return backend;
 }

@@ -94,7 +94,7 @@ cases.push({
   async run({ page }) {
     const backend = makeBackend(WEEK, { now: NOW });
     await ready(page, { backend });
-    await edit(page, S.jazz);
+    await edit(page, S.late);
     await page.setInputFiles("#stTkFile", [file("one.png", "image/png", pngBytes(300, 300, 9))]);
     await waitPicked(page, 1);
     assert.equal((await picked(page))[0].for, "Both");
@@ -107,7 +107,7 @@ cases.push({
     const rows = backend.fake.tables.Tickets;
     assert.equal(rows.length, 3);
     assert.ok(rows.every((r) => r.who === "" && (r.mime === "image/jpeg" || r.mime === "image/png")));
-    await expectText(page, row(S.jazz) + " .ts-on .ts-n", "3 pages");
+    await expectText(page, row(S.late) + " .ts-on .ts-n", "3 pages");
   },
 });
 

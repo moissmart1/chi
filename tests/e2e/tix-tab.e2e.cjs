@@ -46,7 +46,7 @@ cases.push({
     await advance(page, backend, 3 * 60 * 1000 + 31000);
     await until(() => visible(page, "#ticketsBtn"), "Day 1: the Tickets key");
     assert.deepEqual(await keys(page), ["days", "tickets", "money", "youBtn", "ring"]);
-    await expectText(page, "#ticketsBtn", "TicketsStubs1"); // the flight to O’Hare is that day
+    await expectText(page, "#ticketsBtn", "TicketsStubs1"); // the flight in is that day
     await page.focus('#nav [data-tab="days"]');
     await page.keyboard.press("Tab");
     assert.equal(await page.evaluate(() => document.activeElement.id), "ticketsBtn");
@@ -72,23 +72,23 @@ for (const size of SIZES) {
       await goTickets(page);
       await allKept(page);
       await expectText(page, "#vTickets .tt-bar", "Tickets Mon Dec 28 · today6 to come");
-      // Today: the hockey next (lead line, big stub, Show ticket), the jazz reserved.
+      // Today: the hockey next (lead line, big stub, Show ticket), the late set reserved.
       await expectText(page, '#vTickets .ck[data-date="2026-12-28"] .ck-h', "Date12/28Guest CheckMon · todayNo.0003");
       await expectText(page, "#vTickets .f-nx .r-lv", "NextLeave by 18:55 · in 15 min");
       await expectText(page, "#vTickets #ttWin .bigst-t", "TICKET · MON DEC 28 · 19:30");
       await expectText(page, "#vTickets #ttWin .bigst-l", "Blackhawks v. Blues2 tickets · on this phoneSEC 112ROW 8SEAT 4");
       await expectText(page, "#ttShow", "Show ticket2 tickets");
-      await expectText(page, '#vTickets .cr[data-id="' + S.jazz + '"]', "22:15ReservedJazz, late setReference onlyJZ-5512");
+      await expectText(page, '#vTickets .cr[data-id="' + S.late + '"]', "22:15ReservedComedy, late setReference onlyCS-5512");
       // Later days, each on its own check.
       await expectText(page, "#vTickets .gl", "Later days4, on their checks");
       assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll("#vTickets .ck")].map((c) => c.dataset.date)), ["2026-12-28", "2026-12-29", "2026-12-30", "2026-12-31", "2027-01-01"]);
       await expectText(page, '#vTickets .ck[data-date="2026-12-29"] .ck-h', "Date12/29Tue Dec 29River dayNo.0004");
       await expectText(page, '#vTickets .cr[data-id="' + S.boat + '"]', "10:00BOARD2BOARDING CARD · TUE DEC 29Architecture river cruise1 ticket for everyone · on this phone");
-      await expectText(page, '#vTickets .cr[data-id="' + S.fly + '"]', "13:05PASS2BOARDING PASS · FRI JAN 1Flight to Toronto2 passes · on this phone");
+      await expectText(page, '#vTickets .cr[data-id="' + S.fly + '"]', "15:40PASS2BOARDING PASS · FRI JAN 1Flight home2 passes · on this phone");
       // Used: off their checks, the time clock's print.
       assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll("#vTickets .gl")].map((g) => g.textContent)), ["Later days4, on their checks", "Used2, off their checks"]);
       assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll("#vTickets .tt-used .tclock")].map((t) => t.textContent)), ["USED DEC 28", "USED DEC 26"]);
-      assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll("#vTickets .tt-used")].map((b) => b.getAttribute("aria-label"))), ["Used: The Art Institute, Mon Dec 28 11:00", "Used: Flight to O’Hare, Sat Dec 26 08:00"]);
+      assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll("#vTickets .tt-used")].map((b) => b.getAttribute("aria-label"))), ["Used: Science hall, Mon Dec 28 10:15", "Used: Flight in, Sat Dec 26 08:00"]);
       // The badge: today's still to come.
       await expectText(page, "#ticketsN", "2");
       assert.equal(await page.evaluate(() => document.getElementById("ticketsBtn").getAttribute("aria-label")), "Tickets, 2 still to come today");
@@ -109,7 +109,7 @@ for (const size of SIZES) {
       await page.evaluate(() => document.querySelector("#vTickets .tt-used").scrollIntoView({ block: "center" }));
       await page.click("#vTickets .tt-used");
       await ticketUp(page);
-      await expectText(page, "#tix .pp-pg:not([hidden]) .f-ttl b", "The Art Institute");
+      await expectText(page, "#tix .pp-pg:not([hidden]) .f-ttl b", "Science hall");
       if (size.tag !== "393") await shot(page, "F-1-ticket-from-tab-" + size.tag);
       await closeTicket(page);
     },
@@ -127,13 +127,13 @@ cases.push({
     assert.deepEqual(names, [
       "Show ticket: Blackhawks v. Blues, 19:30, 2 tickets, on this phone",
       "Show ticket: Blackhawks v. Blues",
-      "Show ticket: Jazz, late set, 22:15, reservation, reference only",
+      "Show ticket: Comedy, late set, 22:15, reservation, reference only",
       "Show ticket: Architecture river cruise, 10:00, 1 ticket for everyone, on this phone",
-      "Show ticket: Field Museum, 11:00, 2 tickets, on this phone",
+      "Show ticket: Science hall annex, 10:15, 2 tickets, on this phone",
       "Show ticket: River cruise, sunset, 16:30, 2 pages, on this phone",
-      "Show ticket: Flight to Toronto, 13:05, 2 passes, on this phone",
-      "Used: The Art Institute, Mon Dec 28 11:00",
-      "Used: Flight to O’Hare, Sat Dec 26 08:00",
+      "Show ticket: Flight home, 15:40, 2 passes, on this phone",
+      "Used: Science hall, Mon Dec 28 10:15",
+      "Used: Flight in, Sat Dec 26 08:00",
     ]);
     assert.equal(await page.evaluate(() => document.querySelector("#vTickets section").getAttribute("aria-labelledby")), "ttTitle");
     await page.focus("#ttWin");
@@ -151,7 +151,7 @@ cases.push({
     const backend = await ticketed({ kinds: ["fly"] });
     await ready(page, { backend, storage: { "chi.tixFetch": "open" } });
     await goTickets(page);
-    await expectText(page, '#vTickets #ttWin .bigst-l', /Flight to Toronto2 passes · needs signal once/);
+    await expectText(page, '#vTickets #ttWin .bigst-l', /Flight home2 passes · needs signal once/);
     assert.equal(await page.evaluate(() => document.querySelector("#vTickets #ttWin .bigst").classList.contains("is-ghost")), true);
   },
 });
@@ -168,7 +168,7 @@ cases.push({
     await until(() => page.evaluate(() => globalThis.__matTest && globalThis.__matTest.store.state.status !== "loading"), "the app opens from the cache");
     await goTickets(page);
     await expectText(page, "#vTickets .tt-bar", "Tickets Mon Dec 28 · today6 to come");
-    await page.click('#vTickets .cr[data-id="' + S.field + '"] .tt-tk');
+    await page.click('#vTickets .cr[data-id="' + S.hall + '"] .tt-tk');
     await ticketUp(page);
     assert.equal(await page.evaluate(() => [...document.querySelectorAll("#tix img")].every((i) => i.naturalWidth > 0)), true);
   },
@@ -181,11 +181,11 @@ cases.push({
     await ready(page, { backend });
     assert.equal(await visible(page, "#ticketsBtn"), false);
     assert.deepEqual(await keys(page), ["days", "money", "youBtn", "ring"]);
-    await as(backend, "updateStop", { id: S.jazz, patch: { tkRef: "JZ-5512" } });
+    await as(backend, "updateStop", { id: S.late, patch: { tkRef: "CS-5512" } });
     await page.evaluate(() => globalThis.__matTest.store.checkRev());
     await until(() => visible(page, "#ticketsBtn"), "the key comes with the first ticket");
     await goTickets(page);
-    await expectText(page, '#vTickets .cr[data-id="' + S.jazz + '"]', /JZ-5512/);
+    await expectText(page, '#vTickets .cr[data-id="' + S.late + '"]', /CS-5512/);
   },
 });
 
@@ -193,7 +193,7 @@ cases.push({
   name: "nothing still to come: the used ones only, under a line that says so",
   async run({ page }) {
     const late = Date.parse("2027-01-01T22:00:00-06:00");
-    const backend = await ticketed({ now: late, kinds: ["art", "fly"] });
+    const backend = await ticketed({ now: late, kinds: ["sci", "fly"] });
     await ready(page, { backend, nowMs: late });
     await goTickets(page);
     await expectText(page, "#vTickets .tt-empty", "No ticket still to come.The used ones are below.");
@@ -232,7 +232,7 @@ cases.push({
   viewport: { width: 320, height: 568 },
   async run({ page }) {
     const backend = await ticketed();
-    await as(backend, "updateStop", { id: S.field, patch: { title: "Field Museum, the dinosaur hall and the whole of the second floor" } });
+    await as(backend, "updateStop", { id: S.hall, patch: { title: "Science hall annex, the long gallery and the whole of the second floor" } });
     await ready(page, { backend });
     await goTickets(page);
     await allKept(page);
@@ -316,7 +316,7 @@ cases.push({
 cases.push({
   name: "a refused key: the tab is emptied and its key leaves the bar",
   async run({ page }) {
-    const backend = await ticketed({ kinds: ["hawks", "jazz"] });
+    const backend = await ticketed({ kinds: ["hawks", "late"] });
     await ready(page, { backend, own: "Izzah" });
     await goTickets(page);
     backend.fake.world.cancelLinkForPerson2(); // Izzah

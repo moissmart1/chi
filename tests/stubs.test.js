@@ -14,15 +14,15 @@ import { stockOf, seatParts, countLine, edgeOf, kindWord, staffLine } from "../j
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 test("the stock follows the stop's own words: a flight, a boat, a museum, else a game's long stock", () => {
-  assert.equal(stockOf({ title: "Flight to Toronto" }), "fly");
-  assert.equal(stockOf({ title: "Home", detail: "O’Hare, Terminal 1" }), "fly");
+  assert.equal(stockOf({ title: "Flight home" }), "fly");
+  assert.equal(stockOf({ title: "Home", detail: "Gate hall, Terminal 1" }), "fly");
   assert.equal(stockOf({ title: "Architecture river cruise" }), "boat");
   assert.equal(stockOf({ title: "Ferry across" }), "boat");
-  assert.equal(stockOf({ title: "Field Museum" }), "mus");
-  assert.equal(stockOf({ title: "The Art Institute" }), "mus");
-  assert.equal(stockOf({ title: "Shedd Aquarium" }), "mus");
+  assert.equal(stockOf({ title: "Science hall", detail: "Museum day" }), "mus");
+  assert.equal(stockOf({ title: "Science hall", detail: "Museum day" }), "mus");
+  assert.equal(stockOf({ title: "Sea aquarium" }), "mus");
   assert.equal(stockOf({ title: "Blackhawks v. Blues" }), "game");
-  assert.equal(stockOf({ title: "Jazz, late set" }), "game");
+  assert.equal(stockOf({ title: "Comedy, late set" }), "game");
   assert.equal(stockOf({}), "game");
   assert.equal(stockOf(null), "game");
   // A word inside another word is not it.

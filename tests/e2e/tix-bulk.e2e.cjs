@@ -19,11 +19,11 @@ const row = (o) => COLS.map((c) => {
   return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
 }).join(",");
 const LIST = "﻿" + [HEAD,
-  row({ ticket_id: "T001", start_date: "2026-12-28", start_time: "22:15", type: "activity", title: "Jazz, late set", provider: "Jazz Co", confirmation: "JZ-5512", traveler: "ALL", holder: "MO", notes: "two lines,\nwith a comma", status: "active" }),
+  row({ ticket_id: "T001", start_date: "2026-12-28", start_time: "22:15", type: "activity", title: "Comedy, late set", provider: "Comedy Co", confirmation: "CS-5512", traveler: "ALL", holder: "MO", notes: "two lines,\nwith a comma", status: "active" }),
   row({ ticket_id: "T005", start_date: "2026-12-28", start_time: "19:30", type: "activity", title: "Hockey", confirmation: "ZX4K9Q", traveler: "Mo", seat: "Sec 112 Row 8 Seat 4", status: "active" }),
   row({ ticket_id: "T006", start_date: "2026-12-28", start_time: "19:30", type: "activity", title: "Hockey", confirmation: "ZX4K9Q", traveler: "Izzah", seat: "Sec 112 Row 8 Seat 5", status: "active" }),
-  row({ ticket_id: "T008", start_date: "2026-12-30", start_time: "11:00", type: "activity", title: "Field Museum entry", ticket_ref: "FM99120", traveler: "ALL", status: "active" }),
-  row({ ticket_id: "T009", start_date: "2027-01-01", start_time: "13:05", type: "flight", title: "No file for this one", status: "active" }),
+  row({ ticket_id: "T008", start_date: "2026-12-30", start_time: "10:15", type: "activity", title: "Science hall annex entry", ticket_ref: "SH99120", traveler: "ALL", status: "active" }),
+  row({ ticket_id: "T009", start_date: "2027-01-01", start_time: "15:40", type: "flight", title: "No file for this one", status: "active" }),
   row({ ticket_id: "T010", start_date: "2026-12-28", start_time: "22:15", type: "activity", title: "Old booking", status: "cancelled" }),
   row({ ticket_id: "T012", start_date: "2026-12-30", start_time: "23:30", type: "activity", title: "Comedy show", status: "active" }),
   row({ ticket_id: "T020", start_date: "2026-12-29", start_time: "10:00", type: "activity", title: "Calendar entry", status: "active" }),
@@ -31,10 +31,10 @@ const LIST = "﻿" + [HEAD,
 
 const file = (name, mimeType, buffer) => ({ name, mimeType, buffer });
 const FILES = () => [
-  file("T001 Jazz.png", "image/png", pngBytes(360, 360, 11)),
+  file("T001 Late.png", "image/png", pngBytes(360, 360, 11)),
   file("T005 Mo.png", "image/png", pngBytes(300, 300, 15)),
   file("T006 Izzah.png", "image/png", pngBytes(300, 300, 16)),
-  file("T008 Field e-ticket.pdf", "application/pdf", pdfBytes(2)),
+  file("T008 Hall e-ticket.pdf", "application/pdf", pdfBytes(2)),
   file("T010 old.png", "image/png", pngBytes(300, 300, 20)),
   file("river cruise.png", "image/png", pngBytes(320, 320, 30)),
   file("T012 Comedy.png", "image/png", pngBytes(300, 300, 19)),
@@ -82,7 +82,7 @@ cases.push({
   name: "393: the list and eight files; the sure ones clipped together, a loose one answered and one left; Staple adds through addTicket, facts only where empty; Not added; Open Day",
   viewport: { width: 393, height: 852 },
   async run({ page }) {
-    const backend = makeBackend({ ...WEEK, stops: WEEK.stops.map((s) => (s.id === S.field ? { ...s, tkRef: "KEEP-1" } : s)) }, { now: NOW });
+    const backend = makeBackend({ ...WEEK, stops: WEEK.stops.map((s) => (s.id === S.hall ? { ...s, tkRef: "KEEP-1" } : s)) }, { now: NOW });
     await ready(page, { backend });
     await openBulk(page);
     // Empty: the envelope, the two keys, the stapler at rest, nothing sent.
@@ -151,13 +151,13 @@ cases.push({
     const rows = backend.fake.tables.Tickets.map((r) => [r.stop, r.who, r.seat, String(r.page)]).sort();
     assert.deepEqual(rows, [
       [S.hawks, "Izzah", "Sec 112 Row 8 Seat 5", "1"], [S.hawks, "Mo", "Sec 112 Row 8 Seat 4", "1"],
-      [S.jazz, "", "", "1"], [S.field, "", "", "1"], [S.field, "", "", "2"], [S.boat, "", "", "1"],
+      [S.late, "", "", "1"], [S.hall, "", "", "1"], [S.hall, "", "", "2"], [S.boat, "", "", "1"],
     ].sort());
     // The facts: only where the stop's own field was empty.
     const st = (id) => backend.fake.tables.Stops.find((s) => s.id === id);
-    assert.deepEqual([st(S.jazz).tk_ref, st(S.jazz).tk_name], ["JZ-5512", "MO"]);
+    assert.deepEqual([st(S.late).tk_ref, st(S.late).tk_name], ["CS-5512", "MO"]);
     assert.equal(st(S.hawks).tk_ref, "ZX4K9Q");
-    assert.equal(st(S.field).tk_ref, "KEEP-1", "never overwritten");
+    assert.equal(st(S.hall).tk_ref, "KEEP-1", "never overwritten");
     assert.deepEqual(await lines(page, "#bulk .nol > div"), [
       "T012 · Comedy showleft out: no stop on D5",
       "T010 · Old bookingon the list as cancelled",
@@ -189,10 +189,10 @@ cases.push({
   async run({ page }) {
     const backend = makeBackend(WEEK, { now: NOW });
     await ready(page, { backend });
-    const jazz = () => file("T001 Jazz.png", "image/png", pngBytes(360, 360, 11));
+    const late = () => file("T001 Late.png", "image/png", pngBytes(360, 360, 11));
     await openBulk(page);
     await page.setInputFiles("#bulkList", listFile());
-    await page.setInputFiles("#bulkFiles", [jazz()]);
+    await page.setInputFiles("#bulkFiles", [late()]);
     await sorted(page, 1);
     await page.click("#bulkPunch");
     await added(page);
@@ -200,9 +200,9 @@ cases.push({
     await page.click("#bulkTop");
     await openBulk(page);
     await page.setInputFiles("#bulkList", listFile());
-    await page.setInputFiles("#bulkFiles", [jazz(), file("T005 Mo.png", "image/png", pngBytes(300, 300, 15))]);
+    await page.setInputFiles("#bulkFiles", [late(), file("T005 Mo.png", "image/png", pngBytes(300, 300, 15))]);
     await sorted(page, 2);
-    await expectText(page, "#bulk .quiet-l", "2×1 already there: T001 · Jazz, late set is on Jazz, late set. Left out.");
+    await expectText(page, "#bulk .quiet-l", "2×1 already there: T001 · Comedy, late set is on Comedy, late set. Left out.");
     await expectText(page, "#bulkPunch", /^Staple 1 now/);
     backend.failWith = "network";
     await page.context().setOffline(true);
@@ -233,7 +233,7 @@ cases.push({
     await page.setInputFiles("#bulkList", file("bad.csv", "text/csv", Buffer.from("ticket_id,title\nT001,Thing\n")));
     await expectText(page, "#bulk .quiet-l.is-warn", "!The list has no start_date column, so it wasn’t used. The files are matched without it.");
     await page.setInputFiles("#bulkFiles", [
-      file("T001 Jazz.png", "image/png", pngBytes(360, 360, 11)),
+      file("T001 Late.png", "image/png", pngBytes(360, 360, 11)),
       file("river cruise with a very long file name to wrap on a small phone.png", "image/png", pngBytes(320, 320, 30)),
     ]);
     await sorted(page, 2);
@@ -435,10 +435,10 @@ cases.push({
     };
     await page.click("#bulkPunch");
     await until(() => seen >= 1, "the first picture leaves", 20000);
-    const other = await handle({ key: "test-key", actor: "Izzah", action: "updateStop", args: { id: S.jazz, patch: { tkRef: "OTHER-2" } } });
+    const other = await handle({ key: "test-key", actor: "Izzah", action: "updateStop", args: { id: S.late, patch: { tkRef: "OTHER-2" } } });
     assert.equal(other.ok, true, other.message);
     await page.evaluate(() => globalThis.__matTest.store.checkRev());
-    await until(() => page.evaluate((id) => globalThis.__matTest.store.state.stops.find((s) => s.id === id).tkRef === "OTHER-2", S.jazz), "this phone has the other phone's change");
+    await until(() => page.evaluate((id) => globalThis.__matTest.store.state.stops.find((s) => s.id === id).tkRef === "OTHER-2", S.late), "this phone has the other phone's change");
     release();
     await added(page);
     await until(async () => (await queued(page)).length === 5, "all five wait on the phone");
@@ -480,23 +480,23 @@ cases.push({
     };
     await page.click("#bulkPunch");
     await until(() => seen >= 1, "the pictures leave", 20000);
-    const other = await handle({ key: "test-key", actor: "Izzah", action: "updateStop", args: { id: S.jazz, patch: { tkRef: "OTHER-1" } } });
+    const other = await handle({ key: "test-key", actor: "Izzah", action: "updateStop", args: { id: S.late, patch: { tkRef: "OTHER-1" } } });
     assert.equal(other.ok, true, other.message);
     await page.evaluate(() => globalThis.__matTest.store.checkRev());
-    await until(() => page.evaluate((id) => globalThis.__matTest.store.state.stops.find((s) => s.id === id).tkRef === "OTHER-1", S.jazz), "this phone has the other phone's reference");
+    await until(() => page.evaluate((id) => globalThis.__matTest.store.state.stops.find((s) => s.id === id).tkRef === "OTHER-1", S.late), "this phone has the other phone's reference");
     release();
     await added(page);
     backend.handle = handle;
     const st = (id) => backend.fake.tables.Stops.find((s) => s.id === id);
-    assert.equal(st(S.jazz).tk_ref, "OTHER-1", "never overwritten");
-    assert.equal(st(S.jazz).tk_name, "", "a stop changed since the sort gets none of the list's details");
+    assert.equal(st(S.late).tk_ref, "OTHER-1", "never overwritten");
+    assert.equal(st(S.late).tk_name, "", "a stop changed since the sort gets none of the list's details");
     assert.equal(st(S.hawks).tk_ref, "ZX4K9Q", "an unchanged stop's empty field is filled");
-    assert.ok((await lines(page, "#bulk .nol > div")).includes("Jazz, late setdetails not filled: changed on another phone"));
+    assert.ok((await lines(page, "#bulk .nol > div")).includes("Comedy, late setdetails not filled: changed on another phone"));
     await expectText(page, "#bulk .quiet-l.is-warn", "!Details not filled can be added from the stop’s Edit sheet.");
   },
 });
 
-const SECRET_WORDS = ["T001", "T012", "Comedy", "Jazz.png", "river cruise", "JZ-5512", "ZX4K9Q", "cal.ics", "Tickets.csv"];
+const SECRET_WORDS = ["T001", "T012", "Comedy", "Late.png", "river cruise", "CS-5512", "ZX4K9Q", "cal.ics", "Tickets.csv"];
 for (const how of ["Forget this phone", "a refused key"]) {
   cases.push({
     name: "I3: " + how + " with a sort held and the sheet closed: nothing of it stays, its pictures' addresses revoked",
@@ -571,7 +571,7 @@ cases.push({
     await ready(page, { backend });
     await openBulk(page);
     await holdPictures(page);
-    await page.setInputFiles("#bulkFiles", [file("T008 Field e-ticket.pdf", "application/pdf", pdfBytes(2))]);
+    await page.setInputFiles("#bulkFiles", [file("T008 Hall e-ticket.pdf", "application/pdf", pdfBytes(2))]);
     await until(() => page.evaluate(() => window.__held.length > 0), "reading is under way", 20000);
     await page.keyboard.press("Escape");
     await until(() => page.evaluate(() => !document.getElementById("phone").classList.contains("bulk-open")), "closed");
@@ -592,7 +592,7 @@ cases.push({
     await ready(page, { backend });
     await openBulk(page);
     await page.setInputFiles("#bulkList", listFile());
-    await page.setInputFiles("#bulkFiles", [file("T008 Field e-ticket.pdf", "application/pdf", pdfBytes(2))]);
+    await page.setInputFiles("#bulkFiles", [file("T008 Hall e-ticket.pdf", "application/pdf", pdfBytes(2))]);
     await sorted(page, 1);
     await holdPictures(page);
     await page.click("#bulkPunch");
