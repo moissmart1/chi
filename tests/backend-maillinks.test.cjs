@@ -43,14 +43,16 @@ function assertNoKeyOrLink(fake, extra = []) {
   assert.equal(/[0-9a-f]{64}/.test(fake.logged.join("\n")), false, "nothing shaped like a key in the run log");
 }
 
-test("mailLinks: for each person a new key, its hash stored before one POST of exactly the four fields; then that key opens the trip as them", async () => {
+test("mailLinks: for each person a new key, its hash stored (as next, beside any old one) before one POST of exactly the four fields; then that key opens the trip as them", async () => {
   const fake = world();
   const old = fake.personKey("Izzah");
+  const oldHash = sha256(old);
   const seen = [];
   fake.desk = (url, body) => {
-    // At the moment of the POST the new key's hash is already stored.
+    // At the moment of the POST the new key's hash is already stored, as
+    // next; the old one (Izzah's) is still there.
     const stored = keysOf(fake)[body.name];
-    seen.push(stored && stored.hash === sha256(LINK_RE.exec(body.link)[1]));
+    seen.push(!!stored && stored.next === sha256(LINK_RE.exec(body.link)[1]) && stored.hash === (body.name === "Izzah" ? oldHash : ""));
     return { ok: true };
   };
   fake.world.mailLinks();
@@ -172,18 +174,6 @@ test("a busy app: nothing is posted for that person and nothing changes", () => 
     "Sent 0 of 2 links.", "The old shared link still works until you run retireSharedLink."]);
 });
 
-test("busy when putting the old link back: says the old link no longer works, still no key", async () => {
-  let calls = 0;
-  // The first lock (storing the new hash) is had; the second (putting the old back) is not.
-  const fake = world({ lockFails: () => calls++ === 1 });
-  const old = fake.personKey("Izzah");
-  fake.desk = () => ({ ok: false, error: "quota" });
-  fake.world.mailLinkForPerson2();
-  assert.deepEqual(fake.logged, ["Not sent to Izzah: quota. The old link could not be put back (the app was busy), so it no longer works: run mailLinkForPerson2 again later."]);
-  assert.equal((await fake({ key: old, action: "load", args: {} })).error, "bad_key");
-  assertNoKeyOrLink(fake);
-});
-
 test("after retireSharedLink there is no reminder about the shared link", () => {
   const fake = world();
   fake.personKey("Mo");
@@ -219,4 +209,245 @@ test("Env.js postJson_: one POST of the JSON body, redirects followed, its JSON 
   assert.equal(make(reply(500, '{"ok":true}')).postJson_(DESK, {}), null);
   assert.equal(make(reply(200, "<html>Sorry</html>")).postJson_(DESK, {}), null);
   assert.equal(make(() => { throw new Error("Address unavailable"); }).postJson_(DESK, {}), null);
+});
+
+// ---- the hand-over (review fix, 2026-11-19) ----
+// The new key's hash waits beside the old one as `next` while the desk works:
+// the old link keeps working, so an open phone that asks during the desk call
+// is not refused (a refusal clears the trip off it). On the desk's ok `next`
+// takes the old one's place; on anything else `next` is dropped and the old
+// link is untouched. A newLinkFor or cancelLinkFor during the call wins.
+const P = require("../backend/Pure.js");
+const hex = (c) => c.repeat(64);
+
+test("personKeysFrom keeps a well-formed next beside the hash, or alone (hash \"\"); drops a malformed next", () => {
+  const h = hex("a");
+  const n = hex("b");
+  assert.deepEqual(P.personKeysFrom(JSON.stringify({ Mo: { hash: h, at: "2026-11-18T00:00:00Z", next: n } })), { Mo: { hash: h, at: "2026-11-18T00:00:00Z", next: n } });
+  assert.deepEqual(P.personKeysFrom(JSON.stringify({ Mo: { hash: "", at: "", next: n } })), { Mo: { hash: "", at: "", next: n } });
+  assert.deepEqual(P.personKeysFrom(JSON.stringify({ Mo: { next: n } })), { Mo: { hash: "", at: "", next: n } });
+  assert.deepEqual(P.personKeysFrom(JSON.stringify({ Mo: { hash: h, at: "x", next: "short" } })), { Mo: { hash: h, at: "x" } }, "a malformed next is left out");
+  assert.deepEqual(P.personKeysFrom(JSON.stringify({ Mo: { hash: "", next: "short" }, Sam: { next: 5 } })), {}, "neither usable: no entry");
+});
+
+test("keyHolder: a person's next opens the trip as them, as their hash does; an empty hash never matches", () => {
+  const people = { Mo: { hash: sha256("mo-old"), at: "", next: sha256("mo-new") }, Izzah: { hash: "", at: "", next: sha256("iz-new") } };
+  const who = (k) => P.keyHolder(k, sha256(k), "", people, "");
+  assert.deepEqual(who("mo-old"), { kind: "person", name: "Mo" });
+  assert.deepEqual(who("mo-new"), { kind: "person", name: "Mo" });
+  assert.deepEqual(who("iz-new"), { kind: "person", name: "Izzah" });
+  assert.equal(who("other"), null);
+  assert.equal(P.keyHolder("", sha256(""), "", { X: { hash: "", next: sha256("") } }, ""), null);
+});
+
+test("during the desk call the old link answers ok (a phone asking then is not cleared), and the new link already opens the trip as that person", async () => {
+  for (const answer of [{ ok: true }, { ok: false, error: "unreachable" }, null]) {
+    const fake = world();
+    const old = fake.personKey("Izzah");
+    let during = null;
+    let fresh = null;
+    fake.desk = (url, body) => {
+      during = fake({ key: old, action: "load", args: {} });
+      fresh = fake({ key: LINK_RE.exec(body.link)[1], action: "load", args: {} });
+      return answer;
+    };
+    fake.world.mailLinkForPerson2();
+    const d = await during;
+    assert.equal(d.ok, true, JSON.stringify(answer) + ": old key during the call");
+    assert.equal(d.data.me, "Izzah");
+    const f = await fresh;
+    assert.equal(f.ok, true, "the desk's check of the new link");
+    assert.equal(f.data.personal, true);
+    assert.equal(f.data.me, "Izzah");
+    assertNoKeyOrLink(fake);
+  }
+});
+
+test("refused: the old link still works, the new one never does; ok: the new one works, the old one does not", async () => {
+  const no = world();
+  const oldNo = no.personKey("Izzah");
+  const before = keysOf(no).Izzah;
+  no.desk = () => ({ ok: false, error: "too soon" });
+  no.world.mailLinkForPerson2();
+  assert.deepEqual(keysOf(no).Izzah, before, "exactly the previous entry, no next left behind");
+  assert.equal((await no({ key: oldNo, action: "load", args: {} })).data.me, "Izzah");
+  assert.equal((await no({ key: linkKey(no.deskPosts[0]), action: "load", args: {} })).error, "bad_key");
+  assert.deepEqual(no.logged, ["Not sent to Izzah: too soon."]);
+
+  const yes = world();
+  const oldYes = yes.personKey("Izzah");
+  yes.world.mailLinkForPerson2();
+  const entry = keysOf(yes).Izzah;
+  assert.deepEqual(Object.keys(entry).sort(), ["at", "hash"], "promoted: no next left");
+  assert.equal(entry.hash, sha256(linkKey(yes.deskPosts[0])));
+  assert.equal((await yes({ key: linkKey(yes.deskPosts[0]), action: "load", args: {} })).data.me, "Izzah");
+  assert.equal((await yes({ key: oldYes, action: "load", args: {} })).error, "bad_key");
+  assert.deepEqual(yes.logged, ["Sent to Izzah."]);
+});
+
+test("cancelLinkFor during the desk call wins over a later ok, and the log says the mailed link does not work", async () => {
+  const fake = world();
+  const old = fake.personKey("Izzah");
+  fake.desk = () => {
+    fake.world.cancelLinkForPerson2();
+    return { ok: true };
+  };
+  fake.world.mailLinkForPerson2();
+  assert.equal(Object.prototype.hasOwnProperty.call(keysOf(fake), "Izzah"), false, "still cancelled");
+  assert.equal((await fake({ key: old, action: "load", args: {} })).error, "bad_key");
+  assert.equal((await fake({ key: linkKey(fake.deskPosts[0]), action: "load", args: {} })).error, "bad_key");
+  assert.deepEqual(fake.logged, ["Izzah: link cancelled.", "Sent to Izzah, but Izzah’s link was replaced or cancelled during this run, so the link just mailed does not work."]);
+  assertNoKeyOrLink(fake);
+});
+
+test("newLinkFor during the desk call wins, whatever the desk answers", async () => {
+  for (const answer of [{ ok: true }, { ok: false, error: "quota" }]) {
+    const fake = world();
+    const old = fake.personKey("Izzah");
+    let newer = null;
+    fake.desk = () => {
+      fake.world.newLinkForPerson2();
+      newer = keysOf(fake).Izzah;
+      return answer;
+    };
+    fake.world.mailLinkForPerson2();
+    assert.deepEqual(keysOf(fake).Izzah, newer, JSON.stringify(answer));
+    assert.equal(newer.next, undefined);
+    assert.equal((await fake({ key: old, action: "load", args: {} })).error, "bad_key");
+    assert.equal((await fake({ key: linkKey(fake.deskPosts[0]), action: "load", args: {} })).error, "bad_key");
+  }
+});
+
+test("a second mailing run while one is going is refused (the owner's own lock): no second key, no second POST", async () => {
+  const fake = world();
+  const old = fake.personKey("Izzah");
+  let depth = 0; // a nested run that does post must not recurse for ever
+  fake.desk = () => {
+    if (depth++ === 0) {
+      fake.world.mailLinkForPerson2();
+      fake.world.mailLinks();
+    }
+    return { ok: false, error: "quota" };
+  };
+  fake.world.mailLinkForPerson2();
+  assert.equal(fake.deskPosts.length, 1);
+  assert.deepEqual(fake.logged, ["Not done: another mailLinks run is still going. Nothing was changed.", "Not done: another mailLinks run is still going. Nothing was changed.", "Not sent to Izzah: quota."]);
+  assert.equal((await fake({ key: old, action: "load", args: {} })).data.me, "Izzah");
+  // The lock is let go afterwards, also when the run throws.
+  fake.desk = () => ({ ok: true });
+  fake.world.mailLinkForPerson2();
+  assert.equal(fake.deskPosts.length, 2);
+});
+
+test("two interleaved hand-overs (A stores, B stores, A undoes, B undoes) cannot bring back a key that was never delivered", async () => {
+  for (const aDelivered of [false, true]) {
+    const fake = world();
+    const p = fake.personKey("Izzah");
+    const w = fake.world;
+    const hA = sha256("key-A");
+    const hB = sha256("key-B");
+    assert.equal(w.handOverStart_("Izzah", hA), true);
+    assert.equal(w.handOverStart_("Izzah", hB), true);
+    assert.equal(w.handOverEnd_("Izzah", hA, aDelivered), "superseded");
+    assert.equal(w.handOverEnd_("Izzah", hB, false), "done");
+    assert.deepEqual(Object.keys(keysOf(fake).Izzah).sort(), ["at", "hash"]);
+    assert.equal(keysOf(fake).Izzah.hash, sha256(p), "the working link P is still the one");
+    for (const k of ["key-A", "key-B"]) assert.equal((await fake({ key: k, action: "load", args: {} })).error, "bad_key", k);
+    assert.equal((await fake({ key: p, action: "load", args: {} })).data.me, "Izzah");
+  }
+});
+
+test("time budget: no new person is begun after about 4 minutes; the log says who is left and what to run", () => {
+  const fake = world({ people: [{ name: "Sam", initials: "SA" }, { name: "Lee", initials: "LE" }] });
+  let ms = 1000000;
+  fake.world.clockMs_ = () => ms;
+  fake.desk = () => {
+    ms += 150 * 1000; // each hand-over takes two and a half minutes
+    return { ok: true };
+  };
+  fake.world.mailLinks();
+  assert.deepEqual(fake.deskPosts.map((p) => p.body.name), ["Mo", "Izzah"]);
+  assert.deepEqual(fake.logged, ["Sent to Mo.", "Sent to Izzah.",
+    "Stopped before the time limit. Not tried: Sam, Lee. Run mailLinkForPerson3 and mailLinkForPerson4 for the rest.",
+    "Sent 2 of 2 links.", "The old shared link still works until you run retireSharedLink."]);
+  assert.equal(Object.prototype.hasOwnProperty.call(keysOf(fake), "Sam"), false);
+});
+
+test("time budget: under 4 minutes everyone is tried", () => {
+  const fake = world({ people: [{ name: "Sam", initials: "SA" }] });
+  let ms = 0;
+  fake.world.clockMs_ = () => ms;
+  fake.desk = () => {
+    ms += 70 * 1000;
+    return { ok: true };
+  };
+  fake.world.mailLinks();
+  assert.deepEqual(fake.deskPosts.map((p) => p.body.name), ["Mo", "Izzah", "Sam"]);
+  assert.equal(fake.logged.some((l) => l.startsWith("Stopped")), false);
+});
+
+test("busy at the end: refused leaves the old link working (the unsent one too, until a later run); delivered leaves both working; both say so", async () => {
+  let calls = 0;
+  const no = world({ lockFails: () => calls++ === 1 });
+  const oldNo = no.personKey("Izzah");
+  no.desk = () => ({ ok: false, error: "quota" });
+  no.world.mailLinkForPerson2();
+  assert.equal((await no({ key: oldNo, action: "load", args: {} })).data.me, "Izzah", "the old link is never lost");
+  assert.deepEqual(no.logged, ["Not sent to Izzah: quota. The app was busy, so the unsent link could not be withdrawn; Izzah’s old link still works. Run mailLinkForPerson2 again later to withdraw it."]);
+  assertNoKeyOrLink(no);
+
+  let calls2 = 0;
+  const yes = world({ lockFails: () => calls2++ === 1 });
+  const oldYes = yes.personKey("Izzah");
+  yes.world.mailLinkForPerson2();
+  assert.equal((await yes({ key: oldYes, action: "load", args: {} })).data.me, "Izzah");
+  assert.equal((await yes({ key: linkKey(yes.deskPosts[0]), action: "load", args: {} })).data.me, "Izzah");
+  assert.deepEqual(yes.logged, ["Sent to Izzah. The app was busy, so Izzah’s old link was not turned off and both work. To turn the old one off, run mailLinkForPerson2 again (Izzah gets another mail)."]);
+  assertNoKeyOrLink(yes);
+});
+
+test("linksStatus and retireSharedLink read a hand-over that did not finish; issueLinks keeps it", () => {
+  const fake = world();
+  fake.personKey("Mo");
+  assert.equal(fake.world.handOverStart_("Mo", sha256("m2")), true);
+  assert.equal(fake.world.handOverStart_("Izzah", sha256("i2")), true);
+  fake.world.linksStatus();
+  assert.match(fake.logged[0], /^1\. Mo: has a link \(issued \d{4}-\d\d-\d\d\), and a new one is waiting for the mail desk\. If no mailLinks run is going, one stopped half way: both links work until you run mailLinkForPerson1 or newLinkForPerson1\.$/);
+  assert.equal(fake.logged[1], "2. Izzah: no link yet, but one is waiting for the mail desk. If no mailLinks run is going, one stopped half way: run mailLinkForPerson2 again.");
+  fake.logged.length = 0;
+  fake.world.retireSharedLink();
+  assert.deepEqual(fake.logged, ["Not retired: Izzah has no personal link yet. Run issueLinks first."]);
+  fake.logged.length = 0;
+  const before = keysOf(fake).Mo;
+  fake.world.issueLinks();
+  assert.deepEqual(keysOf(fake).Mo, before, "Mo's hand-over is kept");
+  assert.equal(keysOf(fake).Izzah.next, undefined, "Izzah had no working link: issueLinks gives her one, and the waiting one is dropped");
+  assert.equal(fake.logged.filter((l) => /’s link: /.test(l)).length, 1);
+});
+
+test("Env.js withOwnerRunLock_: the user lock (not the script lock phones use), tried briefly, always let go; busy when taken", () => {
+  const make = (gets) => {
+    const ctx = vm.createContext({ LockService: {
+      getUserLock: () => { gets.push("user"); return { tryLock: (ms) => { gets.push("try " + ms); return gets.free; }, releaseLock: () => gets.push("release") }; },
+      getScriptLock: () => { gets.push("script"); return { tryLock: () => true, releaseLock: () => {} }; },
+    } });
+    vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "backend", "Env.js"), "utf8"), ctx);
+    return ctx;
+  };
+  const free = [];
+  free.free = true;
+  let ran = 0;
+  assert.equal(make(free).withOwnerRunLock_(() => { ran++; }), true);
+  assert.equal(ran, 1);
+  assert.equal(free.includes("script"), false);
+  assert.deepEqual([free[0], free[2]], ["user", "release"]);
+  const thrown = [];
+  thrown.free = true;
+  assert.throws(() => make(thrown).withOwnerRunLock_(() => { throw new Error("x"); }));
+  assert.equal(thrown[thrown.length - 1], "release");
+  const taken = [];
+  taken.free = false;
+  assert.equal(make(taken).withOwnerRunLock_(() => { ran++; }), false);
+  assert.equal(ran, 1);
+  assert.equal(taken.includes("release"), false);
 });

@@ -1,2 +1,2 @@
 // Written by scripts/stamp-backend.mjs (npm run stamp). Do not edit.
-var BACKEND_STAMP = "78f13f5e32";
+var BACKEND_STAMP = "ffcf45efe0";

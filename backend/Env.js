@@ -79,6 +79,21 @@ function withLock_(fn) {
   }
 }
 
+// Runs fn under the user lock, so two of the owner's mailLinks runs never
+// overlap (Setup.js). It is not the script lock (withLock_) that phones use:
+// holding it for a whole run never makes a phone wait. True when fn ran,
+// false when another run holds it.
+function withOwnerRunLock_(fn) {
+  var lock = LockService.getUserLock();
+  if (!lock.tryLock(1000)) return false;
+  try {
+    fn();
+    return true;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 // Milliseconds now, for timing retries (the connector's wait for the lock).
 function clockMs_() {
   return Date.now();

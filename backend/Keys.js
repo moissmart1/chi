@@ -10,7 +10,8 @@
 
 var PERSON_KEYS_PROP_ = "PERSON_KEYS";
 
-// PERSON_KEYS as { name: { hash, at } }, read afresh on every call (never
+// PERSON_KEYS as { name: { hash, at } } (plus next during a mailLinks
+// hand-over: personKeysFrom, Pure.js), read afresh on every call (never
 // cached), so a cancelled or replaced link stops working on the next request.
 // Throws when the property is there but is not a JSON object (fix round 1):
 // the request then answers the plain server sentence, so nobody gets in and

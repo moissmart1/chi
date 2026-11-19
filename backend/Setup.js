@@ -95,10 +95,11 @@ function dayOf_(iso) {
   return typeof iso === "string" && iso.length >= 10 ? iso.slice(0, 10) : "an unknown date";
 }
 
-// Whether `keys` (PERSON_KEYS as read) holds a link for this name, as its
-// own entry (never an inherited one such as "constructor").
+// Whether `keys` (PERSON_KEYS as read) holds a working link for this name, as
+// its own entry (never an inherited one such as "constructor"). A link still
+// waiting for the mail desk (only a next, mailLinks) is not one yet.
 function hasLink_(keys, name) {
-  return Object.prototype.hasOwnProperty.call(keys, name);
+  return Object.prototype.hasOwnProperty.call(keys, name) && keys[name].hash !== "";
 }
 
 // A name a link can be kept under (fix round 1): a string that is not
@@ -223,7 +224,8 @@ function cancelLinkFor_(n) {
   var had = false;
   var r = withLock_(function () {
     var keys = personKeys_();
-    had = hasLink_(keys, name);
+    // Any entry, a link still waiting for the mail desk too.
+    had = Object.prototype.hasOwnProperty.call(keys, name);
     if (had) {
       delete keys[name];
       setPersonKeys_(keys);
@@ -307,28 +309,61 @@ function deskWord_(answer) {
   return answer.ok === false && typeof answer.error === "string" && DESK_WORD_RE_.test(answer.error) ? answer.error : "no answer";
 }
 
-// One person (n: their place in the People tab): a new key, its hash stored,
-// the link posted; on anything but ok the previous entry is put back (or the
-// new one removed). True when the desk says the mail went.
-function mailLinkTo_(name, n, ready) {
-  var key = newPersonKey_();
-  var hash = sha256Hex_(key);
-  var had = false;
-  var prev = null;
-  var stored;
+// The hand-over (review fix, 2026-11-19). The new key's hash waits beside the
+// person's old one as `next` (PERSON_KEYS, Pure.js personKeysFrom) while the
+// desk works, so the old link keeps working: a phone that asks during the
+// desk call is never refused (a refusal clears the trip off it). On the
+// desk's ok, next takes the old one's place; on anything else next is
+// dropped and the old link is untouched. Both ends act only while next is
+// still this run's, so a newLinkFor or cancelLinkFor in between wins, and
+// two runs that overlap cannot bring back a key that was never delivered.
+
+// Puts `hash` as this person's next. False when the app is busy.
+function handOverStart_(name, hash) {
+  var r;
   try {
-    stored = withLock_(function () {
+    r = withLock_(function () {
       var keys = personKeys_();
-      had = hasLink_(keys, name);
-      prev = had ? keys[name] : null;
-      keys[name] = { hash: hash, at: nowIso_() };
+      if (Object.prototype.hasOwnProperty.call(keys, name)) keys[name].next = hash;
+      else keys[name] = { hash: "", at: "", next: hash };
       setPersonKeys_(keys);
       return { ok: true };
     });
   } catch (e) {
-    stored = null;
+    r = null;
   }
-  if (!stored || stored.ok !== true) {
+  return !!r && r.ok === true;
+}
+
+// Ends the hand-over of `hash`: delivered, next becomes the person's link
+// (the old one stops working); not delivered, next is dropped (the old one,
+// if any, stays). "done", "superseded" (next is no longer this run's: the
+// link was replaced or cancelled meanwhile; nothing is changed) or "busy".
+function handOverEnd_(name, hash, delivered) {
+  var r;
+  try {
+    r = withLock_(function () {
+      var keys = personKeys_();
+      if (!Object.prototype.hasOwnProperty.call(keys, name) || keys[name].next !== hash) return { ok: true, said: "superseded" };
+      if (delivered) keys[name] = { hash: hash, at: nowIso_() };
+      else if (hasLink_(keys, name)) delete keys[name].next;
+      else delete keys[name];
+      setPersonKeys_(keys);
+      return { ok: true, said: "done" };
+    });
+  } catch (e) {
+    r = null;
+  }
+  return r && r.ok === true ? r.said : "busy";
+}
+
+// One person (n: their place in the People tab): a new key, its hash stored
+// as next, the link posted, then the hand-over ended as above. True when the
+// desk says the mail went and the mailed link works.
+function mailLinkTo_(name, n, ready) {
+  var key = newPersonKey_();
+  var hash = sha256Hex_(key);
+  if (!handOverStart_(name, hash)) {
     Logger.log("Not sent to " + name + ": the app is busy saving. Nothing changed for " + name + ".");
     return false;
   }
@@ -339,66 +374,86 @@ function mailLinkTo_(name, n, ready) {
     word = "no answer";
   }
   key = null;
-  if (word === "ok") {
-    Logger.log("Sent to " + name + ".");
-    return true;
+  var delivered = word === "ok";
+  var end = handOverEnd_(name, hash, delivered);
+  if (delivered) {
+    if (end === "done") Logger.log("Sent to " + name + ".");
+    else if (end === "superseded") Logger.log("Sent to " + name + ", but " + name + "’s link was replaced or cancelled during this run, so the link just mailed does not work.");
+    else Logger.log("Sent to " + name + ". The app was busy, so " + name + "’s old link was not turned off and both work. To turn the old one off, run mailLinkForPerson" + n + " again (" + name + " gets another mail).");
+    return end !== "superseded";
   }
-  var undone;
-  try {
-    undone = withLock_(function () {
-      var keys = personKeys_();
-      if (hasLink_(keys, name) && keys[name].hash === hash) {
-        if (had) keys[name] = prev;
-        else delete keys[name];
-        setPersonKeys_(keys);
-      }
-      return { ok: true };
-    });
-  } catch (e) {
-    undone = null;
-  }
-  if (undone && undone.ok === true) Logger.log("Not sent to " + name + ": " + word + ".");
-  else Logger.log("Not sent to " + name + ": " + word + ". The old link could not be put back (the app was busy), so it no longer works: run mailLinkForPerson" + n + " again later.");
+  if (end === "busy") Logger.log("Not sent to " + name + ": " + word + ". The app was busy, so the unsent link could not be withdrawn; " + name + "’s old link still works. Run mailLinkForPerson" + n + " again later to withdraw it.");
+  else Logger.log("Not sent to " + name + ": " + word + ".");
   return false;
 }
 
+var OWNER_RUN_BUSY_ = "Not done: another mailLinks run is still going. Nothing was changed.";
+// No new person is begun after this long, so a run is never cut off by Apps
+// Script's six-minute limit in the middle of a hand-over.
+var MAIL_BUDGET_MS_ = 4 * 60 * 1000;
+
+// "a", "a and b", "a, b and c".
+function andList_(items) {
+  return items.length < 2 ? items.join("") : items.slice(0, -1).join(", ") + " and " + items[items.length - 1];
+}
+
 // Mails everyone on the trip a new link of their own (each replaces that
-// person's previous link once the desk has mailed it).
+// person's previous link once the desk has mailed it). Under the owner's own
+// lock for the whole run; stops before the time limit.
 function mailLinks() {
-  var ready = mailReady_();
-  if (!ready) return;
-  var names = mailNames_();
-  if (!names) return;
-  var sent = 0;
-  var tried = 0;
-  names.forEach(function (name, i) {
-    if (!linkableName_(name)) {
-      Logger.log(name + ": no link made: that name can’t be used. Change it in the People tab.");
-      return;
+  var start = clockMs_();
+  var ran = withOwnerRunLock_(function () {
+    var ready = mailReady_();
+    if (!ready) return;
+    var names = mailNames_();
+    if (!names) return;
+    var sent = 0;
+    var tried = 0;
+    for (var i = 0; i < names.length; i++) {
+      var name = names[i];
+      if (!linkableName_(name)) {
+        Logger.log(name + ": no link made: that name can’t be used. Change it in the People tab.");
+        continue;
+      }
+      if (clockMs_() - start >= MAIL_BUDGET_MS_) {
+        var left = [];
+        var runs = [];
+        for (var j = i; j < names.length; j++) {
+          if (!linkableName_(names[j])) continue;
+          left.push(names[j]);
+          runs.push("mailLinkForPerson" + (j + 1));
+        }
+        Logger.log("Stopped before the time limit. Not tried: " + left.join(", ") + ". Run " + andList_(runs) + " for the rest.");
+        break;
+      }
+      tried++;
+      if (mailLinkTo_(name, i + 1, ready)) sent++;
     }
-    tried++;
-    if (mailLinkTo_(name, i + 1, ready)) sent++;
+    Logger.log("Sent " + sent + " of " + tried + " links.");
+    if (getProp_("TRIP_KEY")) Logger.log("The old shared link still works until you run retireSharedLink.");
   });
-  Logger.log("Sent " + sent + " of " + tried + " links.");
-  if (getProp_("TRIP_KEY")) Logger.log("The old shared link still works until you run retireSharedLink.");
+  if (!ran) Logger.log(OWNER_RUN_BUSY_);
 }
 
 // The same for person n only.
 function mailLinkFor_(n) {
-  var ready = mailReady_();
-  if (!ready) return;
-  var names = mailNames_();
-  if (!names) return;
-  var name = n >= 1 && n <= names.length ? names[n - 1] : null;
-  if (name === null) {
-    Logger.log("There is no person " + n + " on this trip.");
-    return;
-  }
-  if (!linkableName_(name)) {
-    Logger.log(name + ": no link made: that name can’t be used. Change it in the People tab.");
-    return;
-  }
-  mailLinkTo_(name, n, ready);
+  var ran = withOwnerRunLock_(function () {
+    var ready = mailReady_();
+    if (!ready) return;
+    var names = mailNames_();
+    if (!names) return;
+    var name = n >= 1 && n <= names.length ? names[n - 1] : null;
+    if (name === null) {
+      Logger.log("There is no person " + n + " on this trip.");
+      return;
+    }
+    if (!linkableName_(name)) {
+      Logger.log(name + ": no link made: that name can’t be used. Change it in the People tab.");
+      return;
+    }
+    mailLinkTo_(name, n, ready);
+  });
+  if (!ran) Logger.log(OWNER_RUN_BUSY_);
 }
 
 function mailLinkForPerson1() { mailLinkFor_(1); }
@@ -423,8 +478,12 @@ function linksStatus() {
     raw = {};
   }
   names.forEach(function (name, i) {
+    var n = i + 1;
+    var waiting = Object.prototype.hasOwnProperty.call(keys, name) && typeof keys[name].next === "string";
     var said = hasLink_(keys, name) ? "has a link (issued " + dayOf_(keys[name].at) + ")"
-      : Object.prototype.hasOwnProperty.call(raw, name) ? "unreadable entry for " + name + " (run newLinkForPerson" + (i + 1) + " to give a new link)"
+        + (waiting ? ", and a new one is waiting for the mail desk. If no mailLinks run is going, one stopped half way: both links work until you run mailLinkForPerson" + n + " or newLinkForPerson" + n + "." : "")
+      : waiting ? "no link yet, but one is waiting for the mail desk. If no mailLinks run is going, one stopped half way: run mailLinkForPerson" + n + " again."
+      : Object.prototype.hasOwnProperty.call(raw, name) ? "unreadable entry for " + name + " (run newLinkForPerson" + n + " to give a new link)"
       : "no link yet";
     Logger.log((i + 1) + ". " + name + ": " + said);
   });

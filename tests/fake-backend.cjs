@@ -92,7 +92,7 @@ function createFakeBackend(seed, { clock, lockFails, keepsApostrophe = false } =
   // Seeded Log rows are not writes, so REV starts at 0 even when seeded (an
   // unset REV would otherwise fall back to the Log's highest id).
   const props = { TRIP_KEY, CLAUDE_TOKEN, REV: "0" };
-  const held = { app: false };
+  const held = { app: false, owner: false };
   const missing = new Set((seed && seed.missingColumns) || []);
   const missingTabs = new Set((seed && seed.missingTabs) || []);
   const tableReads = {};
@@ -228,6 +228,19 @@ function createFakeBackend(seed, { clock, lockFails, keepsApostrophe = false } =
         return fn();
       } finally {
         held.app = was;
+      }
+    },
+    // Same as Env.js: the owner's own lock for a whole mailLinks run; a run
+    // started while one holds it (here: from inside the desk's answer) is
+    // refused at once.
+    withOwnerRunLock_(fn) {
+      if (held.owner) return false;
+      held.owner = true;
+      try {
+        fn();
+        return true;
+      } finally {
+        held.owner = false;
       }
     },
     clockMs_: () => Date.now() + lockWaited,
