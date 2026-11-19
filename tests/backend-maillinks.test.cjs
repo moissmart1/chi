@@ -346,8 +346,8 @@ test("two interleaved hand-overs (A stores, B stores, A undoes, B undoes) cannot
     const w = fake.world;
     const hA = sha256("key-A");
     const hB = sha256("key-B");
-    assert.equal(w.handOverStart_("Izzah", hA), true);
-    assert.equal(w.handOverStart_("Izzah", hB), true);
+    assert.equal(w.handOverStart_("Izzah", hA), "done");
+    assert.equal(w.handOverStart_("Izzah", hB), "done");
     assert.equal(w.handOverEnd_("Izzah", hA, aDelivered), "superseded");
     assert.equal(w.handOverEnd_("Izzah", hB, false), "done");
     assert.deepEqual(Object.keys(keysOf(fake).Izzah).sort(), ["at", "hash"]);
@@ -386,18 +386,18 @@ test("time budget: under 4 minutes everyone is tried", () => {
   assert.equal(fake.logged.some((l) => l.startsWith("Stopped")), false);
 });
 
-test("busy at the end: refused leaves the old link working (the unsent one too, until a later run); delivered leaves both working; both say so", async () => {
+test("busy at the end (three tries): refused leaves the old link working (the unsent one too, until dropWaitingLinks); delivered leaves both working; both say so", async () => {
   let calls = 0;
-  const no = world({ lockFails: () => calls++ === 1 });
+  const no = world({ lockFails: () => { calls++; return calls >= 2 && calls <= 4; } });
   const oldNo = no.personKey("Izzah");
   no.desk = () => ({ ok: false, error: "quota" });
   no.world.mailLinkForPerson2();
   assert.equal((await no({ key: oldNo, action: "load", args: {} })).data.me, "Izzah", "the old link is never lost");
-  assert.deepEqual(no.logged, ["Not sent to Izzah: quota. The app was busy, so the unsent link could not be withdrawn; Izzah’s old link still works. Run mailLinkForPerson2 again later to withdraw it."]);
+  assert.deepEqual(no.logged, ["Not sent to Izzah: quota. The app was busy, so the unsent link could not be withdrawn; Izzah’s old link still works. Run dropWaitingLinks later to withdraw it."]);
   assertNoKeyOrLink(no);
 
   let calls2 = 0;
-  const yes = world({ lockFails: () => calls2++ === 1 });
+  const yes = world({ lockFails: () => { calls2++; return calls2 >= 2 && calls2 <= 4; } });
   const oldYes = yes.personKey("Izzah");
   yes.world.mailLinkForPerson2();
   assert.equal((await yes({ key: oldYes, action: "load", args: {} })).data.me, "Izzah");
@@ -409,11 +409,11 @@ test("busy at the end: refused leaves the old link working (the unsent one too, 
 test("linksStatus and retireSharedLink read a hand-over that did not finish; issueLinks keeps it", () => {
   const fake = world();
   fake.personKey("Mo");
-  assert.equal(fake.world.handOverStart_("Mo", sha256("m2")), true);
-  assert.equal(fake.world.handOverStart_("Izzah", sha256("i2")), true);
+  assert.equal(fake.world.handOverStart_("Mo", sha256("m2")), "done");
+  assert.equal(fake.world.handOverStart_("Izzah", sha256("i2")), "done");
   fake.world.linksStatus();
-  assert.match(fake.logged[0], /^1\. Mo: has a link \(issued \d{4}-\d\d-\d\d\), and a new one is waiting for the mail desk\. If no mailLinks run is going, one stopped half way: both links work until you run mailLinkForPerson1 or newLinkForPerson1\.$/);
-  assert.equal(fake.logged[1], "2. Izzah: no link yet, but one is waiting for the mail desk. If no mailLinks run is going, one stopped half way: run mailLinkForPerson2 again.");
+  assert.match(fake.logged[0], /^1\. Mo: has a link \(issued \d{4}-\d\d-\d\d\), and a new one is waiting for the mail desk\. If no mailLinks run is going, one stopped half way: both links work until you run dropWaitingLinks \(which keeps the old one\) or mailLinkForPerson1\.$/);
+  assert.equal(fake.logged[1], "2. Izzah: no link yet, but one is waiting for the mail desk. If no mailLinks run is going, one stopped half way: run dropWaitingLinks to withdraw it, or mailLinkForPerson2 again.");
   fake.logged.length = 0;
   fake.world.retireSharedLink();
   assert.deepEqual(fake.logged, ["Not retired: Izzah has no personal link yet. Run issueLinks first."]);
@@ -450,4 +450,126 @@ test("Env.js withOwnerRunLock_: the user lock (not the script lock phones use), 
   assert.equal(make(taken).withOwnerRunLock_(() => { ran++; }), false);
   assert.equal(ran, 1);
   assert.equal(taken.includes("release"), false);
+});
+
+// ---- fix round 1 (second review, 2026-11-19) ----
+
+test("a refusal whose word is \"ok\" is not a delivery: the old link still works, the new one never does, the log says Not sent", async () => {
+  for (const answer of [{ ok: false, error: "ok" }, { ok: "ok", error: "ok" }, { error: "ok" }]) {
+    const fake = world();
+    const old = fake.personKey("Izzah");
+    const before = keysOf(fake).Izzah;
+    fake.desk = () => answer;
+    fake.world.mailLinkForPerson2();
+    assert.deepEqual(keysOf(fake).Izzah, before, JSON.stringify(answer));
+    assert.equal((await fake({ key: old, action: "load", args: {} })).data.me, "Izzah");
+    assert.equal((await fake({ key: linkKey(fake.deskPosts[0]), action: "load", args: {} })).error, "bad_key");
+    assert.deepEqual(fake.logged, ["Not sent to Izzah: no answer."], JSON.stringify(answer));
+  }
+  assert.equal(world().world.deskWord_({ ok: false, error: "ok" }), "no answer", "deskWord_ never says ok for a refusal");
+  assert.equal(world().world.deskWord_({ ok: true, error: "too soon" }), "ok");
+});
+
+test("one busy lock at the end is tried again: the hand-over still finishes", async () => {
+  let calls = 0;
+  const fake = world({ lockFails: () => ++calls === 2 });
+  const old = fake.personKey("Izzah");
+  fake.world.mailLinkForPerson2();
+  assert.deepEqual(fake.logged, ["Sent to Izzah."]);
+  assert.deepEqual(Object.keys(keysOf(fake).Izzah).sort(), ["at", "hash"]);
+  assert.equal((await fake({ key: old, action: "load", args: {} })).error, "bad_key");
+});
+
+test("dropWaitingLinks: removes every waiting link without mail; working links are untouched; only names are logged", async () => {
+  const fake = world({ people: [{ name: "Sam", initials: "SA" }] });
+  const mo = fake.personKey("Mo");
+  const sam = fake.personKey("Sam");
+  assert.equal(fake.world.handOverStart_("Mo", sha256("m2")), "done");
+  assert.equal(fake.world.handOverStart_("Izzah", sha256("i2")), "done");
+  fake.world.dropWaitingLinks();
+  assert.deepEqual(fake.logged, ["Withdrew the waiting link of Mo and Izzah. Working links are unchanged."]);
+  assert.deepEqual(Object.keys(keysOf(fake)).sort(), ["Mo", "Sam"]);
+  assert.deepEqual(Object.keys(keysOf(fake).Mo).sort(), ["at", "hash"]);
+  for (const k of ["m2", "i2"]) assert.equal((await fake({ key: k, action: "load", args: {} })).error, "bad_key");
+  assert.equal((await fake({ key: mo, action: "load", args: {} })).data.me, "Mo");
+  assert.equal((await fake({ key: sam, action: "load", args: {} })).data.me, "Sam");
+  assert.equal(fake.deskPosts.length, 0);
+  fake.logged.length = 0;
+  const before = fake.props.PERSON_KEYS;
+  fake.world.dropWaitingLinks();
+  assert.deepEqual(fake.logged, ["No link was waiting. Nothing was changed."]);
+  assert.equal(fake.props.PERSON_KEYS, before);
+  assertNoKeyOrLink(fake);
+});
+
+test("dropWaitingLinks: refused while a mailing run is going, when the app is busy, and when PERSON_KEYS is broken", () => {
+  const during = world();
+  during.desk = () => {
+    during.world.dropWaitingLinks();
+    return { ok: true };
+  };
+  during.world.mailLinkForPerson2();
+  assert.deepEqual(during.logged, ["Not done: a mailLinks run is still going. Nothing was changed.", "Sent to Izzah."]);
+  const busy = world({ lockFails: () => true });
+  busy.world.dropWaitingLinks();
+  assert.deepEqual(busy.logged, ["The app is busy saving. Run it again in a moment."]);
+  const broken = world();
+  broken.props.PERSON_KEYS = "{bad";
+  broken.world.dropWaitingLinks();
+  assert.equal(broken.props.PERSON_KEYS, "{bad");
+  assert.ok(broken.logged.length === 1 && broken.logged[0].startsWith("PERSON_KEYS can’t be read"), broken.logged.join("\n"));
+});
+
+test("a PERSON_KEYS broken during the desk call is said as broken, not as a busy app", async () => {
+  for (const answer of [{ ok: true }, { ok: false, error: "quota" }]) {
+    const fake = world();
+    fake.personKey("Izzah");
+    fake.desk = () => {
+      fake.props.PERSON_KEYS = "{bad";
+      return answer;
+    };
+    fake.world.mailLinkForPerson2();
+    assert.equal(fake.props.PERSON_KEYS, "{bad");
+    assert.equal(fake.logged.some((l) => /busy/.test(l)), false, fake.logged.join("\n"));
+    assert.equal(fake.logged.length, 2, fake.logged.join("\n"));
+    assert.equal(fake.logged[0], answer.ok
+      ? "Sent to Izzah, but PERSON_KEYS can’t be read, so Izzah’s old link was not turned off."
+      : "Not sent to Izzah: quota. PERSON_KEYS can’t be read, so the unsent link could not be withdrawn: run dropWaitingLinks once it is mended.");
+    assert.match(fake.logged[1], /^PERSON_KEYS can’t be read/);
+    assertNoKeyOrLink(fake);
+  }
+  // Broken before a person is begun (by hand, between two people): the run stops there.
+  const fake = world();
+  fake.desk = () => {
+    fake.props.PERSON_KEYS = "{bad";
+    return { ok: false, error: "quota" };
+  };
+  fake.world.mailLinks();
+  assert.deepEqual(fake.deskPosts.map((p) => p.body.name), ["Mo"]);
+  assert.equal(fake.logged.some((l) => /busy/.test(l)), false, fake.logged.join("\n"));
+  assert.ok(fake.logged.includes("Not sent to Izzah: PERSON_KEYS can’t be read. Stopped here."), fake.logged.join("\n"));
+});
+
+test("the time-budget line names only functions that exist (six); beyond that it says to add one", () => {
+  const more = ["P3", "P4", "P5", "P6", "P7", "P8"].map((name) => ({ name, initials: name }));
+  const fake = world({ people: more });
+  let ms = 0;
+  fake.world.clockMs_ = () => ms;
+  fake.desk = () => {
+    ms += 250 * 1000;
+    return { ok: true };
+  };
+  fake.world.mailLinks();
+  assert.deepEqual(fake.deskPosts.map((p) => p.body.name), ["Mo"]);
+  const line = fake.logged.find((l) => l.startsWith("Stopped"));
+  assert.equal(line, "Stopped before the time limit. Not tried: Izzah, P3, P4, P5, P6, P7, P8. Run mailLinkForPerson2, mailLinkForPerson3, mailLinkForPerson4, mailLinkForPerson5 and mailLinkForPerson6 for the rest. P7 and P8 come after the sixth person, and there is no mailLinkForPerson function for them: add one in Setup.js.");
+  assert.equal(/mailLinkForPerson[7-9]/.test(fake.logged.join("\n")), false);
+});
+
+test("a name listed twice in the People tab is mailed once", () => {
+  const fake = world({ people: [{ name: "Izzah", initials: "IZ" }] });
+  fake.world.mailLinks();
+  assert.deepEqual(fake.deskPosts.map((p) => p.body.name), ["Mo", "Izzah"]);
+  assert.ok(fake.logged.includes("Izzah: listed twice in the People tab; mailed once."), fake.logged.join("\n"));
+  assert.ok(fake.logged.includes("Sent 2 of 2 links."), fake.logged.join("\n"));
 });
