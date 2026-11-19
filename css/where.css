@@ -56,3 +56,8 @@
 .brd-x{position:static;flex:none;margin-left:auto;width:44px;height:44px;border:0;padding:0 0 2px;border-radius:50%;color:var(--stock);font-weight:800;font-size:17px;line-height:1;
   background:radial-gradient(circle, rgba(19,38,31,.82) 0 13px, transparent 13.5px)}   /* 44px to the finger, 26px drawn */
 @media (prefers-reduced-motion: reduce){ .brd-wrap{transition:none !important} }
+
+/* the Edit sheet's "Where it is" row */
+.st-at-h{display:flex;flex-wrap:wrap;align-items:center;gap:5px 9px}
+.st-at-h b{font-size:16px;font-weight:900}
+.st-at i{font-size:12.5px;font-weight:600;line-height:1.35;overflow-wrap:anywhere}

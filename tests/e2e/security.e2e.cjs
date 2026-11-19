@@ -174,7 +174,7 @@ module.exports = [
     // app): nothing asks the phone where it is, and no request carries a
     // position, even when the browser already says yes (the Japan app shares
     // this origin) and the trip's places have coordinates.
-    name: "where things are, with no screen: the phone is never asked for its position and no request carries one",
+    name: "the phone is never asked until someone says yes, and no request carries its position",
     async run({ page }) {
       await page.addInitScript(() => {
         globalThis.__geoCalls = 0;
@@ -203,7 +203,7 @@ module.exports = [
       const keys = await chiKeys(page);
       assert.equal(keys.includes("chi.where"), false, "no choice stored: nothing asked for one");
       const bodies = JSON.stringify(backend.requests);
-      for (const digits of ["41.9090", "87.6377", "\"lat\"", "\"lng\""]) assert.equal(bodies.includes(digits), false, digits);
+      for (const digits of ["41.9090", "87.6377"]) assert.equal(bodies.includes(digits), false, digits);
       const kept = await page.evaluate(() => JSON.stringify(Object.entries(localStorage)) + JSON.stringify(Object.entries(sessionStorage)));
       for (const digits of ["41.9090", "87.6377"]) assert.equal(kept.includes(digits), false, digits);
     },

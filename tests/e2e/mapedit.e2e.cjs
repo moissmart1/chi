@@ -50,7 +50,8 @@ async function openEdit(page, id) {
 }
 const stored = (backend, id) => {
   const r = backend.fake.tables.Stops.find((x) => x.id === id);
-  return [String(r.lat || ""), String(r.lng || "")];
+  // A text cell that starts with a minus is stored with a leading apostrophe (formula safety); Sheets reads it back without.
+  return [String(r.lat || "").replace(/^'/, ""), String(r.lng || "").replace(/^'/, "")];
 };
 const saved = (page) => until(async () => !(await isOpen(page, "stop")), "the sheet closes, saved");
 const sign = (page) => page.evaluate(() => {
@@ -200,7 +201,7 @@ module.exports = [
       await page.click("#stSave");
       await saved(page);
       const r = backend.fake.tables.Stops.find((x) => x.title === "Tea");
-      assert.deepEqual([String(r.lat), String(r.lng)], ["41.9037", "-87.6788"]);
+      assert.deepEqual([String(r.lat).replace(/^'/, ""), String(r.lng).replace(/^'/, "")], ["41.9037", "-87.6788"]);
     },
   },
   {
