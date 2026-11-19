@@ -678,9 +678,11 @@ function updateStop_(args, ctx) {
 // a stop its place with its day's city, then its title with its day's city
 // (and when the day has coordinates, an answer more than LOCATE_NEAR_M_ from
 // them counts as not found: a common name in another city); a stay its name
-// with its place; a day its city. A stop whose place is a Maps link with a
-// position is read without asking. (The Japan app asks for a stay's
-// Japanese address first; Chicago's stays are asked by name and place only.)
+// with its place and the city of its first night (its street address with
+// that city first, when it has one); a day its city. A stay's answer far
+// from its first night's coordinates is not taken either. A stop whose place is a Maps link with a
+// position is read without asking. (Chicago's address_jp holds the
+// street address.)
 // Fair to every row: a row costs at most one lookup a call; rows never tried
 // go first, rows tried before go last (the longest ago first), each trying
 // its next form. Which rows found nothing, and how often, is kept in one
@@ -733,7 +735,13 @@ function locate_() {
   readTable_("Stays").forEach(function (r) {
     var id = cellText_(r.id);
     if (id === "" || cellSet_(r.deleted_at) || coordsOf_(r).lat !== "") return;
-    rows.push({ key: "stay:" + id, tab: "Stays", col: "id", ref: id, queries: clean([cellText_(r.name) + " " + placeText(r.place)]) });
+    var night = cellDate_(r.first_night);
+    var stayCity = cityOf[night] || "";
+    var addr = cellText_(r.address_jp).trim();
+    rows.push({
+      key: "stay:" + id, tab: "Stays", col: "id", ref: id, on: night,
+      queries: clean([addr ? addr + " " + stayCity : "", cellText_(r.name) + " " + placeText(r.place) + " " + stayCity]),
+    });
   });
   readTable_("Stops").forEach(function (r) {
     var id = cellText_(r.id);
@@ -784,7 +792,7 @@ function locate_() {
         if (asked[q] && asked[q].lat === "") asked[q] = null;
       }
       p = asked[q];
-      // A stop's answer far from its day's place is another place of that name.
+      // A stop's or stay's answer far from its day's place is another place of that name.
       if (p && row.on && dayAt[row.on] && !(metresBetween_(p, dayAt[row.on]) <= LOCATE_NEAR_M_)) p = null;
     }
     if (!p) {

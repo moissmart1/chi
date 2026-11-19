@@ -40,6 +40,7 @@ const locate = (call) => call.fake({ key: KEY, action: "locate", args: {} });
 const stopById = (d, id) => d.stops.find((s) => s.id === id);
 const TOKYO_DAY = "2026-12-28";
 const CHI_DAY = "2026-12-30";
+const HOTEL_ADDR = PLAN.stays[0].addressJp; // a fixture's own street address
 
 test("the tabs have lat and lng, as text columns, after everything older", () => {
   for (const tab of ["Stops", "Stays", "Days"]) {
@@ -86,7 +87,7 @@ test("locate needs a trip key, geocodes in region us what has no coordinates, an
   const asked = geocoder(call, {
     "Shibuya Sky Tokyo": { lat: 35.6585, lng: 139.7023 },
     "Meiji Jingu Tokyo": { lat: 35.6764, lng: 139.6993 },
-    "Asakusa hotel Asakusa hotel Tokyo": { lat: 35.7119, lng: 139.7967 },
+    [HOTEL_ADDR + " Chicago"]: { lat: 35.7119, lng: 139.7967 },
     Tokyo: { lat: 35.6812, lng: 139.7671 },
     "Dinner Tokyo": { lat: 35.68, lng: 139.77 },
   });
@@ -103,7 +104,7 @@ test("locate needs a trip key, geocodes in region us what has no coordinates, an
   // A stop with no place: its title plus the day's city.
   assert.equal(stopById(d, "planstop1204").lat, "35.68");
   const hotel = d.stays.find((s) => s.id === "planstay0001");
-  assert.deepEqual([hotel.lat, hotel.lng], ["35.7119", "139.7967"], "a stay by its name with its place");
+  assert.deepEqual([hotel.lat, hotel.lng], ["35.7119", "139.7967"], "a stay by its street address with its first night's city");
   assert.equal(d.days.find((x) => x.date === TOKYO_DAY).lat, "35.6812", "a day by its city");
   // Nothing found for the rest: "" and counted as missing; asked again next call.
   assert.ok(r.data.missing > 0, JSON.stringify(r.data));
@@ -141,12 +142,11 @@ test("locate: a stop's place first, then its title, each with the day's city; a 
   const qs = asked.map((a) => a.q);
   assert.ok(qs.includes("Meiji Shrine Tokyo"), qs.join(" | "));
   assert.ok(qs.includes("Lunch in Harajuku Tokyo"), qs.join(" | "));
-  // The hotel: its name and its place, the one form.
-  assert.ok(qs.includes("Asakusa hotel Asakusa hotel Tokyo"), qs.join(" | "));
-  // The lodge has no place: its name alone.
-  assert.ok(qs.includes("Niseko lodge"), qs.join(" | "));
-  // No second name and no address is ever asked for (Chicago does not read them).
-  assert.equal(qs.some((q) => q.includes("浅草")), false, qs.join(" | "));
+  // The hotel: its street address with its first night's city, then its name and place with that city.
+  assert.ok(qs.includes(HOTEL_ADDR + " Chicago"), qs.join(" | "));
+  assert.ok(qs.includes("Asakusa hotel Asakusa hotel Tokyo Chicago"), qs.join(" | "));
+  // The lodge has no address or place: its name with the city of its first night.
+  assert.ok(qs.includes("Niseko lodge Niseko"), qs.join(" | "));
   assert.equal(qs.some((q) => q.startsWith("undefined") || q.includes("undefined")), false);
 });
 
@@ -426,7 +426,8 @@ test("undo: a stop's place changed with no coordinates, located at the new place
 
 test("undo: the same for a stay's place and a stay's address", async () => {
   const call = client();
-  const asked = geocoder(call, { "Asakusa hotel Other inn": { lat: 35.2, lng: 139.2 }, "Asakusa hotel Asakusa hotel Tokyo": { lat: 35.7, lng: 139.8 } });
+  const table = { [HOTEL_ADDR + " Chicago"]: { lat: 35.2, lng: 139.2 } };
+  const asked = geocoder(call, table);
   const stay = async () => (await call("load")).data.stays.find((x) => x.id === "planstay0001");
   const base = async () => { const s = await stay(); const { deleted, lat, lng, ...rest } = s; return rest; };
   const e = await call("saveStay", { stay: { ...(await base()), place: "Other inn" } });
@@ -436,12 +437,14 @@ test("undo: the same for a stay's place and a stay's address", async () => {
   const u = await call("undo", { logId: e.data.logId });
   assert.equal(u.data.stay.place, "Asakusa hotel Tokyo");
   assert.deepEqual([u.data.stay.lat, u.data.stay.lng], ["", ""]);
+  table[HOTEL_ADDR + " Chicago"] = { lat: 35.7, lng: 139.8 };
   await locate(call);
   assert.equal((await stay()).lat, "35.7");
   // The address, changed while the stay had no coordinates: cleared again on its undo.
   call.fake.tables.Stays.find((x) => x.id === "planstay0001").lat = "";
   const a = await call("saveStay", { stay: { ...(await base()), addressJp: "2 Made Up St" } });
   assert.deepEqual([a.data.stay.lat, a.data.stay.lng], ["", ""]);
+  table["2 Made Up St Chicago"] = { lat: 35.7, lng: 139.8 };
   await locate(call);
   assert.equal((await stay()).lat, "35.7");
   const ua = await call("undo", { logId: a.data.logId });
@@ -481,4 +484,20 @@ test("metresBetween_: along the ground, NaN without both", () => {
   assert.ok(m > 2200 && m < 2400, String(m));
   assert.ok(Number.isNaN(P.metresBetween_({ lat: "", lng: "" }, { lat: 1, lng: 1 })));
   assert.ok(Number.isNaN(P.metresBetween_(null, { lat: 1, lng: 1 })));
+});
+
+test("locate: a stay is asked by street address then name, each with its first night's city; a far answer is not taken", async () => {
+  const call = client();
+  const addrQ = HOTEL_ADDR + " Chicago";
+  const nameQ = "Asakusa hotel Asakusa hotel Tokyo Chicago";
+  // The city of its first night is found first (rows go days first), then the hotel's answers are checked against it.
+  const asked = geocoder(call, { Chicago: { lat: 41.9, lng: -87.6 }, [addrQ]: { lat: 35.7, lng: 139.8 }, [nameQ]: { lat: 41.95, lng: -87.65 } });
+  await locate(call);
+  const stay = async () => (await call("load")).data.stays.find((x) => x.id === "planstay0001");
+  assert.ok(asked.some((a) => a.q === addrQ), "the address goes first");
+  assert.ok(!asked.some((a) => a.q === nameQ));
+  assert.equal((await stay()).lat, "", "an answer 10,000 km from the day is not taken");
+  await locate(call);
+  assert.ok(asked.some((a) => a.q === nameQ), "then the name with the place");
+  assert.deepEqual([(await stay()).lat, (await stay()).lng], ["41.95", "-87.65"]);
 });
