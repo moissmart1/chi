@@ -317,6 +317,123 @@ for (const calmMotion of [true, false]) {
   });
 }
 
+// A ticket up with its pictures held back; the finger goes down on the corner,
+// then the pictures are let in and the ticket repaints under the finger.
+async function heldUnderFinger(page, { down = true } = {}) {
+  const backend = await ticketed({ kinds: ["hawks"] });
+  let release;
+  const gate = new Promise((r) => { release = r; });
+  const handle = backend.handle.bind(backend);
+  backend.handle = async (b) => { if (b.action === "ticket") await gate; return handle(b); };
+  await ready(page, { backend });
+  await showTicket(page, S.hawks);
+  const first = await onTop(page);
+  const b = await cornerPoint(page);
+  await page.evaluate(() => { document.querySelector("#tix .ov").dataset.mark = "1"; });
+  await page.mouse.move(b.x, b.y);
+  const repainted = () => until(() => page.evaluate(() => !document.querySelector("#tix .ov[data-mark]") && document.querySelectorAll("#tix img.code").length > 0), "the picture arrives and the ticket repaints under the finger");
+  return { backend, first, b, release, repainted };
+}
+const settle = (page) => page.waitForTimeout(400);
+const stillUp = async (page) => assert.equal(await page.evaluate(() => document.getElementById("tix").hidden), false, "the ticket is still up");
+
+cases.push({
+  name: "a drag of 30 px from the corner while a picture arrives is not a tap: no flip, the ticket stays up",
+  async run({ page }) {
+    const h = await heldUnderFinger(page);
+    await page.mouse.down();
+    await page.mouse.move(h.b.x + 30, h.b.y, { steps: 5 });
+    h.release();
+    await h.repainted();
+    await page.mouse.up();
+    await settle(page);
+    assert.equal(await onTop(page), h.first, "no flip");
+    await stillUp(page);
+  },
+});
+
+cases.push({
+  name: "a sideways swipe from the corner while a picture arrives flips once, not twice",
+  async run({ page }) {
+    const h = await heldUnderFinger(page);
+    await page.mouse.down();
+    await page.mouse.move(h.b.x - 120, h.b.y, { steps: 8 });
+    h.release();
+    await h.repainted();
+    await page.mouse.up();
+    await until(async () => (await onTop(page)) !== h.first, "the other ticket is on top");
+    await settle(page);
+    assert.notEqual(await onTop(page), h.first, "flipped once");
+    await stillUp(page);
+  },
+});
+
+cases.push({
+  name: "a right button on the corner while a picture arrives flips nothing",
+  async run({ page }) {
+    const h = await heldUnderFinger(page);
+    await page.mouse.down({ button: "right" });
+    h.release();
+    await h.repainted();
+    await page.mouse.up({ button: "right" });
+    await settle(page);
+    assert.equal(await onTop(page), h.first);
+    await stillUp(page);
+  },
+});
+
+cases.push({
+  name: "a second pointer going down on the corner takes the tap away from the first: nothing flips",
+  async run({ page }) {
+    const h = await heldUnderFinger(page);
+    await page.mouse.down();
+    await page.evaluate(({ x, y }) => {
+      const t = document.elementFromPoint(x, y);
+      t.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerId: 7, isPrimary: false, button: 0, clientX: x, clientY: y }));
+    }, h.b);
+    h.release();
+    await h.repainted();
+    await page.mouse.up();
+    await settle(page);
+    assert.equal(await onTop(page), h.first);
+    await stillUp(page);
+  },
+});
+
+cases.push({
+  name: "after a tap that got no click, Enter on the corner still flips (a key click has no pointer before it)",
+  async run({ page }) {
+    const h = await heldUnderFinger(page);
+    await page.mouse.down();
+    h.release();
+    await h.repainted();
+    await page.mouse.up();
+    await until(async () => (await onTop(page)) !== h.first, "the tap flipped");
+    await page.focus("#tix .nx");
+    await page.keyboard.press("Enter");
+    await until(async () => (await onTop(page)) === h.first, "Enter flipped it back");
+    await stillUp(page);
+  },
+});
+
+cases.push({
+  name: "the finger's record is gone when the ticket is put away: a later click with no finger before it works",
+  async run({ page }) {
+    const h = await heldUnderFinger(page);
+    await page.mouse.down();
+    h.release();
+    await h.repainted();
+    await page.mouse.up();
+    await until(async () => (await onTop(page)) !== h.first, "the tap flipped");
+    await page.keyboard.press("Escape");
+    await until(() => page.evaluate(() => document.getElementById("tix").hidden), "put away");
+    await showTicket(page, S.hawks);
+    const top = await onTop(page);
+    await page.evaluate(() => document.querySelector("#tix .nx").dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 1 })));
+    await until(async () => (await onTop(page)) !== top, "the click flipped");
+  },
+});
+
 cases.push({
   name: "no ticket anywhere (or before migrate): no stub, no Show ticket, the stop as it was; no Ticket pictures row",
   async run({ page, newPhone }) {

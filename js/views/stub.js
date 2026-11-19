@@ -29,6 +29,7 @@
 import { ticketKinds, hasFacts, sniff, fromBase64 } from "../tickets.js";
 import { dayHead } from "../format.js";
 import { el, stockOf, kindWord, seatEl, staple, staffLine } from "./stubs.js";
+import { tapOnRelease } from "./tap.js";
 
 const str = (v) => (typeof v === "string" ? v.trim() : "");
 const calm = () => !!(globalThis.matchMedia && globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches);
@@ -406,6 +407,7 @@ export function mountStub(root, store, keep) {
     if (!isOpen()) return;
     host.hidden = true;
     host.replaceChildren();
+    tap.clear();
     forget();
     sleep();
     locked = false;
@@ -418,34 +420,25 @@ export function mountStub(root, store, keep) {
     if (restoreFocus && back && back.isConnected) back.focus({ preventScroll: true });
   }
 
-  let lastDown = null; // what the finger went down on: { el, in, flip, seal, close, done }
-  host.addEventListener("pointerdown", (ev) => {
-    const w = ev.target.closest(".who button");
-    lastDown = {
-      el: ev.target,
-      in: !!ev.target.closest(".f-tk, .who, .tb"),
-      flip: !!ev.target.closest("[data-flip]"),
-      seal: w ? Number(w.dataset.k) : null,
-      close: !!ev.target.closest("[data-close]"),
-      done: false,
-    };
-  });
   // A picture arriving between finger down and finger up repaints the ticket and
   // replaces what the finger went down on, so the browser sends no click to it.
   // The tap is still the tap it was (the corner, a seal, Back), never a tap on
-  // the dark around the ticket.
-  host.addEventListener("pointerup", () => {
-    const down = lastDown;
-    if (!down || !down.in || down.el.isConnected) return;
-    down.done = true;
-    if (down.flip) show(at + 1, true);
-    else if (down.seal !== null && down.seal !== at) show(down.seal, true);
-    else if (down.close) close();
+  // the dark around the ticket (js/views/tap.js).
+  const tap = tapOnRelease(host, {
+    pick: (t) => {
+      if (!t.closest(".f-tk, .who, .tb")) return null;
+      const w = t.closest(".who button");
+      return { flip: !!t.closest("[data-flip]"), seal: w ? Number(w.dataset.k) : null, close: !!t.closest("[data-close]") };
+    },
+    act: (what) => {
+      if (!isOpen()) return;
+      if (what.flip) show(at + 1, true);
+      else if (what.seal !== null && what.seal !== at) show(what.seal, true);
+      else if (what.close) close();
+    },
   });
   host.addEventListener("click", (ev) => {
-    const down = lastDown;
-    lastDown = null;
-    if (down && down.done) return;
+    if (tap.skip(ev)) return;
     if (ev.target.closest(".zoom")) {
       zoomOut();
       return;
