@@ -150,7 +150,7 @@ export function mountTicketTab(root, store, { clock, keep, onTicket = () => {}, 
     else b.append(stubEl({ stock: i.stock, edge: i.edge, kicker: kindWord(i.stock), name: t.title || "Ticket", sub: i.count }));
     const holes = el("span", "sh");
     holes.setAttribute("aria-hidden", "true");
-    b.append(holes, tclock("USED " + day[1] + " " + day[2], t.time || ""));
+    b.append(holes, tclock("USED " + day[1] + " " + day[2]));
     return b;
   }
 

@@ -57,7 +57,7 @@ for (const size of SIZES) {
       await ready(page, { backend, me: "Izzah" });
       await allKept(page);
       // Used: the stub stays on the line with the time clock's print.
-      await expectText(page, row(S.art) + " .ts-on", "ADMIT2ADMISSION2 ticketsUSED 11:00");
+      await expectText(page, row(S.art) + " .ts-on", "ADMIT2ADMISSION2 ticketsUSED");
       assert.equal(await page.evaluate((sel) => getComputedStyle(document.querySelector(sel + " .tclock")).color, row(S.art)), "rgb(107, 42, 140)");
       // Reference only: the Reserved card, the reference large.
       await expectText(page, row(S.jazz) + " .ts-on", "ReservedReference onlyJZ-5512");

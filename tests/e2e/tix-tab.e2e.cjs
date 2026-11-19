@@ -87,7 +87,7 @@ for (const size of SIZES) {
       await expectText(page, '#vTickets .cr[data-id="' + S.fly + '"]', "13:05PASS2BOARDING PASS · FRI JAN 1Flight to Toronto2 passes · on this phone");
       // Used: off their checks, the time clock's print.
       assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll("#vTickets .gl")].map((g) => g.textContent)), ["Later days4, on their checks", "Used2, off their checks"]);
-      assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll("#vTickets .tt-used .tclock")].map((t) => t.textContent)), ["USED DEC 2811:00", "USED DEC 2608:00"]);
+      assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll("#vTickets .tt-used .tclock")].map((t) => t.textContent)), ["USED DEC 28", "USED DEC 26"]);
       assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll("#vTickets .tt-used")].map((b) => b.getAttribute("aria-label"))), ["Used: The Art Institute, Mon Dec 28 11:00", "Used: Flight to O’Hare, Sat Dec 26 08:00"]);
       // The badge: today's still to come.
       await expectText(page, "#ticketsN", "2");

@@ -184,7 +184,7 @@ function row(stop, i, model, keep) {
   // The ticket, stapled under the name; once the stop is over, the time clock's USED print across it.
   if (tix) {
     const used = r.classList.contains("is-done");
-    body.append(onCheckEl(tix, { used, usedText: "USED" + (minutesOf(stop.time) === null ? "" : " " + stop.time), sm: true }));
+    body.append(onCheckEl(tix, { used, usedText: "USED", sm: true }));
     r.classList.add("has-tix");
   }
   // The price column of the check: a stop carries no price of its own (what

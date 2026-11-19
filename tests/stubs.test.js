@@ -86,3 +86,10 @@ test("no Japanese in the ticket screens, their styles or their tests", () => {
   assert.deepEqual(found, []);
   assert.ok(files.includes("js/views/stubs.js"));
 });
+
+test("the USED print never carries a time: the app does not know when a ticket was used", () => {
+  const stop = fs.readFileSync(path.join(ROOT, "js/views/ticket.js"), "utf8");
+  const tab = fs.readFileSync(path.join(ROOT, "js/views/tickettab.js"), "utf8");
+  assert.ok(!/usedText:[^\n]*stop\.time/.test(stop));
+  assert.ok(!/tclock\("USED[^\n]*time/.test(tab));
+});
