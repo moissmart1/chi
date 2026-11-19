@@ -83,3 +83,6 @@
 .set-where-l{display:flex;align-items:center;gap:8px;white-space:nowrap}
 .set-where>b.no{color:var(--red)}
 .set-where>b.off{color:var(--dim)}
+
+/* the hotel card: how far */
+.sy-dist{display:flex;flex-wrap:wrap;align-items:center;gap:5px 9px;margin-top:11px;padding-top:11px;border-top:1px solid var(--rule);font-size:21px;font-weight:900;line-height:1.15;font-variant-numeric:tabular-nums}

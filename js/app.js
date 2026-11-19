@@ -304,7 +304,7 @@ function start() {
   // One sheet at a time: opening one closes the others.
   const history = mountHistory(phone, store);
   // The Days sheets: the hotel card, the list of every day and the stop sheet.
-  const stayCard = mountStayCard(phone, store);
+  const stayCard = mountStayCard(phone, store, { where });
   const allDays = mountAllDays(phone, store, { clock, onPick: (i) => days.goDay(i) });
   const stopSheet = mountStopSheet(phone, store, { keep });
   // The stamp book, a panel like History, opened from the Days bar or today's ticket.
