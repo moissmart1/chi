@@ -335,3 +335,20 @@ test("planLeave rebuilds nextLine for every minute", () => {
   assert.equal(planLeave(stop("n", ""), 600), null);
   assert.deepEqual(planLeave(stop("t", "14:30", { travelMin: 25 }), 600), { kind: "leave", leaveBy: "14:05", in: "4 h 5 min" });
 });
+
+// Each rule on its own measure: the grid for distances and leave-by, the
+// straight line for the stamp. Each case below sits where the two disagree.
+test("each rule uses its own measure, and a tie keeps the first", () => {
+  // 1,600 m north and 1,600 m east: 2,263 m straight, 3,200 m on the grid.
+  assert.deepEqual(nearStops([atOff("x", "", 1600, 1600), atOff("y", "", 100, 0)], P).x, undefined, "over 3,000 m on the grid");
+  // 30 km north and 30 km east: 42 km straight, 60 km on the grid.
+  assert.equal(stayDistance(txt(off(P, 30000, 30000)), P), null, "over 50 km on the grid");
+  // 1,000 m north and 1,000 m east: 1,414 m straight (within a mile), 2,000 m on the grid.
+  assert.equal(inPlace({ date: "2026-12-28", ...txt(off(P, 1000, 1000)) }, [], P), true, "the stamp's mile is a straight line");
+  // Two loose stops the same distance away (the same spot): the first in the list is the nearest.
+  const tie = nearStops([atOff("e", "", 0, 400), atOff("n", "", 0, 400), atOff("f", "", 900, 0)], P);
+  assert.equal(tie.e.near, true);
+  assert.equal(tie.n.near, false);
+  // The board's hereLine reads the grid too: 1,000 m S and 600 m E is 1,600 m on the grid.
+  assert.equal(hereLine(atOff("g", "14:30", -1000, 600), 832, P).from.dist, "1.0 mi · 23 min walk");
+});

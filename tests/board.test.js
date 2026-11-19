@@ -99,3 +99,13 @@ test("closed until the trip's date changes", () => {
   assert.equal(isClosed(null, TZ, now), false);
   assert.equal(isClosed(20261228, TZ, now), false);
 });
+
+test("the trip over: no board, even when a check is there for the day", () => {
+  const late = mk({
+    days: DATES.concat("2027-01-02").map((date) => ({ date })),
+    stops: [{ id: "Z", date: "2027-01-02", time: "18:00", title: "Stop Z", travelMin: 0 }],
+  });
+  assert.equal(boardFor(late, at("2027-01-02T12:00:00-06:00"), null), null);
+  // The same day inside the trip has a board, so the rule above is the trip's end.
+  assert.equal(boardFor({ ...late, trip: { ...late.trip, end: "2027-01-02" } }, at("2027-01-02T12:00:00-06:00"), null).name, "Stop Z");
+});
