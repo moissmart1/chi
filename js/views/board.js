@@ -13,10 +13,13 @@
 //   every word taken off it (update(null) leaves the last words in the page).
 // - The × closes it for today (44 px wide). A closed board is not in the
 //   page's tab order. now(): the real time, never the demo's.
+// - The plate (.g-pl): with a model that used the phone's position (from),
+//   the sign and the miles and walk to the next stop; else hidden and empty.
 // Every word on it is set with textContent.
 
 import { BOARD_KEY, closedDate, isClosed } from "../board.js";
 import { TRIP_TZ } from "../trip.js";
+import { bladeEl } from "./sign.js";
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
@@ -92,6 +95,7 @@ export function mountBoard({ storage = null, now = () => Date.now() } = {}) {
   wrap.append(clip);
 
   let shown = false;
+  let plate = ""; // what the plate says now ("" when it is hidden)
   let tzNow = TRIP_TZ;
   let foldTimer = null;
 
@@ -123,6 +127,17 @@ export function mountBoard({ storage = null, now = () => Date.now() } = {}) {
   const put = (node, text) => {
     if (node.textContent !== text) node.textContent = text;
   };
+  // The plate: its children are made again only when what it says changes.
+  function drawPlate(from) {
+    const want = from ? [from.blocks, from.dir, from.dist].join("|") : "";
+    if (want === plate) return;
+    plate = want;
+    pl.hidden = !from;
+    if (from) {
+      const d = el("span", "dist", from.dist);
+      pl.replaceChildren(bladeEl(from), d);
+    } else pl.replaceChildren();
+  }
 
   function update(model, tz) {
     tzNow = tz || TRIP_TZ;
@@ -137,7 +152,7 @@ export function mountBoard({ storage = null, now = () => Date.now() } = {}) {
       put(nm.b, model.big);
       no.d.hidden = true;
       lv.hidden = true;
-      pl.hidden = true;
+      drawPlate(null);
     } else {
       brd.dataset.tone = model.tone;
       put(nm.small, "Next stop");
@@ -155,7 +170,7 @@ export function mountBoard({ storage = null, now = () => Date.now() } = {}) {
         put(right.small, model.r.small);
         put(right.b, model.r.big);
       }
-      pl.hidden = true;
+      drawPlate(model.from);
     }
     show(true);
   }
@@ -176,6 +191,7 @@ export function mountBoard({ storage = null, now = () => Date.now() } = {}) {
     wrap.hidden = true;
     wrap.classList.add("is-shut");
     for (const n of [nm.small, nm.b, no.small, no.b, left.small, left.b, right.small, right.b]) n.textContent = "";
+    drawPlate(null);
   }
 
   return { el: wrap, update, clear };

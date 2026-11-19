@@ -10,6 +10,7 @@ const assert = require("node:assert/strict");
 const fs = require("fs");
 const { open, advance, until, text, expectText, visible } = require("./helpers.cjs");
 const { SEED_WHERE, whereBackend, clock, D28 } = require("./where-fixture.cjs");
+const { geoStub, leaks } = require("./geostub.cjs");
 
 const SHOTS = "/private/tmp/claude-501/chi-shots/where";
 const MIN = 60000;
@@ -296,6 +297,47 @@ module.exports = [
       await page.waitForTimeout(300);
       assert.equal(await boardUp(page), false);
       assert.deepEqual(await page.evaluate(() => [...document.getElementById("vDays").children].filter((n) => !n.hidden).map((n) => n.className.split(" ")[0])), ["bar", "rail"]);
+    },
+  },
+  // Stage 2: from where the phone is (the Corner stop is 0.5 mi south of the stood-in phone).
+  ...[
+    ["13:52", "hon", ["Leave by", "14:18"], ["In", "26 min"]],
+    ["14:15", "tow", ["By 14:18", "Leave now"], ["To spare", "3 min"]],
+    ["14:24", "red", ["About", "6 min late"], ["Leave", "Now"]],
+  ].map(([clk, tone, l, r]) => ({
+    name: "from where the phone is at " + clk + ": the plate and the " + tone + " blade",
+    async run({ page }) {
+      await geoStub(page);
+      const backend = await ready(page, { nowMs: clock(clk), storage: { "chi.where": "on" } });
+      await until(async () => (await lines(page)).tone === tone && !(await page.evaluate(() => document.querySelector("#vDays .g-pl").hidden)), "the board reads the position");
+      assert.deepEqual(await lines(page), { kind: "trip", tone, nameSmall: "Next stop", name: "Corner stop", noSmall: "At", no: "14:30", l, r });
+      assert.equal(
+        await page.evaluate(() => document.querySelector("#vDays .g-pl").innerHTML),
+        '<span class="g-bl" role="img" aria-label="4 blocks south"><b>4</b>BLOCKS<i>S</i></span><span class="dist">0.5 mi · 12 min walk</span>',
+      );
+      assert.deepEqual(await fits(page), []);
+      await shot(page, "board-plate-" + tone);
+      assert.deepEqual(await leaks(page, backend), []);
+      assert.equal(await page.evaluate(() => window.__geoWatch), 0);
+    },
+  })),
+  {
+    name: "the plate keeps its nodes while the minutes pass, and goes when the position does",
+    async run({ page }) {
+      await geoStub(page);
+      const backend = await ready(page, { nowMs: clock("13:52"), storage: { "chi.where": "on" } });
+      await until(() => page.evaluate(() => !document.querySelector("#vDays .g-pl").hidden), "the plate shows");
+      const sign = await page.evaluateHandle(() => document.querySelector("#vDays .g-pl .g-bl"));
+      await advance(page, backend, MIN);
+      await until(async () => (await lines(page)).r[1] === "25 min", "the minute passes");
+      assert.equal(await page.evaluate((n) => n === document.querySelector("#vDays .g-pl .g-bl"), sign), true, "the same sign");
+      await page.evaluate(() => window.__geoSet({ mode: "silent" }));
+      await advance(page, backend, 3 * MIN); // 13:56: the last answer is 4 minutes old
+      await until(() => page.evaluate(() => document.querySelector("#vDays .g-pl").hidden), "the plate goes");
+      assert.equal(await page.evaluate(() => document.querySelector("#vDays .g-pl").childElementCount), 0);
+      assert.deepEqual((await lines(page)).l, ["Leave by", "14:05"]);
+      assert.deepEqual(await leaks(page, backend), []);
+      assert.equal(await page.evaluate(() => window.__geoWatch), 0);
     },
   },
   sizeCase({ width: 393, height: 852 }, true, "393x852"),
