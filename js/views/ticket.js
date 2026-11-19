@@ -46,12 +46,15 @@
 // - hereNext: leave by from where you are (js/plan.js hereLine) for today's
 //   next stop: its sign line (.r-here: the sign, the miles and the walk) and
 //   its leave line (late: .r-lv.is-late). Absent, today's line stands.
+// - near: { [stopId]: nearStops(...) } for today's stops with no time: each
+//   gets the same sign line; the nearest of two or more gets the NEAREST
+//   sign above its name. Absent, the stop reads as it did.
 
 import { minutesOf, issueLine, isPast, nextLine, mapsUrl, safeHref, gateDate, checkDate } from "../plan.js";
 import { dayHead, tripMoney, dollars } from "../format.js";
 import { rng, gateStampSVG } from "../stamp.js";
 import { onCheckEl, bigStubEl, kindWord, bandDay, thumbEl, statusWords } from "./stubs.js";
-import { plainBlade, bladeEl } from "./sign.js";
+import { plainBlade, bladeEl, nearestEl } from "./sign.js";
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
@@ -172,8 +175,11 @@ function row(stop, i, model, keep) {
   body.tabIndex = 0;
   body.setAttribute("aria-expanded", "false");
   const title = str(stop.title);
-  if (title || next) {
+  const near = model.near && model.near[stop.id] ? model.near[stop.id] : null;
+  const nearest = !!(near && near.near);
+  if (title || next || nearest) {
     const n = el("div", "r-n");
+    if (nearest) n.append(nearestEl());
     if (next) n.append(el("span", "tag", "Next"));
     if (title) n.append(title);
     body.append(n);
@@ -186,7 +192,7 @@ function row(stop, i, model, keep) {
   }
   // From where you are: the sign, the miles and the walk.
   const hereNext = next && model.hereNext ? model.hereNext : null;
-  const signed = hereNext;
+  const signed = hereNext || near;
   if (signed) {
     const h = el("div", "r-here");
     h.append(bladeEl(signed.from), el("span", "dist", signed.dist));

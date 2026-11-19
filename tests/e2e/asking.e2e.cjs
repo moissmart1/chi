@@ -231,6 +231,46 @@ const cases = [
       await clean(page, backend);
     },
   },
+  {
+    name: "exactly today's: with no usable position the check and the board are byte for byte as with no geolocation at all",
+    async run({ page, newPhone }) {
+      const snap = (pg) =>
+        pg.evaluate(() => {
+          const rail = document.querySelector("#rail").cloneNode(true);
+          const ask = rail.querySelector(".tk-ask");
+          if (ask) ask.remove();
+          return { rail: rail.outerHTML, board: document.querySelector("#vDays .brd-wrap").outerHTML, ask: !!ask };
+        });
+      await geoStub(page, { mode: "none" });
+      await ready(page);
+      await page.waitForTimeout(400);
+      const base = await snap(page);
+      assert.equal(base.ask, false);
+      assert.ok(base.board.includes("Corner stop"), "the board is up");
+      const FAR = { lat: 41.990061, lng: -87.580021 }; // about 10 km north and east of everything
+      for (const [tag, stub, storage] of [
+        ["off (after Not now)", {}, { "chi.where": "off" }],
+        ["refused", { mode: "refused", permission: "denied" }, { "chi.where": "refused" }],
+        ["on, no answer", { mode: "silent" }, { "chi.where": "on" }],
+        ["on, stale", { ageMs: 200000 }, { "chi.where": "on" }],
+        ["on, rough", { accuracy: 400 }, { "chi.where": "on" }],
+        ["on, far", FAR, { "chi.where": "on" }],
+        ["unset", {}, {}],
+      ]) {
+        const other = await newPhone();
+        await geoStub(other, stub);
+        const backend = await ready(other, { storage });
+        if (storage["chi.where"] === "on") await until(() => other.evaluate(() => window.__geoCalls.length > 0), "asked: " + tag);
+        await other.waitForTimeout(400);
+        const got = await snap(other);
+        assert.equal(got.ask, tag === "unset", "the ask: " + tag);
+        assert.equal(got.rail, base.rail, "the check: " + tag);
+        assert.equal(got.board, base.board, "the board: " + tag);
+        assert.deepEqual(await leaks(other, backend, stub.lat ? stub : undefined), [], tag);
+        assert.equal(await other.evaluate(() => window.__geoWatch), 0);
+      }
+    },
+  },
 ];
 
 module.exports = cases;

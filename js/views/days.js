@@ -51,7 +51,7 @@
 // ground under it), it goes back to the top. Never
 // on a minute tick, a sync or a redraw.
 
-import { openDayIndex, dayState, daysToGo, nowIn, stopsFor, nextStopId, header, dayTotalTrip, stayShownFor, hereLine } from "../plan.js";
+import { openDayIndex, dayState, daysToGo, nowIn, stopsFor, nextStopId, header, dayTotalTrip, stayShownFor, hereLine, nearStops } from "../plan.js";
 import { dayShort, dayHead } from "../format.js";
 import { cadCents } from "../money.js";
 import { APP_NAME } from "../config.js";
@@ -650,6 +650,11 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
       if (nextId && here) {
         const hl = hereLine(dayStops.find((x) => x.id === nextId), now.minutes, here);
         if (hl) model.hereNext = hl;
+      }
+      // A loose day: each stop's distance and the nearest, the order kept.
+      if (state === "today" && here) {
+        const near = nearStops(dayStops, here);
+        if (Object.keys(near).length) model.near = near;
       }
       // Asked once, on today's check, only when something on it could show a distance.
       if (nextId && where && where.supported() && where.state() === "unset" && dayStops.some((x) => point(x))) model.ask = true;
