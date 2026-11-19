@@ -294,7 +294,7 @@ test("several ids on different stops, per-person: a card (one stop only), not du
 
 // ---------- already there, limits ----------
 
-test("a file already on its stop is 既 already there, left out; so is the same file dropped twice", () => {
+test("a file already on its stop is already there, left out; so is the same file dropped twice", () => {
   const rows = [R({ ticket_id: "T006", start_date: "2026-12-27", start_time: "10:00", title: "Museum" })];
   const there = sortFiles({ files: [png("f", "T006 museum.png")], rows, state: state(), isThere: (k, stop) => k === "f" && stop === "s-mu" });
   assert.deepEqual(there.out.map((o) => [o.kind, o.stop]), [["there", "s-mu"]]);

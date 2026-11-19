@@ -131,6 +131,37 @@ module.exports = [
     },
   },
   {
+    name: "fix round 1, M1: a link pasted while Forget this phone is still running waits for it, and is kept",
+    async run({ page }) {
+      const backend = await ready(page, { own: "Mo" });
+      const key = ownKey(backend, "Mo");
+      // The picture keep's two deletes never answer: Forget then waits on the
+      // keep's own 3-second limit, which the paused page clock holds until the
+      // test moves it. Later deletes (forgetPhone's own) work as usual.
+      await page.evaluate(() => {
+        const real = indexedDB.deleteDatabase.bind(indexedDB);
+        let held = 2;
+        indexedDB.deleteDatabase = (name) => (held-- > 0 ? {} : real(name));
+      });
+      await page.dispatchEvent("#youBtn", "click");
+      await until(() => page.evaluate(() => document.getElementById("you").classList.contains("is-open")), "the settings sheet opens");
+      await page.dispatchEvent("#setForget", "click");
+      await page.dispatchEvent("#setForget", "click");
+      await until(() => visible(page, "#gate"), "the no-key screen shows while Forget is still running");
+      // The store has already let go of the trip; forgetPhone (which clears the storage again) has not run yet.
+      assert.equal(await page.evaluate(() => localStorage.getItem("chi.key")), null);
+      await page.fill("#keyPaste", "https://example.test/chi/#k=" + key);
+      await page.dispatchEvent("#keyGo", "click");
+      await page.clock.fastForward(3100);
+      await until(() => page.evaluate(() => globalThis.__matTest.store.state.status === "ready"), "the trip opens on the pasted link");
+      await until(async () => !(await visible(page, "#gate")), "the no-key screen goes");
+      assert.equal(await page.evaluate(() => localStorage.getItem("chi.key")), key, "the pasted link is kept, not wiped by Forget");
+      await page.reload();
+      await until(() => page.evaluate(() => globalThis.__matTest && globalThis.__matTest.store.state.status === "ready"), "after a reload the trip is still there");
+      assert.equal(await visible(page, "#gate"), false);
+    },
+  },
+  {
     name: "a trip sheet before migrate sends no tickets: ticketsReady is false and the phone asks for no picture",
     async run({ page }) {
       const backend = await ready(page, { seed: { ...WITH_PLAN, missingTabs: ["Tickets", "TicketData"], missingColumns: ["Stops.tk_ref", "Stops.tk_name", "Stops.tk_people", "Stops.tk_seat"] } });

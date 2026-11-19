@@ -7,7 +7,7 @@
 // the phone already holds: the stops, the ticket rows and which pictures are
 // kept on this phone (have). Nothing new is stored.
 //
-// A ticket is a stop with a 券 mark (js/tickets.js ticketMark): pictures, or
+// A ticket is a stop with a ticket mark (js/tickets.js ticketMark): pictures, or
 // the facts alone (reference only). A ticket is used when its stop is over by
 // the Days screen's own rule: an earlier day, or today and past by isPast
 // with the day's next stop (R38) kept. Untimed stops stand after the timed
@@ -55,7 +55,7 @@ export function tripStarted(s, nowMs) {
   return dateIn(TRIP_TZ, nowMs) >= s.trip.start;
 }
 
-// The status line of a ticket, from its 券 mark.
+// The status line of a ticket, from its ticket mark.
 function statusOf(mark, stop) {
   if (mark.kind === "ref") return { kind: "ref", label: "Reference only", ref: str(stop.tkRef) };
   return { kind: mark.saved ? "have" : "needs", label: mark.label, ref: "" };

@@ -388,7 +388,7 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
     myName = null;
     for (const k of DATA_KEYS) state[k] = Array.isArray(state[k]) ? [] : null;
     Object.assign(state, {
-      rev: null, me: null, personal: false, sheetUrl: "", tripProblem: null,
+      rev: null, me: null, personal: false, sheetUrl: "", tripProblem: null, ticketsReady: false,
       loadedAt: null, lastChange: null, notice: null, setAside: [],
       history: { entries: [], more: false, loading: false, error: null },
       cleared: had ? { kept: mine.length } : null,

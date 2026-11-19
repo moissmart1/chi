@@ -329,7 +329,7 @@ export function createKeep({ indexedDB = globalThis.indexedDB, name = KEEP_NAME,
         if (mine !== gen) return;
         for (const k of keys || []) known.add(String(k));
         lasting = true;
-        // Views drawn before this (the 券 boxes) look again.
+        // Views drawn before this (a stop's ticket mark) look again.
         if (known.size) tell();
       } catch {
         db = null;
@@ -558,7 +558,11 @@ export function fetchMissing(store, keep, { now = () => Date.now(), allowed = ()
         return;
       }
     }
-  })().finally(() => running.delete(store));
+  })()
+    // A fault inside a pass (odd rows, say) ends that pass quietly: the
+    // callers never wait on it, and the next load or redraw starts again.
+    .catch(() => {})
+    .finally(() => running.delete(store));
   running.set(store, p);
   return p;
 }
@@ -576,7 +580,7 @@ export function ticketKinds(list) {
 
 export const hasFacts = (stop) => !!stop && ["tkRef", "tkName", "tkPeople", "tkSeat"].some((k) => typeof stop[k] === "string" && stop[k].trim() !== "");
 
-// The 券 mark for a stop: null (no ticket at all), or { kind, label, saved }.
+// A stop's ticket mark: null (no ticket at all), or { kind, label, saved }.
 export function ticketMark(stop, tickets, have) {
   if (!stop) return null;
   const k = ticketKinds((Array.isArray(tickets) ? tickets : []).filter((t) => t && t.stop === stop.id));

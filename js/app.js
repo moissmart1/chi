@@ -315,6 +315,8 @@ function start() {
       demoGuard = null;
     }
   });
+  // Forget this phone while it runs (onForget), else null.
+  let forgetting = null;
   const you = mountYou(phone, store, {
     demo: clock,
     getKey: () => storage.getItem(STORAGE_PREFIX + "key"),
@@ -337,31 +339,40 @@ function start() {
       you.close(false);
       history.open();
     },
-    // Forget this phone: the trip, the key and every setting, the offline
-    // copy and the worker, then the no-key screen.
-    onForget: async () => {
-      keyHere = null;
-      // The store is marked wiped first (nothing is written or sent after it),
-      // then the ticket pictures: their open database would hold up its deletion.
-      store.forgot();
-      await keep.wipe();
-      let session = null;
-      try {
-        session = window.sessionStorage;
-      } catch {
-        session = null;
-      }
-      await forgetPhone({
-        storages: [raw, session].filter(Boolean),
-        indexedDB: globalThis.indexedDB || null,
-        caches: globalThis.caches || null,
-        serviceWorker: (navigator && navigator.serviceWorker) || null,
-        // Only this app's worker: the Japan app shares the origin.
-        scope: new URL("./", location.href).href,
+    // Forget this phone (forgetAll, below). Kept while it runs, so a link pasted on the no-key screen meanwhile
+    // (it shows as soon as the store forgets) waits for it to finish and is
+    // never wiped by it.
+    onForget: () => {
+      if (!forgetting) forgetting = forgetAll().finally(() => {
+        forgetting = null;
       });
-      you.close(false);
+      return forgetting;
     },
   });
+  // Forget this phone: the trip, the key and every setting, the ticket
+  // pictures, the offline copy and the worker, then the no-key screen.
+  async function forgetAll() {
+    keyHere = null;
+    // The store is marked wiped first (nothing is written or sent after it),
+    // then the ticket pictures: their open database would hold up its deletion.
+    store.forgot();
+    await keep.wipe();
+    let session = null;
+    try {
+      session = window.sessionStorage;
+    } catch {
+      session = null;
+    }
+    await forgetPhone({
+      storages: [raw, session].filter(Boolean),
+      indexedDB: globalThis.indexedDB || null,
+      caches: globalThis.caches || null,
+      serviceWorker: (navigator && navigator.serviceWorker) || null,
+      // Only this app's worker: the Japan app shares the origin.
+      scope: new URL("./", location.href).href,
+    });
+    you.close(false);
+  }
   const line = mountLine(phone, store, {
     onEdit: (id) => {
       line.close(false);
@@ -437,7 +448,9 @@ function start() {
     connected,
     storage,
     // A key pasted on the no-key screen: keep it and start, without a reload.
-    onKey: (key) => {
+    onKey: async (key) => {
+      // Forget this phone still running: it would take this key off too.
+      if (forgetting) await forgetting;
       keyHere = key;
       try {
         raw.setItem(STORAGE_PREFIX + "key", key);

@@ -829,3 +829,30 @@ test("fetchOrder judges today on the trip's clock (Chicago), not the Trip tab's 
   // (Judged in Tokyo it would be Dec 28 there, and the order z, y, x.)
   assert.deepEqual(fetchOrder(s, late27).map((t) => t.id), ["y", "z", "x"]);
 });
+
+// ---------- fix round 1 of this port ----------
+
+test("M2: a refused key leaves ticketsReady false until the next load says otherwise", async () => {
+  const p = phone();
+  await p.store.boot();
+  assert.equal(p.store.state.ticketsReady, true);
+  p.fake.props.TRIP_KEY = "another-key";
+  await p.store.checkRev();
+  assert.equal(p.store.state.status, "nokey");
+  assert.equal(p.store.state.ticketsReady, false);
+  // Forget this phone the same.
+  const q = phone();
+  await q.store.boot();
+  q.store.forgot();
+  assert.equal(q.store.state.ticketsReady, false);
+});
+
+test("M5: a fault inside a fetching pass ends it quietly (no unhandled rejection); the next call starts afresh", async () => {
+  const keep = createKeep({ indexedDB: fakeIndexedDB() });
+  await keep.ready;
+  const { store, calls } = fakeStore({ tickets: [T("t1", "soon0001")], stops: STOPS, answer: (id) => ({ id, mime: "image/png", data: pngData }) });
+  await fetchMissing(store, keep, { now: () => NOW12, allowed: () => { throw new Error("odd"); } });
+  assert.equal(calls.ids.length, 0);
+  await fetchMissing(store, keep, { now: () => NOW12 });
+  assert.deepEqual(calls.ids, ["t1"]);
+});
