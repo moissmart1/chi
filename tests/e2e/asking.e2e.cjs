@@ -34,6 +34,27 @@ async function clean(page, backend) {
   assert.equal(await page.evaluate(() => window.__geoWatch), 0, "never watchPosition");
 }
 
+const isOpen = (page, id) => page.evaluate((i) => !!document.getElementById(i) && document.getElementById(i).classList.contains("is-open"), id);
+async function openYou(page) {
+  await page.evaluate(() => document.getElementById("youBtn").click());
+  await until(() => isOpen(page, "you"), "You opens");
+  await until(() => page.evaluate(() => getComputedStyle(document.getElementById("you")).transform === "none"), "You has risen");
+  await page.evaluate(() => document.getElementById("setWhere").scrollIntoView({ block: "center" }));
+}
+// The Location row: its words, its value and its classes, and the sign's.
+const whereRow = (page) =>
+  page.evaluate(() => ({
+    hidden: document.getElementById("setWhere").hidden,
+    v: document.getElementById("setWhereV").textContent,
+    vCls: document.getElementById("setWhereV").className,
+    sign: document.getElementById("setWhereM").className,
+    s: document.getElementById("setWhereS").textContent,
+    why: document.getElementById("setWhereWhy").hidden ? null : document.getElementById("setWhereWhy").textContent,
+  }));
+const FOR = "For leave-by times, distances and the stamp. Your position stays on this phone. A stamp pressed in the day’s place gets a small mark, saved with the trip.";
+const NO = "To change it: iPhone Settings, Apps, Safari, Location. Then tap here to try again.";
+const NO_APP = "On the Home Screen app, iPhone won’t ask again here. Open your own link in Safari, go to You and tap Location. If Safari doesn’t ask, tap the page menu beside the address (aA), then Website Settings, Location, Allow. Then come back here and tap Location.";
+
 const SIZES = [
   { tag: "393x852", viewport: { width: 393, height: 852 } },
   { tag: "320x568", viewport: { width: 320, height: 568 } },
@@ -269,6 +290,121 @@ const cases = [
         assert.deepEqual(await leaks(other, backend, stub.lat ? stub : undefined), [], tag);
         assert.equal(await other.evaluate(() => window.__geoWatch), 0);
       }
+    },
+  },
+  {
+    name: "You: the Location row says Off while unset, and right after FROM HERE its word is Location",
+    async run({ page }) {
+      await geoStub(page);
+      const backend = await ready(page);
+      await openYou(page);
+      assert.deepEqual(await whereRow(page), { hidden: false, v: "Off", vCls: "off", sign: "g-bl pl off", s: FOR, why: null });
+      assert.equal(await page.evaluate(() => document.getElementById("setWhere").previousElementSibling.id), "setSound");
+      assert.equal(await text(page, ".set-where-l"), "FROM HERELocation");
+      assert.equal(await page.evaluate(() => document.getElementById("setWhereM").getAttribute("aria-hidden")), "true");
+      await shot(page, "you-off");
+      // A tap asks the phone, and the row says On.
+      await page.dispatchEvent("#setWhere", "click");
+      await until(async () => (await whereRow(page)).v === "On", "On");
+      assert.deepEqual(await whereRow(page), { hidden: false, v: "On", vCls: "", sign: "g-bl pl", s: FOR, why: null });
+      assert.equal(await calls(page), 1);
+      await shot(page, "you-on");
+      // Another tap turns it off.
+      await page.dispatchEvent("#setWhere", "click");
+      assert.equal((await whereRow(page)).v, "Off");
+      assert.equal(await choice(page), "off");
+      await clean(page, backend);
+    },
+  },
+  {
+    name: "You: the phone said no, in Safari, with its own answer as text in memory only",
+    async run({ page }) {
+      await geoStub(page, { mode: "refused", message: "Denied <b>by</b> the user" });
+      const backend = await ready(page);
+      await until(() => askShown(page), "today's check asks");
+      await page.dispatchEvent(TODAY + " .tk-ask .yes", "click");
+      await until(async () => (await choice(page)) === "refused", "refused");
+      await openYou(page);
+      assert.deepEqual(await whereRow(page), { hidden: false, v: "Phone said no", vCls: "no", sign: "g-bl pl off", s: NO, why: "Phone’s answer: Denied <b>by</b> the user (code 1)" });
+      assert.equal(await page.locator("#setWhereWhy b").count(), 0, "not markup");
+      assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById("setWhereV")).color), "rgb(194, 54, 43)");
+      await shot(page, "you-phone-said-no");
+      // Not in storage, not sent, not in Report a problem.
+      const kept = await page.evaluate(() => JSON.stringify({ ...localStorage }) + JSON.stringify({ ...sessionStorage }));
+      assert.equal(kept.includes("Denied"), false);
+      assert.equal(JSON.stringify(backend.requests).includes("Denied"), false);
+      await page.evaluate(() => document.getElementById("setReport").scrollIntoView({ block: "center" }));
+      await page.dispatchEvent("#setReport", "click");
+      await until(() => page.evaluate(() => navigator.clipboard.readText().then((t) => t.length > 0)), "the note is copied");
+      const note = await page.evaluate(() => navigator.clipboard.readText());
+      assert.equal(/Denied|code 1|41\.9/.test(note), false, note);
+      await clean(page, backend);
+    },
+  },
+  {
+    name: "You: the phone said no on the Home Screen app: how to allow it in Safari",
+    async run({ page }) {
+      await page.addInitScript(() => Object.defineProperty(navigator, "standalone", { value: true, configurable: true }));
+      await geoStub(page, { mode: "refused", permission: "denied" });
+      const backend = await ready(page, { storage: { "chi.where": "refused" } });
+      await openYou(page);
+      const got = await whereRow(page);
+      assert.equal(got.v, "Phone said no");
+      assert.equal(got.s, NO_APP);
+      await shot(page, "you-phone-said-no-home-screen");
+      await clean(page, backend);
+    },
+  },
+  {
+    name: "refused, then allowed in Settings: back on screen turns it On without a prompt; still 'prompt': only a tap asks",
+    async run({ page, newPhone }) {
+      await geoStub(page, { permission: "denied" });
+      const backend = await ready(page, { storage: { "chi.where": "refused" } });
+      await page.evaluate(() => window.__geoSet({ permission: "granted" }));
+      await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+      await until(async () => (await choice(page)) === "on", "On once Settings says granted");
+      await openYou(page);
+      assert.equal((await whereRow(page)).v, "On");
+      await clean(page, backend);
+      const other = await newPhone();
+      await geoStub(other, { permission: "denied" });
+      await ready(other, { storage: { "chi.where": "refused" } });
+      await other.evaluate(() => window.__geoSet({ permission: "prompt" }));
+      await other.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+      await other.waitForTimeout(200);
+      assert.equal(await calls(other), 0, "the phone is never asked by itself");
+      assert.equal(await choice(other), "refused");
+      await openYou(other);
+      await other.dispatchEvent("#setWhere", "click");
+      await until(async () => (await whereRow(other)).v === "On", "a tap tries again");
+      assert.equal(await calls(other), 1);
+    },
+  },
+  {
+    name: "You: a phone with no geolocation has no Location row",
+    async run({ page }) {
+      await geoStub(page, { mode: "none" });
+      await ready(page);
+      await openYou(page).catch(() => {});
+      assert.equal((await whereRow(page)).hidden, true);
+    },
+  },
+  {
+    name: "You: the Location row at 320 wraps its words and stays inside the sheet",
+    viewport: { width: 320, height: 568 },
+    async run({ page }) {
+      await geoStub(page, { mode: "refused", permission: "denied" });
+      const backend = await ready(page, { storage: { "chi.where": "refused" } });
+      await openYou(page);
+      const got = await page.evaluate(() => {
+        const r = document.getElementById("setWhere").getBoundingClientRect();
+        const s = document.getElementById("you").getBoundingClientRect();
+        const v = document.getElementById("setWhereV").getBoundingClientRect();
+        return { inside: r.left >= s.left - 0.5 && r.right <= s.right + 0.5 && v.right <= r.right + 0.5, sw: document.documentElement.scrollWidth, vw: innerWidth };
+      });
+      assert.ok(got.inside && got.sw <= got.vw, JSON.stringify(got));
+      await shot(page, "you-320");
+      await clean(page, backend);
     },
   },
 ];

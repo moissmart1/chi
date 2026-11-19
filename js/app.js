@@ -363,6 +363,7 @@ function start() {
   let forgetting = null;
   const you = mountYou(phone, store, {
     demo: clock,
+    where,
     getKey: () => storage.getItem(STORAGE_PREFIX + "key"),
     screen: () => (tabs.tab() === "tickets" ? "Tickets" : isWide() ? "Days and Money" : tabs.tab() === "days" ? "Days" : "Money"),
     // Try another day: Days follows the demo clock from the picked day's

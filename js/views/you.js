@@ -5,7 +5,13 @@
 // the invite link, the Claude link, the Google Sheet and "Report a problem".
 // One sheet, no sub-pages.
 //
-// mountYou(root, store, { onHistory(), onDemo(date), getKey(), screen(), onForget(), onTixMode(mode), onBulk() }) -> { open(), close(restoreFocus), isOpen() }
+// mountYou(root, store, { onHistory(), onDemo(date), getKey(), screen(), onForget(), onTixMode(mode), onBulk(), where }) -> { open(), close(restoreFocus), isOpen() }
+// where: the phone's position (js/where.js). Its row, Location, says whether
+// it is on, off or refused by the phone, and, when refused, where to change
+// it (Safari, or the Home Screen app). Only the choice is shown, never a
+// position; the phone's own answer to a refusal is shown as text, in memory
+// only (never in Report a problem). A tap turns it off when on, else asks
+// the phone. A phone with no geolocation has no row.
 // Ticket pictures (only once the trip has the ticket tabs): every picture
 // fetched in the background, or only when one is opened (js/tickets.js
 // fetchMode); onTixMode(mode) is told of a change. Add tickets (the same):
@@ -37,6 +43,9 @@ import { copyText } from "../clip.js";
 import { fillSeal, choosePicture, isPicture } from "../picture.js";
 
 const NOT_YET = "Not updated yet";
+const WHERE_FOR = "For leave-by times, distances and the stamp. Your position stays on this phone. A stamp pressed in the day’s place gets a small mark, saved with the trip.";
+const WHERE_NO = "To change it: iPhone Settings, Apps, Safari, Location. Then tap here to try again.";
+const WHERE_NO_APP = "On the Home Screen app, iPhone won’t ask again here. Open your own link in Safari, go to You and tap Location. If Safari doesn’t ask, tap the page menu beside the address (aA), then Website Settings, Location, Allow. Then come back here and tap Location.";
 const HISTORY_UNAVAILABLE = "history unavailable";
 const NO_KEY = "This phone has no trip key, so there is no link to copy.";
 const COPY_FAILED = "Couldn’t copy. Try again.";
@@ -77,6 +86,7 @@ const MARKUP = `
     <input type="file" accept="image/*" id="setPicFile" tabindex="-1" aria-hidden="true" hidden>
   </div>
   <button type="button" class="set-r" id="setSound"><span>Stamp sound</span><b id="setSoundV">On</b></button>
+  <button type="button" class="set-r set-where" id="setWhere" hidden><span><span class="set-where-l"><span class="g-bl pl" id="setWhereM" aria-hidden="true">FROM HERE</span>Location</span><small id="setWhereS"></small><small id="setWhereWhy" hidden></small></span><b id="setWhereV" data-w="Phone said no"></b></button>
   <button type="button" class="set-r" id="setBulk" hidden><span>Add tickets<small>Many ticket files at once, yours or anyone’s on the trip</small></span><b>Open</b></button>
   <button type="button" class="set-r" id="setTix" hidden><span>Ticket pictures<small id="setTixS"></small></span><b id="setTixV">On Wi‑Fi and mobile</b></button>
   <button type="button" class="set-r" id="setHist"><span>History<small>Every change, with undo</small></span><b>Open</b></button>
@@ -140,7 +150,7 @@ const FORGET_FOR = "Takes the trip and your link off this phone";
 const FORGET_SURE = "Tap again to take everything off this phone";
 const FORGET_MS = 5000; // how long the row waits for the second tap
 
-export function mountYou(root, store, { onHistory = () => {}, onDemo = () => {}, demo = null, getKey = () => null, screen = () => "Money", onForget = async () => {}, onTixMode = () => {}, onBulk = () => {} } = {}) {
+export function mountYou(root, store, { onHistory = () => {}, onDemo = () => {}, demo = null, getKey = () => null, screen = () => "Money", onForget = async () => {}, onTixMode = () => {}, onBulk = () => {}, where = null } = {}) {
   const scrim = el("div", "scrim");
   scrim.id = "youScrim";
   scrim.hidden = true;
@@ -351,6 +361,7 @@ export function mountYou(root, store, { onHistory = () => {}, onDemo = () => {},
     setHow(false);
     setDemo(false);
     render(store.state);
+    drawWhere();
     sheet.classList.add("is-open");
     sheet.inert = false;
     scrim.hidden = false;
@@ -449,6 +460,38 @@ export function mountYou(root, store, { onHistory = () => {}, onDemo = () => {},
   $("setSound").addEventListener("click", () => {
     setSound(!soundOn());
     soundV.textContent = soundOn() ? "On" : "Off";
+  });
+
+  // Location: on, off, or the phone said no (and where to change that).
+  const whereRow = $("setWhere");
+  const whereM = $("setWhereM");
+  const whereS = $("setWhereS");
+  const whereWhy = $("setWhereWhy");
+  const whereV = $("setWhereV");
+  function drawWhere() {
+    whereRow.hidden = !where || !where.supported();
+    if (whereRow.hidden) return;
+    const st = where.state();
+    const no = st === "refused";
+    const on = st === "on";
+    whereV.textContent = no ? "Phone said no" : on ? "On" : "Off";
+    whereV.classList.toggle("no", no);
+    whereV.classList.toggle("off", !no && !on);
+    whereM.classList.toggle("off", !on);
+    whereS.textContent = no ? (standalone() ? WHERE_NO_APP : WHERE_NO) : WHERE_FOR;
+    // The phone's own answer to the refusal (memory only, js/where.js), as text.
+    const why = no ? where.why() : null;
+    whereWhy.hidden = !why;
+    whereWhy.textContent = why ? (why.message ? "Phone’s answer: " + why.message + " " : "") + "(code " + why.code + ")" : "";
+  }
+  whereRow.addEventListener("click", () => {
+    if (!where) return;
+    if (where.state() === "on") where.turnOff();
+    else where.ask();
+    drawWhere();
+  });
+  if (where) where.subscribe(() => {
+    if (opened) drawWhere();
   });
 
   $("setHist").addEventListener("click", () => onHistory());

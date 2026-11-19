@@ -78,3 +78,8 @@
 .r.has-here>.r-j{align-self:start;height:38px}          /* the price column's rule: a short tick, so it never crosses the line */
 .r-lv.is-late{color:var(--red)}
 @media (max-width:350px){ .r-here{margin-right:-30px} }
+
+/* the Location row in You */
+.set-where-l{display:flex;align-items:center;gap:8px;white-space:nowrap}
+.set-where>b.no{color:var(--red)}
+.set-where>b.off{color:var(--dim)}
