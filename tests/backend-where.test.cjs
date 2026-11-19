@@ -571,3 +571,27 @@ test("before migrate, a stop edit or a new stop carrying a position is refused w
   r = await call("updateStop", { id: "planstop1204", patch: { note: "Late" } });
   assert.equal(r.ok, true, JSON.stringify(r));
 });
+
+test("locatePlaces (run from the script editor) does what locate does, logs only counts, and a geocoder throw is reported and writes nothing further", async () => {
+  const call = client();
+  geocoder(call, { Chicago: { lat: 41.9, lng: -87.6 } });
+  const viaAction = await locate(call);
+  const other = client();
+  geocoder(other, { Chicago: { lat: 41.9, lng: -87.6 } });
+  other.fake.world.locatePlaces();
+  const said = JSON.parse(other.fake.logged.at(-1));
+  assert.equal(said.ok, true, JSON.stringify(said));
+  assert.deepEqual(said.data, viaAction.data, "the same counts as the action");
+  assert.deepEqual(Object.keys(said.data).sort(), ["found", "missing", "more"]);
+  assert.equal(/41\.9|Chicago|Shibuya/.test(other.fake.logged.join("\n")), false, "counts only");
+  // A throw: reported, and nothing further is asked or written.
+  const bad = client();
+  let n = 0;
+  bad.fake.geocoder.answer = () => { n++; throw new Error("quota"); };
+  bad.fake.world.locatePlaces();
+  const r = JSON.parse(bad.fake.logged.at(-1));
+  assert.deepEqual([r.ok, r.error], [false, "geocoder"], JSON.stringify(r));
+  assert.equal(n, 1);
+  const d = (await bad("load")).data;
+  assert.ok(d.stops.every((s) => s.lat === "") && d.days.every((x) => x.lat === ""));
+});

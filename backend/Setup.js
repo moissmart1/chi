@@ -612,3 +612,8 @@ function retireSharedLink() {
   forgetTripKey_();
   Logger.log("The shared link is retired: it stops working now. Personal links, the check key and the Claude link still work.");
 }
+
+// Fills in where stops, stays and days are (Actions.js locate_). Run from the editor; again while more is true.
+function locatePlaces() {
+  Logger.log(JSON.stringify(withLock_(locate_)));
+}
