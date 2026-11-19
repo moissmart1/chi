@@ -93,3 +93,32 @@ test("the USED print never carries a time: the app does not know when a ticket w
   assert.ok(!/usedText:[^\n]*stop\.time/.test(stop));
   assert.ok(!/tclock\("USED[^\n]*time/.test(tab));
 });
+
+test("a small picture that arrives after the trip was taken off the phone is dropped, with no blob address made", async () => {
+  const realDoc = globalThis.document;
+  globalThis.document = { createElement: () => ({ append() {}, replaceChildren() {}, setAttribute() {} }) };
+  const made = [];
+  const realCreate = URL.createObjectURL;
+  const realRevoke = URL.revokeObjectURL;
+  URL.createObjectURL = () => { const u = "blob:test/" + made.length; made.push(u); return u; };
+  URL.revokeObjectURL = () => {};
+  try {
+    const { thumbEl, forgetThumbs } = await import("../js/views/stubs.js");
+    let release;
+    const slow = { get: () => new Promise((res) => { release = () => res(new Blob(["x"])); }) };
+    thumbEl(slow, "p1");
+    forgetThumbs(); // the wipe happens while keep.get is still under way
+    release();
+    await new Promise((r) => setTimeout(r, 10));
+    assert.deepEqual(made, []);
+    // Before a wipe, a picture is made as usual.
+    thumbEl({ get: async () => new Blob(["y"]) }, "p2");
+    await new Promise((r) => setTimeout(r, 10));
+    assert.equal(made.length, 1);
+    forgetThumbs();
+  } finally {
+    URL.createObjectURL = realCreate;
+    URL.revokeObjectURL = realRevoke;
+    if (realDoc === undefined) delete globalThis.document; else globalThis.document = realDoc;
+  }
+});

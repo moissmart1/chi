@@ -113,7 +113,9 @@ export function bandDay(date, time) {
 // ---------- pictures from the keep ----------
 
 const thumbs = new Map(); // picture id -> blob: address, made once
+let wipes = 0; // bumped on every forget: a picture still on its way then is dropped, not kept
 export function forgetThumbs() {
+  wipes++;
   for (const u of thumbs.values()) URL.revokeObjectURL(u);
   thumbs.clear();
 }
@@ -132,8 +134,9 @@ export function thumbEl(keep, id, cls = "ts-q") {
   };
   if (thumbs.has(id)) put(thumbs.get(id));
   else {
+    const born = wipes;
     Promise.resolve(keep.get(id)).then((blob) => {
-      if (!blob) return;
+      if (!blob || born !== wipes) return;
       if (!thumbs.has(id)) thumbs.set(id, URL.createObjectURL(blob));
       put(thumbs.get(id));
     }).catch(() => {});
