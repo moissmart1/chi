@@ -80,7 +80,7 @@ const STAMP_DROP_MS = 48 * 3600000;
 const STAMP_DROPPED = "That stamp’s day has closed.";
 
 // A stop as the backend gives it back, before the fields are filled in.
-const STOP_BLANK = { date: "", time: "", title: "", detail: "", gettingThere: "", travelMin: 0, fixed: false, place: "", signJp: "", booked: false, link: "", photo: "", note: "" };
+const STOP_BLANK = { date: "", time: "", title: "", detail: "", gettingThere: "", travelMin: 0, fixed: false, place: "", signJp: "", booked: false, link: "", photo: "", note: "", lat: "", lng: "" };
 
 const copy = (v) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
 const defaultWait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -575,7 +575,7 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
       if (q.stamp && typeof q.stamp === "object" && typeof q.stamp.def === "string" && typeof q.stamp.at === "string") {
         const who = typeof q.who === "string" ? q.who : myName;
         if (!who || ops.some((o) => o.kind === "stamp" && o.id === q.stamp.def + "|" + who)) continue;
-        const op = pressOp({ def: q.stamp.def, at: q.stamp.at, seed: q.stamp.seed }, who);
+        const op = pressOp({ def: q.stamp.def, at: q.stamp.at, seed: q.stamp.seed, here: q.stamp.here === true }, who);
         op.status = "queued";
         op.lost = q.sent !== false;
         writes.set(op.token, op);
@@ -995,15 +995,21 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
   // ---- the stamp book ----
 
   // A press: shown at once (a stamp of mine, with the seed that wears its
-  // ink), sent as pressStamp { def, at, seed }. Kept in the stored queue like a line
+  // ink), sent as pressStamp { def, at, seed } (and here: true when pressed in the place). Kept in the stored queue like a line
   // until the backend has it, resent with the same def (the backend answers a
   // second press of the same stamp with the first), and never shown on the
   // undo bar: it is lifted from History.
-  function pressOp({ def, at, seed }, who) {
+  // here: the phone was in the day's place as it was pressed (a yes only; no position).
+  function pressOp({ def, at, seed, here }, who) {
     const after = { def, who, at, seed, gone: false };
+    const args = { def, at, seed };
+    if (here === true) {
+      after.here = true;
+      args.here = true;
+    }
     return {
       token: newId(), kind: "stamp", id: def + "|" + who, action: "press", api: "pressStamp",
-      args: { def, at, seed }, before: null, after,
+      args, before: null, after,
       view: (cur) => ({ ...(cur || {}), ...after }),
       status: "sending", undone: false, logId: null, inFlight: false, lost: false, actor: who, silent: true,
     };
@@ -1012,7 +1018,9 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
   // Returns the press's token, or null when there is nothing to press: no
   // such stamp, nobody chosen yet, one of mine already shown, or this one's
   // press still on its way (a second tap is not a second request).
-  function pressStamp(defId) {
+  // opts.here: true when the phone is in the day's place (js/plan.js inPlace;
+  // no screen passes it yet).
+  function pressStamp(defId, { here = false } = {}) {
     if (!myName || !state.stampDefs.some((d) => d && d.id === defId)) return null;
     const id = defId + "|" + myName;
     if (ops.some((o) => o.kind === "stamp" && o.id === id && !o.undone)) return null;
@@ -1021,7 +1029,7 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
     const rnd = new Uint32Array(1);
     globalThis.crypto.getRandomValues(rnd);
     const seed = 1 + (rnd[0] % 4294967295);
-    return begin(pressOp({ def: defId, at: new Date(now()).toISOString(), seed }, myName));
+    return begin(pressOp({ def: defId, at: new Date(now()).toISOString(), seed, here: here === true }, myName));
   }
 
   // A press still queued more than 48 hours after the moment it was made is

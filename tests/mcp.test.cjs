@@ -291,7 +291,7 @@ test("the write tools map their arguments to the API and answer { <kind>, log_id
   assert.equal(refusal(fake, "save_stay", { name: "x", first_night: "2026-12-31", last_night: "2026-12-30" }), "The last night can’t be before the first.");
 
   const day = ok(fake, "set_day", { date: "2026-12-30", city: "Kyoto", line_jp: "東海道新幹線", line_en: "Tokaido Shinkansen", line_colour: "#0072BC", from_jp: "東京", from_en: "Tokyo", to_jp: "京都", to_en: "Kyoto", title: "West" });
-  assert.deepEqual(day.day, { date: "2026-12-30", city: "Kyoto", title: "West", lineJp: "東海道新幹線", lineEn: "Tokaido Shinkansen", lineColour: "#0072BC", fromJp: "東京", fromEn: "Tokyo", toJp: "京都", toEn: "Kyoto" });
+  assert.deepEqual(day.day, { date: "2026-12-30", city: "Kyoto", title: "West", lineJp: "東海道新幹線", lineEn: "Tokaido Shinkansen", lineColour: "#0072BC", fromJp: "東京", fromEn: "Tokyo", toJp: "京都", toEn: "Kyoto", lat: "", lng: "" });
   assert.equal(refusal(fake, "set_day", { date: "2026-12-30", line_colour: "blue" }), "Use a colour like #2FB6E8.");
   assert.equal(refusal(fake, "set_day", { date: "2027-01-02", city: "x" }), "That day isn’t on this trip.");
 

@@ -94,6 +94,16 @@ function withOwnerRunLock_(fn) {
   }
 }
 
+// Where a place is, by Apps Script's own geocoder (the Maps service; no key,
+// no Cloud project). -> { lat, lng } for the first answer, or null. Used only
+// by locate (Actions.js), never with a phone's position.
+function geocode_(query, region) {
+  var r = Maps.newGeocoder().setRegion(region || "us").geocode(query);
+  if (!r || r.status !== "OK" || !r.results || !r.results.length) return null;
+  var loc = r.results[0].geometry && r.results[0].geometry.location;
+  return loc && typeof loc.lat === "number" && typeof loc.lng === "number" ? { lat: loc.lat, lng: loc.lng } : null;
+}
+
 // Milliseconds now, for timing retries (the connector's wait for the lock).
 function clockMs_() {
   return Date.now();

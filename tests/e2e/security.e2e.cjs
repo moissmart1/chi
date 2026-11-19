@@ -3,7 +3,7 @@
 // line after its link was replaced; the release check's read-only key.
 
 const assert = require("node:assert/strict");
-const { SEED, WITH_PLAN, NOON28, ORIGIN, open, until, text, expectText, visible } = require("./helpers.cjs");
+const { SEED, WITH_PLAN, NOON28, ORIGIN, makeBackend, open, until, text, expectText, visible } = require("./helpers.cjs");
 
 const chiKeys = (page) => page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("chi.")).sort());
 const drawsTrip = (page) => page.evaluate(() => document.body.innerText.includes("Niseko lodge") || document.body.innerText.includes("Rail passes"));
@@ -167,6 +167,45 @@ module.exports = [
       await openYou(page);
       await page.dispatchEvent("#setForget", "click");
       assert.equal(await text(page, "#setForgetS"), "Tap again to take everything off this phone. 3 entries not sent yet will be lost.");
+    },
+  },
+  {
+    // The location workings are here with no screen (ported from the Japan
+    // app): nothing asks the phone where it is, and no request carries a
+    // position, even when the browser already says yes (the Japan app shares
+    // this origin) and the trip's places have coordinates.
+    name: "where things are, with no screen: the phone is never asked for its position and no request carries one",
+    async run({ page }) {
+      await page.addInitScript(() => {
+        globalThis.__geoCalls = 0;
+        const stand = {
+          getCurrentPosition(ok) { globalThis.__geoCalls++; ok({ coords: { latitude: 41.9090286, longitude: -87.6377472, accuracy: 20 }, timestamp: Date.now() }); },
+          watchPosition() { globalThis.__geoCalls++; return 1; },
+          clearWatch() {},
+          standIn: true,
+        };
+        Object.defineProperty(navigator, "geolocation", { get: () => stand, configurable: true });
+        const perms = { query: () => Promise.resolve({ state: "granted", onchange: null }) };
+        Object.defineProperty(navigator, "permissions", { get: () => perms, configurable: true });
+      });
+      const backend = makeBackend(WITH_PLAN, { now: NOON28 });
+      for (const r of backend.fake.tables.Stops) { r.lat = "41.9174"; r.lng = "-87.6492"; }
+      for (const r of backend.fake.tables.Stays) { r.lat = "41.9089"; r.lng = "-87.6381"; }
+      for (const r of backend.fake.tables.Days) { r.lat = "41.8954"; r.lng = "-87.6589"; }
+      await open(page, { backend, nowMs: NOON28, tab: "days" });
+      await until(() => page.evaluate(() => (globalThis.__matTest && globalThis.__matTest.store.state.stops || []).some((s) => s.lat === "41.9174")), "the trip loads, coordinates and all");
+      await store(page, () => globalThis.__matTest.store.checkRev());
+      await store(page, () => globalThis.__matTest.store.idle());
+      await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+      await openYou(page);
+      assert.equal(await page.evaluate(() => navigator.geolocation.standIn === true), true, "the stood-in phone is the one the app sees");
+      assert.equal(await page.evaluate(() => globalThis.__geoCalls), 0, "never asked");
+      const keys = await chiKeys(page);
+      assert.equal(keys.includes("chi.where"), false, "no choice stored: nothing asked for one");
+      const bodies = JSON.stringify(backend.requests);
+      for (const digits of ["41.9090", "87.6377", "\"lat\"", "\"lng\""]) assert.equal(bodies.includes(digits), false, digits);
+      const kept = await page.evaluate(() => JSON.stringify(Object.entries(localStorage)) + JSON.stringify(Object.entries(sessionStorage)));
+      for (const digits of ["41.9090", "87.6377"]) assert.equal(kept.includes(digits), false, digits);
     },
   },
 ];

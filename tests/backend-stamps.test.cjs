@@ -259,7 +259,7 @@ test("load on a sheet without the two tabs answers empty lists, and a press is t
   assert.deepEqual([r.ok, r.error], [false, "needs_migrate"]);
   // then migrate adds them
   const m = await call("migrate");
-  assert.deepEqual(m.data.added.filter((x) => /^Stamp/.test(x)).length, 14);
+  assert.deepEqual(m.data.added.filter((x) => /^Stamp/.test(x)).length, 15); // eight definition columns, seven press columns (here came with the location port)
   assert.deepEqual((await call("load")).data.stampDefs, []);
 });
 

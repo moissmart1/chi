@@ -32,14 +32,16 @@ function tripMismatch(trip) {
 var TABS = {
   Trip: ["key", "value"],
   People: ["name", "initials", "order", "etransfer", "simplify", "email", "photo"],
-  Days: ["date", "city", "title", "line_jp", "line_en", "line_colour", "from_jp", "from_en", "to_jp", "to_en"],
-  Stops: ["id", "date", "time", "title", "detail", "getting_there", "travel_min", "fixed", "place", "sign_jp", "booked", "link", "photo", "note", "deleted_at", "tk_ref", "tk_name", "tk_people", "tk_seat"],
-  Stays: ["id", "name", "name_jp", "address_jp", "first_night", "last_night", "note", "place", "link", "photo", "deleted_at"],
+  // lat and lng (where things are) came last, so they sit at the end, where migrate adds them.
+  Days: ["date", "city", "title", "line_jp", "line_en", "line_colour", "from_jp", "from_en", "to_jp", "to_en", "lat", "lng"],
+  Stops: ["id", "date", "time", "title", "detail", "getting_there", "travel_min", "fixed", "place", "sign_jp", "booked", "link", "photo", "note", "deleted_at", "tk_ref", "tk_name", "tk_people", "tk_seat", "lat", "lng"],
+  Stays: ["id", "name", "name_jp", "address_jp", "first_night", "last_night", "note", "place", "link", "photo", "deleted_at", "lat", "lng"],
   Expenses: ["id", "day", "title", "amount", "currency", "rate", "paid_by", "split", "split_mode", "split_vals", "note", "kind", "receipt", "added_by", "added_at", "deleted_at"],
   Settlements: ["id", "from", "to", "cad", "stamped_by", "stamped_at", "seed", "rot", "removed_at"],
   Log: ["id", "at", "who", "via", "action", "kind", "ref", "summary", "before", "after", "undoes", "undone_by"],
   StampDefs: ["id", "date", "name_ja", "name_en", "place", "motif", "ink", "shape"],
-  Stamps: ["id", "def", "who", "at", "seed", "gone"],
+  // here (the stamp in the place) came last, so it sits at the end, where migrate adds it.
+  Stamps: ["id", "def", "who", "at", "seed", "gone", "here"],
   // The real ticket on a stop: one row per picture (no data), and the
   // pictures' base64 in chunks, one cell each (README, The ticket on a stop).
   Tickets: ["id", "stop", "who", "seat", "page", "mime", "w", "h", "size", "chunks", "by", "at", "gone"],
@@ -296,6 +298,63 @@ function optFlag_(v, message) {
   return { ok: true, value: v };
 }
 
+// ---- where things are (lat, lng: numbers kept as text, "" when unknown) ----
+
+var COORD_RE_ = /^-?\d{1,3}(\.\d+)?$/;
+var COORD_BAD_ = "That map position didn\u2019t come through properly.";
+
+// A coordinate as the Sheet keeps it: the number as text, else "".
+function coordText_(v, max) {
+  if (v === undefined || v === null || v === "") return "";
+  var t = String(v).trim();
+  if (!COORD_RE_.test(t)) return "";
+  var n = Number(t);
+  return isFinite(n) && Math.abs(n) <= max ? String(n) : "";
+}
+
+// { lat, lng } from a row: both or neither.
+function coordsOf_(o) {
+  var lat = coordText_(o.lat, 90);
+  var lng = coordText_(o.lng, 180);
+  return lat !== "" && lng !== "" ? { lat: lat, lng: lng } : { lat: "", lng: "" };
+}
+
+// Optional coordinates sent by the app (from a pasted Maps link): two
+// strings, both empty (not on the map) or both a coordinate.
+function optCoords_(lat, lng) {
+  if ((lat === undefined || lat === null) && (lng === undefined || lng === null)) return { ok: true, value: { lat: "", lng: "" } };
+  if (typeof lat !== "string" || typeof lng !== "string") return fail_(COORD_BAD_);
+  if (lat.trim() === "" && lng.trim() === "") return { ok: true, value: { lat: "", lng: "" } };
+  var c = { lat: coordText_(lat, 90), lng: coordText_(lng, 180) };
+  if (c.lat === "" || c.lng === "") return fail_(COORD_BAD_);
+  return { ok: true, value: c };
+}
+
+// Metres between two { lat, lng } (numbers or text), along the ground; NaN when either is not a coordinate.
+function metresBetween_(a, b) {
+  var p = coordsOf_(a || {}), q = coordsOf_(b || {});
+  if (p.lat === "" || q.lat === "") return NaN;
+  var rad = Math.PI / 180;
+  var dLat = (Number(q.lat) - Number(p.lat)) * rad, dLng = (Number(q.lng) - Number(p.lng)) * rad;
+  var h = Math.pow(Math.sin(dLat / 2), 2) + Math.cos(Number(p.lat) * rad) * Math.cos(Number(q.lat) * rad) * Math.pow(Math.sin(dLng / 2), 2);
+  return 2 * 6371008.8 * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+// The position in a pasted Google Maps link (the place's pin !3d..!4d.., else,
+// only in a place or search link, the map's centre @lat,lng), or null. Never
+// from a directions link (its start may be where someone was) or a bare map
+// view. The same rule as js/geo.js pointFromLink.
+function pointFromLink(text) {
+  if (typeof text !== "string") return null;
+  var s = text.trim();
+  if (/\/dir\//i.test(s)) return null;
+  var m = /!3d(-?\d{1,2}(?:\.\d+)?)!4d(-?\d{1,3}(?:\.\d+)?)/.exec(s);
+  if (!m && /\/(?:place|search)\//i.test(s)) m = /@(-?\d{1,2}(?:\.\d+)?),(-?\d{1,3}(?:\.\d+)?)/.exec(s);
+  if (!m) return null;
+  var c = coordsOf_({ lat: m[1], lng: m[2] });
+  return c.lat === "" ? null : c;
+}
+
 function validateStop(input, dayDates) {
   if (!isObj_(input)) return fail_("That didn’t come through properly.");
   if (typeof input.id !== "string" || !ID_RE_.test(input.id)) return fail_("That stop has a bad id.");
@@ -331,9 +390,11 @@ function validateStop(input, dayDates) {
     if (!fact.ok) return fact;
     facts[TICKET_FACTS_[i]] = fact.value;
   }
+  var at = optCoords_(input.lat, input.lng);
+  if (!at.ok) return at;
   return {
     ok: true,
-    value: { id: input.id, date: input.date, time: time, title: title, detail: detail.value, gettingThere: there.value, travelMin: travel, fixed: fixed.value, place: place.value, signJp: sign.value, booked: booked.value, link: link.value, photo: photo.value, note: note.value, tkRef: facts.tkRef, tkName: facts.tkName, tkPeople: facts.tkPeople, tkSeat: facts.tkSeat },
+    value: { id: input.id, date: input.date, time: time, title: title, detail: detail.value, gettingThere: there.value, travelMin: travel, fixed: fixed.value, place: place.value, signJp: sign.value, booked: booked.value, link: link.value, photo: photo.value, note: note.value, lat: at.value.lat, lng: at.value.lng, tkRef: facts.tkRef, tkName: facts.tkName, tkPeople: facts.tkPeople, tkSeat: facts.tkSeat },
   };
 }
 
@@ -505,6 +566,8 @@ function stopFromRow(o) {
     photo: safeUrl(cellText_(o.photo)),
     note: cellText_(o.note),
     deleted: cellSet_(o.deleted_at),
+    lat: coordsOf_(o).lat,
+    lng: coordsOf_(o).lng,
     tkRef: cellText_(o.tk_ref),
     tkName: cellText_(o.tk_name),
     tkPeople: cellText_(o.tk_people),
@@ -525,6 +588,8 @@ function stayFromRow(o) {
     link: safeUrl(cellText_(o.link)),
     photo: safeHttpsUrl(cellText_(o.photo)),
     deleted: cellSet_(o.deleted_at),
+    lat: coordsOf_(o).lat,
+    lng: coordsOf_(o).lng,
   };
 }
 
@@ -541,6 +606,8 @@ function dayFromRow(o) {
     fromEn: cellText_(o.from_en),
     toJp: cellText_(o.to_jp),
     toEn: cellText_(o.to_en),
+    lat: coordsOf_(o).lat,
+    lng: coordsOf_(o).lng,
   };
 }
 
@@ -597,6 +664,8 @@ function stopToRow(s) {
   put_(o, "link", s.link);
   put_(o, "photo", s.photo);
   put_(o, "note", s.note);
+  put_(o, "lat", s.lat);
+  put_(o, "lng", s.lng);
   put_(o, "tk_ref", s.tkRef);
   put_(o, "tk_name", s.tkName);
   put_(o, "tk_people", s.tkPeople);
@@ -616,6 +685,8 @@ function stayToRow(s) {
   put_(o, "place", s.place);
   put_(o, "link", s.link);
   put_(o, "photo", s.photo);
+  put_(o, "lat", s.lat);
+  put_(o, "lng", s.lng);
   return o;
 }
 
@@ -631,6 +702,8 @@ function dayToRow(d) {
   put_(o, "from_en", d.fromEn);
   put_(o, "to_jp", d.toJp);
   put_(o, "to_en", d.toEn);
+  put_(o, "lat", d.lat);
+  put_(o, "lng", d.lng);
   return o;
 }
 
@@ -812,7 +885,7 @@ function expenseDiff_(before, after) {
   return "changed " + after.title + (changed.length ? ": " + changed.join(", ") : "");
 }
 
-var STOP_FIELD_LABELS_ = [["detail", "detail"], ["gettingThere", "directions"], ["travelMin", "travel time"], ["fixed", "fixed time"], ["place", "place"], ["signJp", "sign name"], ["booked", "booked"], ["link", "link"], ["photo", "photo"], ["note", "note"], ["tkRef", "ticket"], ["tkName", "ticket"], ["tkPeople", "ticket"], ["tkSeat", "ticket"]];
+var STOP_FIELD_LABELS_ = [["detail", "detail"], ["gettingThere", "directions"], ["travelMin", "travel time"], ["fixed", "fixed time"], ["place", "place"], ["signJp", "sign name"], ["booked", "booked"], ["link", "link"], ["photo", "photo"], ["note", "note"], ["lat", "map"], ["lng", "map"], ["tkRef", "ticket"], ["tkName", "ticket"], ["tkPeople", "ticket"], ["tkSeat", "ticket"]];
 
 function stopDiff_(before, after) {
   if (before.title !== after.title) return "renamed " + before.title + " to " + after.title;
@@ -821,7 +894,7 @@ function stopDiff_(before, after) {
   }
   var changed = [];
   for (var i = 0; i < STOP_FIELD_LABELS_.length; i++) {
-    // The four ticket facts share one label: said once.
+    // The four ticket facts share one label, as do lat and lng: said once.
     var label = STOP_FIELD_LABELS_[i][1];
     if (before[STOP_FIELD_LABELS_[i][0]] !== after[STOP_FIELD_LABELS_[i][0]] && changed.indexOf(label) === -1) changed.push(label);
   }
@@ -1004,6 +1077,8 @@ function stampDefFromRow(o) {
 function stampFromRow(o) {
   var s = { def: cellText_(o.def), who: cellText_(o.who), at: cellStamp_(o.at), seed: cellNum_(o.seed) };
   if (cellText_(o.gone) === "yes") s.gone = true;
+  // Pressed with the phone in the place: only this yes is ever kept, never where.
+  if (cellText_(o.here) === "yes") s.here = true;
   return s;
 }
 
@@ -1116,5 +1191,5 @@ function ticketSnap_(t, stopTitle) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { TABS, KINDS, tripMismatch, rateRounded, TRIP_TZ_, TRIP_UTC_OFFSET_MS_, TRIP_ZONE_WORD_, HOME_CURRENCY_, TRIP_CURRENCY_, TRIP_FIRST_DAY_, TRIP_LAST_DAY_, isTextColumn, sanitizeCell, unsanitizeCell, rowToObj, objToRow, validateExpense, validatePayment, validatePersonPatch, validateStop, validateStay, validateDayPatch, DAY_PATCH_KEYS, safeUrl, safeHttpsUrl, dayLabel, stopFromRow, stopToRow, stayFromRow, stayToRow, dayFromRow, dayToRow, expenseFromRow, paymentFromRow, personFromRow, cellDate_, cellStamp_, summarize, undoTarget, canUndo, entryFromRow, parseLogRow, expenseToRow, paymentToRow, setupSeedRows, shouldFetchRate, rateSource, sameKey, hexOfBytes, personKeysFrom, personKeysReadable, keyHolder, blankSecrets, shortDay_, stampWindow, pressRefusal, stampDefFromRow, stampFromRow, stampSnap_, TICKET_LIMITS, validateTicket, ticketChunks, joinTicketChunks, ticketFromRow, ticketSnap_ };
+  module.exports = { TABS, KINDS, tripMismatch, rateRounded, TRIP_TZ_, TRIP_UTC_OFFSET_MS_, TRIP_ZONE_WORD_, HOME_CURRENCY_, TRIP_CURRENCY_, TRIP_FIRST_DAY_, TRIP_LAST_DAY_, isTextColumn, sanitizeCell, unsanitizeCell, rowToObj, objToRow, validateExpense, validatePayment, validatePersonPatch, validateStop, validateStay, validateDayPatch, DAY_PATCH_KEYS, safeUrl, safeHttpsUrl, dayLabel, stopFromRow, stopToRow, stayFromRow, stayToRow, dayFromRow, dayToRow, expenseFromRow, paymentFromRow, personFromRow, cellDate_, cellStamp_, summarize, undoTarget, canUndo, entryFromRow, parseLogRow, expenseToRow, paymentToRow, setupSeedRows, shouldFetchRate, rateSource, sameKey, hexOfBytes, personKeysFrom, personKeysReadable, keyHolder, blankSecrets, shortDay_, stampWindow, pressRefusal, stampDefFromRow, stampFromRow, stampSnap_, TICKET_LIMITS, validateTicket, ticketChunks, joinTicketChunks, ticketFromRow, ticketSnap_, coordsOf_, pointFromLink, metresBetween_ };
 }

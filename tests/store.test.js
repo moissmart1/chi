@@ -3036,3 +3036,99 @@ test("round 2: an address key that is taken becomes the saved trip at once, so a
   assert.equal(storage.getItem("chi.key"), mine);
   assert.equal(again.store.state.me, "Izzah");
 });
+
+// ---------- where things are, and the stamp in the place (ported from the Japan app: MAT 818a49a, 6c7d5cc) ----------
+// No screen uses these yet. A position never reaches the store: the only thing
+// a press may carry is here: true.
+
+import { createWhere } from "../js/where.js";
+import { inPlace } from "../js/plan.js";
+
+test("a stop shown at once carries lat and lng blank until the backend answers; loaded ones carry the Sheet's", async () => {
+  const p = phone({ seed: { stops: [SKY] } });
+  p.fake.tables.Stops[0].lat = "41.9091";
+  p.fake.tables.Stops[0].lng = "-87.6377";
+  await p.store.boot();
+  assert.deepEqual([stopOf(p.store, SKY.id).lat, stopOf(p.store, SKY.id).lng], ["41.9091", "-87.6377"]);
+  const release = p.net.hold("addStop");
+  p.store.addStop({ date: "2026-12-28", title: "Tea", time: "16:00" });
+  const shown = p.store.state.stops.at(-1);
+  assert.deepEqual([shown.pending, shown.lat, shown.lng], [true, "", ""]);
+  const sent = p.net.sent.find((b) => b.action === "addStop");
+  assert.equal("lat" in sent.args.stop, false, "the request is today's: no lat, no lng");
+  release();
+  await p.store.idle();
+  assert.deepEqual([p.store.state.stops.at(-1).lat, p.store.state.stops.at(-1).lng], ["", ""]);
+});
+
+test("a press with here: true sends and shows that yes; a press without it is today's request", async () => {
+  const p = stampPhone();
+  await p.store.boot();
+  p.store.pressStamp("d1");
+  await p.store.idle();
+  const plain = p.net.sent.find((b) => b.action === "pressStamp");
+  assert.deepEqual(Object.keys(plain.args).sort(), ["at", "def", "seed"], "no here key at all");
+  assert.equal("here" in mineOf(p)[0], false);
+
+  const q = stampPhone({ me: "Izzah", fake: p.fake });
+  await q.store.boot();
+  const release = q.net.hold("pressStamp");
+  q.store.pressStamp("d1", { here: true });
+  assert.equal(q.store.state.stamps.find((s) => s.who === "Izzah").here, true, "shown at once");
+  release();
+  await q.store.idle();
+  const sent = q.net.sent.find((b) => b.action === "pressStamp");
+  assert.equal(sent.args.here, true);
+  assert.equal(q.store.state.stamps.find((s) => s.who === "Izzah").here, true, "the backend's yes");
+  assert.equal(p.fake.tables.Stamps.find((r) => r.who === "Izzah").here, "yes");
+  // Anything but true is no mark.
+  const r = stampPhone({ fake: createFakeBackend({}, { clock: () => new Date(IN_D1).toISOString() }) });
+  for (const d of SDEFS) r.fake.tables.StampDefs.push({ ...d });
+  await r.store.boot();
+  r.store.pressStamp("d1", { here: "yes" });
+  await r.store.idle();
+  assert.equal("here" in r.net.sent.find((b) => b.action === "pressStamp").args, false);
+});
+
+test("a press with here: true made with no signal keeps the yes (a boolean, nothing more) in the queue and sends it later", async () => {
+  const p = stampPhone();
+  await p.store.boot();
+  p.net.offline = true;
+  p.store.pressStamp("d1", { here: true });
+  await p.store.idle();
+  const kept = queueOf(p.storage);
+  assert.deepEqual(Object.keys(kept[0].stamp).sort(), ["at", "def", "here", "seed"]);
+  assert.equal(kept[0].stamp.here, true);
+  const again = stampPhone({ fake: p.fake, storage: p.storage });
+  again.clock.ms = p.clock.ms + 5000;
+  await again.store.boot();
+  await again.store.flush();
+  await again.store.idle();
+  assert.equal(again.net.sent.find((b) => b.action === "pressStamp").args.here, true);
+  assert.equal(p.fake.tables.Stamps[0].here, "yes");
+});
+
+test("a position never leaves the phone: not in any request, not in storage, even when a press is made in the place", async () => {
+  const p = stampPhone();
+  // d1's day has made-up coordinates; the phone stands 2 km from them.
+  const g = {
+    calls: 0,
+    getCurrentPosition(ok) {
+      this.calls++;
+      ok({ coords: { latitude: 41.9090286, longitude: -87.6377472, accuracy: 25 }, timestamp: p.clock.ms });
+    },
+  };
+  const w = createWhere({ storage: p.storage, geolocation: g, now: () => p.clock.ms, doc: { visibilityState: "visible", addEventListener() {} }, every: () => 1, stopEvery() {}, later() {} });
+  w.start();
+  assert.equal(g.calls, 0, "nothing asks by itself");
+  w.ask(); // what a future screen's tap would do
+  const here = w.current();
+  assert.ok(here);
+  await p.store.boot();
+  p.store.pressStamp("d1", { here: inPlace({ lat: "41.9270", lng: "-87.6377" }, here) });
+  await p.store.idle();
+  assert.equal(p.fake.tables.Stamps[0].here, "yes");
+  const everything = JSON.stringify(p.net.sent) + JSON.stringify([...p.storage.map.entries()]) + JSON.stringify(p.fake.tables);
+  for (const digits of ["41.9090", "87.6377", "9090286", "6377472"]) assert.equal(everything.includes(digits), false, digits);
+  assert.equal(p.net.sent.some((b) => JSON.stringify(b).includes("\"lat\"") || JSON.stringify(b).includes("\"lng\"")), false);
+});

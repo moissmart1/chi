@@ -919,7 +919,7 @@ test("saveStay without merge replaces the whole stay, as the app sends it", asyn
   const full = { id: "stayAAAA0001", name: "Ryokan", nameJp: "旅館", addressJp: "京都", firstNight: "2026-12-30", lastNight: "2026-12-31", note: "late", place: "Gion", link: "https://example.test/r" };
   await call("saveStay", { stay: full });
   const r = await call("saveStay", { stay: { id: full.id, name: "Ryokan", firstNight: "2026-12-30", lastNight: "2027-01-01" } });
-  assert.deepEqual(r.data.stay, { id: full.id, name: "Ryokan", nameJp: "", addressJp: "", firstNight: "2026-12-30", lastNight: "2027-01-01", note: "", place: "", link: "", photo: "", deleted: false });
+  assert.deepEqual(r.data.stay, { id: full.id, name: "Ryokan", nameJp: "", addressJp: "", firstNight: "2026-12-30", lastNight: "2027-01-01", note: "", place: "", link: "", photo: "", deleted: false, lat: "", lng: "" });
   const fresh = await call("saveStay", { stay: { id: "stayAAAA0002", name: "Inn", firstNight: "2026-12-31", lastNight: "2026-12-31" } });
   assert.equal(fresh.data.stay.id, "stayAAAA0002", "an unknown id is a new stay");
   assert.equal((await call("saveStay", { stay: { id: full.id, name: "Ryokan", firstNight: "2027-01-01", lastNight: "2026-12-30" } })).message, "The last night can’t be before the first.");
@@ -932,7 +932,7 @@ test("saveStay with merge: true lays the given fields over the row as it is unde
   await call("saveStay", { stay: { ...full, note: "phone B edit" } }, AS("Izzah")); // just before Claude's call
   const m = await call("saveStay", { stay: { id: full.id, lastNight: "2027-01-01" }, merge: true });
   assert.equal(m.ok, true, JSON.stringify(m));
-  assert.deepEqual(m.data.stay, { ...full, photo: "", note: "phone B edit", lastNight: "2027-01-01", deleted: false });
+  assert.deepEqual(m.data.stay, { ...full, photo: "", note: "phone B edit", lastNight: "2027-01-01", deleted: false, lat: "", lng: "" });
   const log = call.fake.tables.Log.at(-1);
   const before = JSON.parse(log.before), after = JSON.parse(log.after);
   assert.deepEqual(Object.keys(after).filter((k) => JSON.stringify(after[k]) !== JSON.stringify(before[k])), ["lastNight"]);
@@ -967,7 +967,7 @@ test("saveStay merge keeps, sets and clears the photo", async () => {
   assert.equal(keep.ok, true, JSON.stringify(keep));
   assert.equal(keep.data.stay.photo, SPIC, "a merge without photo keeps it");
   const set = await call("saveStay", { stay: { id: "stayAAAA0001", photo: SPIC2 }, merge: true });
-  assert.deepEqual(set.data.stay, { ...stayFull(), link: "https://example.test/other", photo: SPIC2, deleted: false });
+  assert.deepEqual(set.data.stay, { ...stayFull(), link: "https://example.test/other", photo: SPIC2, deleted: false, lat: "", lng: "" });
   const clear = await call("saveStay", { stay: { id: "stayAAAA0001", photo: "" }, merge: true });
   assert.equal(clear.data.stay.photo, "");
   assert.equal(await stayPhoto(call), "");
