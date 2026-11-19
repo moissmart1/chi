@@ -246,6 +246,8 @@
 /* Held sideways, the bar is a rail on the right: the ticket leaves it be. */
 @media (orientation:landscape) and (max-height:520px){
   #tix{right:var(--rail)}
+  /* The whole code fits above the fold when the phone is held sideways. */
+  #tix .stub-code,#tix .stub-code.is-page{width:min(calc(100% - 32px),300px,calc(100dvh - 215px))}
 }
 /* On a computer the ticket is held up inside the Days pane, like the other Days sheets. */
 @media (min-width:1000px) and (min-height:521px){

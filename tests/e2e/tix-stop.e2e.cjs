@@ -90,6 +90,12 @@ for (const size of SIZES) {
       assert.equal(code.bg, "rgb(255, 255, 255)");
       if (size.tag === "393") assert.ok(code.w >= 236, "the code is " + code.w + " px");
       await noSideways(page);
+      // The whole code is on screen without scrolling, at every size.
+      const inside = await page.evaluate(() => {
+        const r = document.querySelector("#tix .pp-pg:not([hidden]) .stub-code").getBoundingClientRect();
+        return { top: r.top, left: r.left, right: r.right, bottom: r.bottom, w: innerWidth, h: innerHeight };
+      });
+      assert.ok(inside.top >= 0 && inside.left >= 0 && inside.right <= inside.w && inside.bottom <= inside.h, "the code's box is inside the screen: " + JSON.stringify(inside));
       await shot(page, "F-1-ticket-" + size.tag);
       // Flip it up: Mo's on top, Izzah's underneath.
       await flipUp(page);
