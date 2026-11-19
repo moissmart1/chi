@@ -645,6 +645,8 @@ function addStop_(args, ctx) {
   if (claudeCoords_(args.stop, ctx)) return err_("bad_input", MSG_.stopPatchKey);
   var v = validateStop(args.stop, tripDates_());
   if (!v.ok) return err_("bad_input", v.message);
+  // An older Sheet has no position columns until migrate: refuse one rather than drop it.
+  if (v.value.lat !== "" && !hasColumn_("Stops", "lat")) return err_("needs_migrate", MSG_.needsMigrate);
   if (factsNeedMigrate_(v.value)) return err_("needs_migrate", MSG_.needsMigrate);
   return addPlanItem_("stop", v.value, ctx);
 }
@@ -673,6 +675,7 @@ function updateStop_(args, ctx) {
   merged.id = id;
   var v = validateStop(merged, tripDates_());
   if (!v.ok) return err_("bad_input", v.message);
+  if (v.value.lat !== "" && !hasColumn_("Stops", "lat")) return err_("needs_migrate", MSG_.needsMigrate);
   if (factsNeedMigrate_(v.value)) return err_("needs_migrate", MSG_.needsMigrate);
   // A new place: the old coordinates were for the old one (unless new ones came with it).
   if (v.value.place !== cur.place && patch.lat === undefined && patch.lng === undefined) {

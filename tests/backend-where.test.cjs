@@ -560,3 +560,14 @@ test("updateStop: a patch with only one of lat and lng is refused, not mixed wit
   const d = (await call("load")).data;
   assert.deepEqual([stopById(d, "planstop1204").lat, stopById(d, "planstop1204").lng], ["41.8", "-87.6"], "the old pair is untouched");
 });
+
+test("before migrate, a stop edit or a new stop carrying a position is refused with needs_migrate, not dropped", async () => {
+  const call = client({ ...PLAN, missingColumns: ["Stops.lat", "Stops.lng", "Stays.lat", "Stays.lng", "Days.lat", "Days.lng"] });
+  let r = await call("updateStop", { id: "planstop1204", patch: { lat: "41.8", lng: "-87.6" } });
+  assert.deepEqual([r.ok, r.error], [false, "needs_migrate"], JSON.stringify(r));
+  r = await call("addStop", { stop: { id: "newstop00002", date: CHI_DAY, title: "Tea", lat: "41.8", lng: "-87.6" } });
+  assert.deepEqual([r.ok, r.error], [false, "needs_migrate"], JSON.stringify(r));
+  // An edit with no position still works before migrate.
+  r = await call("updateStop", { id: "planstop1204", patch: { note: "Late" } });
+  assert.equal(r.ok, true, JSON.stringify(r));
+});
