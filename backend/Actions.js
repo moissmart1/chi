@@ -50,6 +50,7 @@ var MSG_ = {
   ticketNeverSent: "That ticket picture never reached the trip sheet. Add it again.",
   // Security (2026-11-18).
   checkOnly: "This key can only read the trip.",
+  halfCoord: "A map position needs both its numbers.",
   locateOwnerOnly: "Only {owner} can run locate.",
   claudeOwnerOnly: "Only {owner} can copy the Claude link.",
   notYours: "You can only change your own settings.",
@@ -659,6 +660,8 @@ function updateStop_(args, ctx) {
   for (var i = 0; i < keys.length; i++) {
     if (plan.fields.indexOf(keys[i]) === -1) return err_("bad_input", MSG_.stopPatchKey);
   }
+  // Both halves of a position or neither: one alone would mix with the old other half.
+  if ((patch.lat === undefined) !== (patch.lng === undefined)) return err_("bad_input", MSG_.halfCoord);
   var row = findPlanRow_(plan, id);
   if (!row) return err_("not_found", plan.missing);
   var cur = plan.fromRow(row);

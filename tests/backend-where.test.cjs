@@ -548,3 +548,15 @@ test("locate: a stay is asked by street address then name, each with its first n
   assert.ok(asked.some((a) => a.q === nameQ), "then the name with the place");
   assert.deepEqual([(await stay()).lat, (await stay()).lng], ["41.95", "-87.65"]);
 });
+
+test("updateStop: a patch with only one of lat and lng is refused, not mixed with the old other half", async () => {
+  const call = client();
+  let r = await call("updateStop", { id: "planstop1204", patch: { lat: "41.8", lng: "-87.6" } });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  for (const bad of [{ lat: "10.5" }, { lng: "-80.5" }]) {
+    const e = await call("updateStop", { id: "planstop1204", patch: bad });
+    assert.deepEqual([e.ok, e.error], [false, "bad_input"], JSON.stringify(bad));
+  }
+  const d = (await call("load")).data;
+  assert.deepEqual([stopById(d, "planstop1204").lat, stopById(d, "planstop1204").lng], ["41.8", "-87.6"], "the old pair is untouched");
+});
