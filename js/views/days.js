@@ -51,7 +51,7 @@
 // ground under it), it goes back to the top. Never
 // on a minute tick, a sync or a redraw.
 
-import { openDayIndex, dayState, daysToGo, nowIn, stopsFor, nextStopId, header, dayTotalTrip, stayShownFor } from "../plan.js";
+import { openDayIndex, dayState, daysToGo, nowIn, stopsFor, nextStopId, header, dayTotalTrip, stayShownFor, hereLine } from "../plan.js";
 import { dayShort, dayHead } from "../format.js";
 import { cadCents } from "../money.js";
 import { APP_NAME } from "../config.js";
@@ -93,15 +93,18 @@ const calm = () => typeof matchMedia === "function" && matchMedia("(prefers-redu
 // whether a redrawn row is the same as the one on screen.
 const drawn = new WeakMap();
 
-// A row's markup without the text of its leave-by line.
-const LEAD = /(<b class="r-lv">)[^<]*(<\/b>)/;
-const withoutLead = (html) => html.replace(LEAD, "$1$2");
+// A row's markup without the text (and the late colour) of its leave-by
+// line, and without the inside of its sign line (it moves as the phone does).
+const LEAD = /(<b class="r-lv)(?: is-late)?(">)[^<]*(<\/b>)/;
+const HERE = /(<div class="r-here">).*?(<\/div>)/s;
+const withoutLead = (html) => html.replace(LEAD, "$1$2$3").replace(HERE, "$1$2");
 
 // Puts the fresh rows into `rows` in order, keeping each old row that is
 // drawn the same. A row that differs only in its leave-by line's words (the
-// next stop, every minute) keeps its node, and only those words change, so
-// focus, its photo, a height change under way and a screen reader are left
-// alone. Only rows that changed otherwise, or moved, are touched.
+// next stop, every minute) or its sign line (the phone moving) keeps its
+// node, and only those change, so focus, its photo, a height change under
+// way, a ticket stub and a screen reader are left alone. Only rows that
+// changed otherwise, or moved, are touched.
 function patchRows(rows, fresh) {
   const old = new Map();
   for (const r of rows.children) if (r.dataset.id) old.set(r.dataset.id, r);
@@ -113,8 +116,14 @@ function patchRows(rows, fresh) {
     if (was === now) return keep;
     const lead = keep.querySelector(".r-lv");
     const next = r.querySelector(".r-lv");
-    if (lead && next && withoutLead(was) === withoutLead(now)) {
-      lead.textContent = next.textContent;
+    const sign = keep.querySelector(".r-here");
+    const fresh = r.querySelector(".r-here");
+    if (!!lead === !!next && !!sign === !!fresh && withoutLead(was) === withoutLead(now)) {
+      if (lead) {
+        if (lead.textContent !== next.textContent) lead.textContent = next.textContent;
+        if (lead.className !== next.className) lead.className = next.className;
+      }
+      if (sign && sign.outerHTML !== fresh.outerHTML) sign.replaceWith(fresh);
       drawn.set(keep, now);
       return keep;
     }
@@ -588,6 +597,8 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
     const stops = list(s.stops).filter((x) => x && typeof x.id === "string" && x.id && typeof x.date === "string");
     const stays = list(s.stays).filter((x) => x && typeof x === "object");
     const expenses = list(s.expenses).filter((x) => x && typeof x === "object");
+    // Where the phone is, when usable: read here and dropped (memory only).
+    const here = where ? where.current() : null;
     const inView = cur >= 0 ? dates[cur] : null;
     const left = rail.scrollLeft;
     const spot = focusSpot();
@@ -635,6 +646,11 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
         // Today's stamp is open and not yet pressed: the ticket says so.
         stampOpen: stampToday === day.date,
       };
+      // Leave by, from where you are: only with a usable position within a mile of the next stop.
+      if (nextId && here) {
+        const hl = hereLine(dayStops.find((x) => x.id === nextId), now.minutes, here);
+        if (hl) model.hereNext = hl;
+      }
       // Asked once, on today's check, only when something on it could show a distance.
       if (nextId && where && where.supported() && where.state() === "unset" && dayStops.some((x) => point(x))) model.ask = true;
       // The stops with a ticket, stapled to their lines. None, no key at all.
@@ -658,7 +674,7 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
     });
     applyOpen();
     restoreFocus(spot);
-    board.update(boardFor(s, nowMs, null), tz);
+    board.update(boardFor(s, nowMs, here), tz);
 
     if (!opened) {
       opened = true;

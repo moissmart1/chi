@@ -43,12 +43,15 @@
 // - ask: today's check asks, once, whether to use where the phone is: the
 //   last thing in its heading, .tk-ask, with Use it (.yes) and Not now (.no)
 //   (the Days view sees to the taps). No sign is drawn with it.
+// - hereNext: leave by from where you are (js/plan.js hereLine) for today's
+//   next stop: its sign line (.r-here: the sign, the miles and the walk) and
+//   its leave line (late: .r-lv.is-late). Absent, today's line stands.
 
 import { minutesOf, issueLine, isPast, nextLine, mapsUrl, safeHref, gateDate, checkDate } from "../plan.js";
 import { dayHead, tripMoney, dollars } from "../format.js";
 import { rng, gateStampSVG } from "../stamp.js";
 import { onCheckEl, bigStubEl, kindWord, bandDay, thumbEl, statusWords } from "./stubs.js";
-import { plainBlade } from "./sign.js";
+import { plainBlade, bladeEl } from "./sign.js";
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
@@ -181,12 +184,21 @@ function row(stop, i, model, keep) {
     fx.append(el("span", "", "Fixed time"));
     body.append(fx);
   }
-  const lead = next ? nextLine(stop, minutes) : "";
+  // From where you are: the sign, the miles and the walk.
+  const hereNext = next && model.hereNext ? model.hereNext : null;
+  const signed = hereNext;
+  if (signed) {
+    const h = el("div", "r-here");
+    h.append(bladeEl(signed.from), el("span", "dist", signed.dist));
+    body.append(h);
+    r.classList.add("has-here");
+  }
+  const lead = hereNext ? hereNext.lead : next ? nextLine(stop, minutes) : "";
   const tix = model.tix && model.tix[stop.id] ? model.tix[stop.id] : null;
   const detail = str(stop.detail);
   if (lead || detail) {
     const s = el("div", "r-s");
-    if (lead) s.append(el("b", "r-lv", lead));
+    if (lead) s.append(el("b", hereNext && hereNext.late ? "r-lv is-late" : "r-lv", lead));
     if (lead && detail) s.append(" ");
     if (detail) s.append(detail);
     body.append(s);

@@ -71,3 +71,10 @@
 .ask-k button{border:0;font:inherit;color:inherit;padding:0;display:grid;place-items:center;height:46px;border-radius:6px;font-weight:900;font-size:15.5px}
 .ask-k .yes{background:var(--print);color:var(--stock);box-shadow:var(--paper-edge)}
 .ask-k .no{background:none;box-shadow:inset 0 0 0 1.5px var(--print)}
+
+/* the sign line on a stop: the sign, the miles and the walk */
+.r-here{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin:5px -86px 2px 0;font-weight:900;font-size:14.5px;line-height:1.2;font-variant-numeric:tabular-nums}
+.r-here .dist{white-space:nowrap}
+.r.has-here>.r-j{align-self:start;height:38px}          /* the price column's rule: a short tick, so it never crosses the line */
+.r-lv.is-late{color:var(--red)}
+@media (max-width:350px){ .r-here{margin-right:-30px} }
