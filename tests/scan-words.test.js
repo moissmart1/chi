@@ -21,6 +21,22 @@ test("a common 4 or 5 letter word is not checked", () => {
   for (const w of ["rail", "Loop", "hotel", "Mo", "tea", "Izzah"]) assert.equal(worthChecking(w), false, w);
 });
 
+test("a placeholder typed as a reference or name (NONE, TBD, On app) is never checked, so it cannot stop a release", () => {
+  for (const w of ["NONE", "None", "TODO", "CASH", "NULL", "DOOR", "TBD", "N/A", "On app", "ONLINE", "PENDING", "E-ticket"]) assert.equal(worthChecking(w), false, w);
+  // Real short references still are, letters only or with digits.
+  for (const w of ["ZK47", "R2D2", "QWERT", "ABCD", "NONE1", "ONLINE7"]) assert.equal(worthChecking(w), true, w);
+});
+
+test("a list holding NONE and a real short ref: code full of 'none' passes, the ref is found", () => {
+  const dir = mkdtempSync(join(tmpdir(), "scan-"));
+  const file = join(dir, "private.txt");
+  writeFileSync(file, ["NONE", "TBD", "QX47"].join("\n"));
+  const words = privateWords(file);
+  assert.deepEqual(words, ["QX47"]);
+  assert.equal(findings("if (x === null || none) return 'none'; // TBD", { words }).length, 0);
+  assert.equal(findings("const ref = 'qx47';", { words }).length, 1);
+});
+
 test("privateWords reads the list with that rule, and a short code is found in a file", () => {
   const dir = mkdtempSync(join(tmpdir(), "scan-"));
   const file = join(dir, "private.txt");
