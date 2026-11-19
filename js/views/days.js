@@ -187,6 +187,7 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
   let autoId = null; // today's next stop: open unless a person chose
   let chosen = false; // a person has opened or closed a stop by hand
   let openId = null; // the stop they left open, or null
+  let whyId = null; // the stop whose Directions line was shown first this visit
 
   const step = () => {
     const pg = rail.firstElementChild;
@@ -269,8 +270,11 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
 
   function applyOpen() {
     const id = chosen ? openId : autoId;
+    if (id && !whyId) whyId = id;
     for (const r of rail.querySelectorAll(".r[data-id]")) {
       const on = r.dataset.id === id;
+      const why = r.querySelector(".r-why");
+      if (why && why.hidden !== (r.dataset.id !== whyId)) why.hidden = r.dataset.id !== whyId;
       if (r.classList.contains("is-open") !== on) r.classList.toggle("is-open", on);
       const b = r.querySelector(".r-b");
       if (b) b.setAttribute("aria-expanded", String(on));
@@ -497,6 +501,7 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
     seen = null;
     autoId = null;
     openId = null;
+    whyId = null;
     chosen = false;
     rail.replaceChildren();
     pager.replaceChildren();

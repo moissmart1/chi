@@ -139,7 +139,7 @@ module.exports = [
         text: a.textContent, href: a.getAttribute("href"), target: a.getAttribute("target"), rel: a.getAttribute("rel"),
       })), row(SKY));
       assert.deepEqual(links, [
-        { text: "Directions ↗", href: "https://www.google.com/maps/dir/?api=1&travelmode=transit&origin=Lunch%20in%20Harajuku&destination=Shibuya%20Sky", target: "_blank", rel: "noopener" },
+        { text: "Directions from here ↗", href: "https://www.google.com/maps/dir/?api=1&travelmode=transit&destination=Shibuya%20Sky", target: "_blank", rel: "noopener" },
         { text: "Ticket or booking ↗", href: "https://example.test/sky-ticket", target: "_blank", rel: "noopener" },
       ]);
       // The open stop's links are on screen and can be reached.
@@ -150,13 +150,13 @@ module.exports = [
     },
   },
   {
-    name: "the first stop of a day starts from the hotel",
+    name: "the first stop of a day starts from the phone too",
     async run({ page }) {
       await ready(page);
       await tap(page, MEIJI);
       await until(() => has(page, row(MEIJI), "is-open"), "Meiji Shrine opens");
       const href = await page.evaluate((sel) => document.querySelector(sel + " a.r-map").getAttribute("href"), row(MEIJI));
-      assert.ok(href.includes("origin=Asakusa%20hotel%20Tokyo&destination=Meiji%20Jingu"), href);
+      assert.equal(href, "https://www.google.com/maps/dir/?api=1&travelmode=transit&destination=Meiji%20Jingu");
     },
   },
   {

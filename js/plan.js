@@ -251,30 +251,18 @@ export function safeHref(v) {
   return typeof v === "string" && /^https?:\/\/\S+$/i.test(v) ? v : "";
 }
 
-// A place that is text (not a link), else "".
-const placeText = (v) => (safeHref(v) ? "" : str(v));
-
 const dayBefore = (date) => {
   const [y, m, d] = date.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d - 1)).toISOString().slice(0, 10);
 };
 
-export function originFor(dayStops, index, stays, date) {
-  if (index > 0) {
-    const prev = dayStops[index - 1];
-    return prev ? placeText(prev.place) || str(prev.title) : "";
-  }
-  const stay = stayFor(stays, dayBefore(date));
-  return stay ? placeText(stay.place) || str(stay.name) : "";
-}
-
-export function mapsUrl(stop, origin) {
+// Directions: no starting point is given, so Maps starts from the phone's own position.
+export function mapsUrl(stop) {
   const link = safeHref(stop.place);
   if (link) return link;
   const dest = str(stop.place) || str(stop.title);
   if (!dest) return "";
-  const from = origin ? "&origin=" + encodeURIComponent(origin) : "";
-  return "https://www.google.com/maps/dir/?api=1&travelmode=transit" + from + "&destination=" + encodeURIComponent(dest);
+  return "https://www.google.com/maps/dir/?api=1&travelmode=transit&destination=" + encodeURIComponent(dest);
 }
 
 export function stayMapsUrl(stay) {

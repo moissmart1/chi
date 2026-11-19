@@ -41,7 +41,7 @@
 //   Absent, a stop reads exactly as it did. ticketEl's second argument,
 //   { keep }, is where the big stub's small picture of the code comes from.
 
-import { minutesOf, issueLine, isPast, nextLine, originFor, mapsUrl, safeHref, gateDate, checkDate } from "../plan.js";
+import { minutesOf, issueLine, isPast, nextLine, mapsUrl, safeHref, gateDate, checkDate } from "../plan.js";
 import { dayHead, tripMoney, dollars } from "../format.js";
 import { rng, gateStampSVG } from "../stamp.js";
 import { onCheckEl, bigStubEl, kindWord, bandDay, thumbEl, statusWords } from "./stubs.js";
@@ -71,7 +71,7 @@ const failedPhotos = new Set();
 
 // What shows when the stop is open: the photo, how to get there, the note,
 // and the buttons (directions, and the stop's own link).
-function more(stop, origin, tix, keep) {
+function more(stop, tix, keep) {
   const wrap = el("div", "r-more");
   wrap.inert = true;
   const inner = el("div");
@@ -103,8 +103,8 @@ function more(stop, origin, tix, keep) {
     a.rel = "noopener";
     return a;
   };
-  const map = mapsUrl(stop, origin);
-  if (map) btns.append(link("r-map", "Directions ↗", map));
+  const map = mapsUrl(stop);
+  if (map) btns.append(link("r-map", "Directions from here ↗", map));
   const own = safeHref(stop.link);
   if (own) btns.append(link("r-map alt", "Ticket or booking ↗", own));
   // Opens the stop sheet on this stop (js/views/stopsheet.js).
@@ -112,6 +112,12 @@ function more(stop, origin, tix, keep) {
   edit.type = "button";
   btns.append(edit);
   inner.append(btns);
+  // Said once per visit (the Days view shows it on one stop only).
+  if (map) {
+    const why = el("p", "r-why", "Opens Maps from where your phone is, by train and bus.");
+    why.hidden = true;
+    inner.append(why);
+  }
   wrap.append(inner);
   return wrap;
 }
@@ -146,7 +152,7 @@ function showKey(stop, tix, keep) {
 }
 
 function row(stop, i, model, keep) {
-  const { state, minutes, nextId, stops, stays, day } = model;
+  const { state, minutes, nextId } = model;
   const next = state === "today" && stop.id === nextId;
   const r = el("div", "r");
   r.dataset.id = stop.id;
@@ -191,7 +197,7 @@ function row(stop, i, model, keep) {
   // was paid is rung up on Money), so it holds the check's blank dot.
   const price = el("div", "r-j", "·");
   price.setAttribute("aria-hidden", "true");
-  r.append(el("div", "r-t", minutesOf(stop.time) === null ? "—" : stop.time), body, price, more(stop, originFor(stops, i, stays, day.date), tix, keep));
+  r.append(el("div", "r-t", minutesOf(stop.time) === null ? "—" : stop.time), body, price, more(stop, tix, keep));
   return r;
 }
 
