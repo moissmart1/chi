@@ -36,7 +36,9 @@ function geocoder(call, table) {
   return asked;
 }
 
-const locate = (call) => call.fake({ key: KEY, action: "locate", args: {} });
+// locate is the owner's (the trip's first person), on their own personal link.
+const ownKey = (call, name) => { call.keys = call.keys || {}; return (call.keys[name] = call.keys[name] || call.fake.personKey(name)); };
+const locate = (call) => call.fake({ key: ownKey(call, "Mo"), action: "locate", args: {} });
 const stopById = (d, id) => d.stops.find((s) => s.id === id);
 const TOKYO_DAY = "2026-12-28";
 const CHI_DAY = "2026-12-30";
@@ -92,6 +94,11 @@ test("locate needs a trip key, geocodes in region us what has no coordinates, an
     "Dinner Tokyo": { lat: 35.68, lng: 139.77 },
   });
   assert.equal((await call.fake({ key: "wrong", action: "locate", args: {} })).error, "bad_key");
+  // Only the owner's own personal link runs it: not another person's, not the shared key.
+  const other = await call.fake({ key: ownKey(call, "Izzah"), action: "locate", args: {} });
+  assert.deepEqual([other.ok, other.error], [false, "bad_input"], JSON.stringify(other));
+  assert.equal((await call.fake({ key: KEY, actor: "Mo", action: "locate", args: {} })).error, "bad_input");
+  assert.equal(asked.length, 0, "refused before any lookup");
   const revBefore = (await call("load")).rev;
   const r = await locate(call);
   assert.equal(r.ok, true, JSON.stringify(r));

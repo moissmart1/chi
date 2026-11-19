@@ -50,6 +50,7 @@ var MSG_ = {
   ticketNeverSent: "That ticket picture never reached the trip sheet. Add it again.",
   // Security (2026-11-18).
   checkOnly: "This key can only read the trip.",
+  locateOwnerOnly: "Only {owner} can run locate.",
   claudeOwnerOnly: "Only {owner} can copy the Claude link.",
   notYours: "You can only change your own settings.",
   ownLink: "Open your own link to change an e-Transfer address.",
@@ -162,9 +163,14 @@ function dispatch_(body, holder) {
       return ok_({ added: added }, rev_());
     });
   }
-  // Where things are: run from a terminal like migrate (a person's key; the
+  // Where things are: run from a terminal like migrate, on the owner's own key (the
   // check key and the connector never get here: neither list names it).
-  if (action === "locate") return withLock_(locate_);
+  // Owner only, on their own link: a run holds the save lock for up to 40 lookups.
+  if (action === "locate") {
+    var locOwner = peopleNames_()[0];
+    if (holder.kind !== "person" || holder.name !== locOwner) return err_("bad_input", MSG_.locateOwnerOnly.replace("{owner}", locOwner || "the trip’s organiser"));
+    return withLock_(locate_);
+  }
   // The Claude connector's token, for Settings to copy into a link. Never
   // logged. Only for the trip's first person (the owner), on their own key.
   if (action === "claudeLink") {
