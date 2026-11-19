@@ -679,6 +679,11 @@ var KEY_HASH_RE_ = /^[0-9a-f]{64}$/;
 // PERSON_KEYS as stored ({ "<name>": { hash, at } }), keeping only entries
 // whose hash is 64 hex characters. Anything else (missing, not JSON, not an
 // object) is no personal keys at all.
+// While mailLinks hands a new link to the mail desk (Setup.js), the new key's
+// hash waits beside the old one as `next` ({ hash, at, next }), so both work
+// until the desk answers. A person with no link before has { hash: "", at: "",
+// next }. A malformed next is left out; an entry with neither a usable hash
+// nor a usable next is left out.
 function personKeysFrom(raw) {
   var out = {};
   if (typeof raw !== "string" || raw === "") return out;
@@ -691,9 +696,12 @@ function personKeysFrom(raw) {
   if (!obj || typeof obj !== "object" || Array.isArray(obj)) return out;
   Object.keys(obj).forEach(function (name) {
     var v = obj[name];
-    if (name !== "" && name !== "__proto__" && v && typeof v === "object" && typeof v.hash === "string" && KEY_HASH_RE_.test(v.hash)) {
-      out[name] = { hash: v.hash, at: typeof v.at === "string" ? v.at : "" };
-    }
+    if (name === "" || name === "__proto__" || !v || typeof v !== "object") return;
+    var hashOk = typeof v.hash === "string" && KEY_HASH_RE_.test(v.hash);
+    var nextOk = typeof v.next === "string" && KEY_HASH_RE_.test(v.next);
+    if (!hashOk && !nextOk) return;
+    out[name] = { hash: hashOk ? v.hash : "", at: hashOk && typeof v.at === "string" ? v.at : "" };
+    if (nextOk) out[name].next = v.next;
   });
   return out;
 }
@@ -716,15 +724,18 @@ function personKeysReadable(raw) {
 // { kind: "shared" } | null. given is the key as sent, givenHash its SHA-256
 // in hex, shared the shared trip key (null or "" once retired: then nothing
 // matches it), people PERSON_KEYS as personKeysFrom reads it, checkHash the
-// release check's key hash. Every stored hash is compared, the same way
-// whatever matches (no early exit), and an empty key never matches anything.
+// release check's key hash. Every stored hash (a person's hash and, during a
+// hand-over, their next) is compared, the same way whatever matches (no early
+// exit), and an empty key never matches anything (nor does an empty hash).
 function keyHolder(given, givenHash, shared, people, checkHash) {
   if (typeof given !== "string" || given === "" || typeof givenHash !== "string" || !KEY_HASH_RE_.test(givenHash)) return null;
   var person = null;
   var names = Object.keys(people || {});
   for (var i = 0; i < names.length; i++) {
-    var hit = sameKey(givenHash, people[names[i]].hash);
-    if (hit && person === null) person = names[i];
+    var entry = people[names[i]];
+    var hit = sameKey(givenHash, entry.hash);
+    var hitNext = sameKey(givenHash, typeof entry.next === "string" ? entry.next : "");
+    if ((hit || hitNext) && person === null) person = names[i];
   }
   var check = typeof checkHash === "string" && KEY_HASH_RE_.test(checkHash) && sameKey(givenHash, checkHash);
   var isShared = typeof shared === "string" && shared !== "" && sameKey(given, shared);
