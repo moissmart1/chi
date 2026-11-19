@@ -278,7 +278,7 @@ cases.push({
     await showTicket(page, S.hawks);
     assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector("#tix .f-tk")).animationName), "none");
     await flipUp(page);
-    await until(async () => (await onTop(page)) === "Izzah", "the other ticket flips up");
+    assert.equal(await onTop(page), "Izzah");
     assert.equal(await page.evaluate(() => document.getElementById("tix").getAnimations({ subtree: true }).filter((a) => (a.animationName === "lift" || a.animationName === "flip") && a.playState === "running").length), 0);
     assert.equal(await page.evaluate(() => [...document.querySelectorAll("#tix .pp-pg")].some((p) => p.classList.contains("is-flip"))), false);
   },
