@@ -32,6 +32,7 @@ var MSG_ = {
   badHistory: "That history request didn’t come through properly.",
   server: "Something went wrong on our side. Try again.",
   noClaude: "The Claude link isn’t set up yet. Ask Mo to run migrate.",
+  locateStopped: "The map lookup stopped (its quota ran out, it timed out, or it is not allowed). {found} found before it stopped; run locate again later.",
   needsMigrate: "The trip sheet needs updating first. Ask Mo to run migrate.",
   notYourPicture: "You can only change your own picture.",
   claudeStamp: "Press this one in the app.",
@@ -690,6 +691,9 @@ function updateStop_(args, ctx) {
 // pruned to rows still without coordinates. At most LOCATE_MAX_ lookups a
 // call (the same question twice in a call is asked once). No History line;
 // rev moves when something was found, so phones fetch it.
+// A lookup that throws (quota, timeout, no authorisation) stops the call at
+// that row: no try counted for it, nothing further written, error "geocoder"
+// saying how many were found before (those stay written).
 // -> { found, missing, more } (more: rows never tried remain).
 
 var LOCATE_MAX_ = 40;
@@ -769,7 +773,9 @@ function locate_() {
   var missing = 0;
   var more = false;
   var day = today_();
+  var stopped = false;
   order.forEach(function (o) {
+    if (stopped) return;
     var row = o.row;
     var p = row.pin || null;
     if (!p) {
@@ -786,7 +792,11 @@ function locate_() {
         try {
           got = geocode_(q, LOCATE_REGION_);
         } catch (e) {
-          got = null;
+          // Quota, timeout or no authorisation is not "not found": stop here,
+          // count no try for this row, and say so below.
+          stopped = true;
+          reportError_("locate", e);
+          return;
         }
         asked[q] = got ? coordsOf_(got) : null;
         if (asked[q] && asked[q].lat === "") asked[q] = null;
@@ -806,6 +816,10 @@ function locate_() {
     found++;
   });
   setProp_(LOCATE_KEY_, JSON.stringify(tried));
+  if (stopped) {
+    if (found > 0) bumpRev_();
+    return err_("geocoder", MSG_.locateStopped.replace("{found}", String(found)));
+  }
   return ok_({ found: found, missing: missing, more: more }, found > 0 ? bumpRev_() : rev_());
 }
 

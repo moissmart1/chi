@@ -172,22 +172,62 @@ test("locate: a place that is a Maps link with a position is read without a look
   assert.equal(asked.some((a) => a.q.includes("maps")), false);
 });
 
-test("locate: at most 40 lookups a call, then more: true; a failing geocoder leaves \"\" and does not stop the call", async () => {
+test("locate: at most 40 lookups a call, then more: true", async () => {
   const seed = JSON.parse(JSON.stringify(PLAN));
   for (let i = 0; i < 50; i++) seed.stops.push({ id: "bulkstop" + String(i).padStart(4, "0"), date: CHI_DAY, time: "", title: "Spot " + i });
   const call = client(seed);
   let n = 0;
-  call.fake.geocoder.answer = (q) => {
-    n++;
-    if (q === "Spot 3 Chicago") throw new Error("quota");
-    return null;
-  };
+  call.fake.geocoder.answer = () => { n++; return null; };
   const r = await locate(call);
   assert.equal(r.ok, true, JSON.stringify(r));
   assert.equal(n, 40);
   assert.equal(r.data.more, true);
   const r2 = await locate(call);
   assert.equal(r2.ok, true);
+});
+
+test("locate: a geocoder that throws on the first row stops the call, counts no try, and says so", async () => {
+  const call = client();
+  let n = 0;
+  call.fake.geocoder.answer = () => { n++; throw new Error("quota"); };
+  const r = await locate(call);
+  assert.deepEqual([r.ok, r.error], [false, "geocoder"], JSON.stringify(r));
+  assert.match(r.message, /0 found/);
+  assert.equal(n, 1, "no further lookups after the throw");
+  const d = (await call("load")).data;
+  assert.ok(d.stops.every((s) => s.lat === "") && d.days.every((x) => x.lat === ""));
+  // No try was counted: the next run asks the same first question again, not the weaker one.
+  const asked = geocoder(call, {});
+  const r2 = await locate(call);
+  assert.equal(r2.ok, true, JSON.stringify(r2));
+  assert.ok(asked.length > 0 && asked[0].q === "Chicago", asked.map((a) => a.q).join(" | "));
+  const tried = JSON.parse(call.fake.props?.LOCATE_TRIED || "{}");
+  assert.equal(Object.values(tried).every((t) => t.n === 1), true, JSON.stringify(tried));
+});
+
+test("locate: a throw on a later row keeps what was found, counts no try for that row, and does not fall through to its weaker query", async () => {
+  const call = client();
+  let n = 0;
+  call.fake.geocoder.answer = (q) => {
+    n++;
+    if (q === "Chicago") return { lat: 41.9, lng: -87.6 };
+    if (q === "Shibuya Sky Tokyo") throw new Error("timeout");
+    return null;
+  };
+  const r = await locate(call);
+  assert.deepEqual([r.ok, r.error], [false, "geocoder"], JSON.stringify(r));
+  assert.match(r.message, /[1-9]\d* found/);
+  const d = (await call("load")).data;
+  assert.equal(d.days.find((x) => x.date === "2026-12-26").lat, "41.9", "what was found stays written");
+  assert.equal(stopById(d, "planstop1203").lat, "");
+  const before = n;
+  // The row that threw has no try recorded: its next run asks its first form again, not its title.
+  const tried = JSON.parse(call.fake.props.LOCATE_TRIED || "{}");
+  assert.equal(tried["stop:planstop1203"], undefined, JSON.stringify(tried));
+  const asked = geocoder(call, {});
+  await locate(call);
+  assert.equal(asked.some((a) => a.q === "Shibuya Sky Tokyo"), true, asked.map((a) => a.q).join(" | "));
+  assert.ok(before > 1);
 });
 
 test("updateStop clears a stop's coordinates when its place changes, and keeps them otherwise", async () => {
