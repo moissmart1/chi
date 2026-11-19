@@ -120,6 +120,12 @@ export function changeText(c) {
       default: return "Undone.";
     }
   }
+  // A ticket picture on a stop (js/tickets.js).
+  if (c.kind === "ticket") {
+    if (c.action === "add") return "Added a ticket picture.";
+    if (c.action === "remove") return "Removed a ticket picture.";
+    return "Undone.";
+  }
   switch (c.action) {
     case "add": return "Rang up " + item.title + " " + typed(item) + ".";
     case "edit": return "Changed " + item.title + ".";

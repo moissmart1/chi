@@ -481,7 +481,7 @@ function mcpTools_() {
   return [
     {
       name: "get_trip",
-      description: "Use this first to see the whole trip: its days, stops, stays, expenses and payments, who owes whom now. Amounts owed are in Canadian dollars.",
+      description: "Use this first to see the whole trip: its days, stops (each with its ticket details as text in tkRef, tkName, tkPeople and tkSeat, but never the ticket pictures, which only the app can add, read or remove), stays, expenses and payments, who owes whom now. Amounts owed are in Canadian dollars.",
       args: {},
       run: mcpGetTrip_,
     },

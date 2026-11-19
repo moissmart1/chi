@@ -20,9 +20,27 @@ const NOT_MAIL = /\.(png|jpe?g|svg|js|mjs|cjs|css|json|html|md)$/i;
 const DEPLOY = /AKfy[A-Za-z0-9_-]{20,}/g;
 const GOOGLE_ID = /(?<![A-Za-z0-9_-])1[A-Za-z0-9_-]{43}(?![A-Za-z0-9_-])/g;
 
+// Words typed into a ticket's reference or name when there is none ("NONE",
+// "TBD", "On app"): never a secret, and found all through the code, so
+// checking one would stop every release. Compared without case, spaces or
+// punctuation, and only for an entry with no digit.
+const PLACEHOLDERS = new Set(["none", "null", "nil", "na", "tbd", "tba", "todo", "unknown", "pending", "later", "same", "empty", "blank", "cash", "card", "paid", "unpaid", "free", "door", "gate", "desk", "open", "online", "onapp", "app", "email", "mobile", "eticket", "ticket", "tickets", "booking", "booked", "confirmed", "reference", "voucher", "walkin", "anytime", "entry"]);
+export const isPlaceholder = (s) => !/\d/.test(s) && PLACEHOLDERS.has(s.toLowerCase().replace(/[^a-z]+/g, ""));
+
+// An entry is checked when it has 6 characters or more, or 4 or 5 and it has
+// a digit or is all upper case (a booking code), so a short code is caught
+// without flagging common four and five letter words. A placeholder word is
+// never checked, whatever its length.
+export function worthChecking(s) {
+  if (isPlaceholder(s)) return false;
+  if (s.length >= 6) return true;
+  if (s.length < 4) return false;
+  return /\d/.test(s) || (/[A-Z]/.test(s) && s === s.toUpperCase());
+}
+
 export function privateWords(file = join(PRIVATE_DIR, "private.txt")) {
   if (!existsSync(file)) return null;
-  return readFileSync(file, "utf8").split("\n").map((s) => s.trim()).filter((s) => s.length >= 6);
+  return readFileSync(file, "utf8").split("\n").map((s) => s.trim()).filter(worthChecking);
 }
 
 // [{ rule, line }] for one file's text.

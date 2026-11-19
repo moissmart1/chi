@@ -24,6 +24,7 @@ import { mountNet } from "./views/net.js";
 import { mountStampBook } from "./views/stampbook.js";
 import { createUpdater } from "./update.js";
 import { isWide, onWide } from "./shape.js";
+import { createKeep, fetchMissing, toBase64, fetchesAll, pruneKeep } from "./tickets.js";
 
 // How often a visible phone asks the backend whether anything changed.
 const CHECK_MS = 20000;
@@ -215,15 +216,35 @@ function start() {
     // On its own link the backend knows who this is: no name is sent.
     getActor: () => (store && store.state.personal ? undefined : (store && store.state.me) || storage.getItem(STORAGE_PREFIX + "me")),
   });
+  // Ticket pictures kept on this phone (IndexedDB "chi-tickets"): every phone
+  // fetches every one after each load with signal, so it opens with none
+  // (js/tickets.js), unless the Ticket pictures setting (chi.tixFetch) says
+  // only when one is opened. No screen shows them yet: the ticket screens
+  // plug in here (keep, store.addTicket, store.removeTicket, ticketMark).
+  const keep = createKeep();
+  const fetchAll = () => fetchesAll(raw);
   // A refused key takes the trip off the phone (js/store.js): the stored
-  // keys, and the key this visit came with.
+  // keys, the key this visit came with, and every ticket picture.
   store = createStore({
     api,
     storage,
     clear: (queue) => {
       keyHere = null;
       clearTrip(raw, { queue });
+      keep.wipe();
     },
+    ticketData: async (id) => {
+      const blob = await keep.get(id);
+      return blob ? toBase64(blob) : null;
+    },
+    afterLoad: () => {
+      pruneKeep(store, keep);
+      if (fetchAll()) fetchMissing(store, keep, { allowed: fetchAll });
+    },
+  });
+  // A picture just kept may unblock the next one once saving ends: look again then.
+  store.subscribe(() => {
+    if (!store.busy() && store.state.ticketsReady && fetchAll()) fetchMissing(store, keep, { allowed: fetchAll });
   });
 
   // The one clock the Days screen reads, in the trip's time zone.
@@ -294,6 +315,8 @@ function start() {
       demoGuard = null;
     }
   });
+  // Forget this phone while it runs (onForget), else null.
+  let forgetting = null;
   const you = mountYou(phone, store, {
     demo: clock,
     getKey: () => storage.getItem(STORAGE_PREFIX + "key"),
@@ -316,28 +339,40 @@ function start() {
       you.close(false);
       history.open();
     },
-    // Forget this phone: the trip, the key and every setting, the offline
-    // copy and the worker, then the no-key screen.
-    onForget: async () => {
-      keyHere = null;
-      let session = null;
-      try {
-        session = window.sessionStorage;
-      } catch {
-        session = null;
-      }
-      await forgetPhone({
-        storages: [raw, session].filter(Boolean),
-        indexedDB: globalThis.indexedDB || null,
-        caches: globalThis.caches || null,
-        serviceWorker: (navigator && navigator.serviceWorker) || null,
-        // Only this app's worker: the Japan app shares the origin.
-        scope: new URL("./", location.href).href,
+    // Forget this phone (forgetAll, below). Kept while it runs, so a link pasted on the no-key screen meanwhile
+    // (it shows as soon as the store forgets) waits for it to finish and is
+    // never wiped by it.
+    onForget: () => {
+      if (!forgetting) forgetting = forgetAll().finally(() => {
+        forgetting = null;
       });
-      store.forgot();
-      you.close(false);
+      return forgetting;
     },
   });
+  // Forget this phone: the trip, the key and every setting, the ticket
+  // pictures, the offline copy and the worker, then the no-key screen.
+  async function forgetAll() {
+    keyHere = null;
+    // The store is marked wiped first (nothing is written or sent after it),
+    // then the ticket pictures: their open database would hold up its deletion.
+    store.forgot();
+    await keep.wipe();
+    let session = null;
+    try {
+      session = window.sessionStorage;
+    } catch {
+      session = null;
+    }
+    await forgetPhone({
+      storages: [raw, session].filter(Boolean),
+      indexedDB: globalThis.indexedDB || null,
+      caches: globalThis.caches || null,
+      serviceWorker: (navigator && navigator.serviceWorker) || null,
+      // Only this app's worker: the Japan app shares the origin.
+      scope: new URL("./", location.href).href,
+    });
+    you.close(false);
+  }
   const line = mountLine(phone, store, {
     onEdit: (id) => {
       line.close(false);
@@ -413,13 +448,17 @@ function start() {
     connected,
     storage,
     // A key pasted on the no-key screen: keep it and start, without a reload.
-    onKey: (key) => {
+    onKey: async (key) => {
+      // Forget this phone still running: it would take this key off too.
+      if (forgetting) await forgetting;
       keyHere = key;
       try {
         raw.setItem(STORAGE_PREFIX + "key", key);
       } catch {
         // nowhere to keep it: it works for this visit only
       }
+      // A new link after a wipe: the picture keep opens its database again, empty.
+      keep.restart();
       store.boot();
     },
   });
