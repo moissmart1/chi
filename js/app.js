@@ -308,7 +308,7 @@ function start() {
   const allDays = mountAllDays(phone, store, { clock, onPick: (i) => days.goDay(i) });
   const stopSheet = mountStopSheet(phone, store, { keep });
   // The stamp book, a panel like History, opened from the Days bar or today's ticket.
-  const book = mountStampBook(phone, store);
+  const book = mountStampBook(phone, store, { where });
   // The ticket, lifted off its stop's line and held up (js/views/stub.js).
   const stub = mountStub(phone, store, keep);
   // The trip taken off this phone: the small pictures drawn from the keep go too.

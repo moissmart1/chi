@@ -86,3 +86,9 @@
 
 /* the hotel card: how far */
 .sy-dist{display:flex;flex-wrap:wrap;align-items:center;gap:5px 9px;margin-top:11px;padding-top:11px;border-top:1px solid var(--rule);font-size:21px;font-weight:900;line-height:1.15;font-variant-numeric:tabular-nums}
+
+/* the stamp pressed in the place */
+.g-cap{text-transform:uppercase}
+.bk-in .g-bl{text-transform:uppercase}
+.bk-cap.is-here{margin-top:3px}
+.bk-lt i.bk-in{display:flex;flex-wrap:wrap;align-items:center;gap:4px 7px;margin-top:6px;font-weight:900}

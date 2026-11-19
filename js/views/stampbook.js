@@ -7,7 +7,13 @@
 // Placemat pill on its top line, or the line on today's check), closed by
 // Done, the scrim or Escape.
 //
-// mountStampBook(root, store, { now }) -> { open(), close(restoreFocus), isOpen() }
+// mountStampBook(root, store, { now, where }) -> { open(), close(restoreFocus), isOpen() }
+// - In the place: pressed with a usable position (js/where.js) within a mile,
+//   straight line, of that day's place or of one of that day's stops on the
+//   map (js/plan.js inPlace), the press carries here: true and nothing else
+//   about where. Such a stamp's caption is a small green sign, and held up it
+//   reads "pressed in <place>". No position, or elsewhere: no mark, nothing
+//   said. A press is never held up or refused because of a position.
 // - root is the phone. now() is the real time (the phone's clock; a press is
 //   judged by it, so the demo clock is never used here).
 // - A stamp is open, not yet open, closed or held: js/stampbook.js stateOf, in
@@ -33,6 +39,8 @@ import { tripSpan } from "../format.js";
 import { calm, wetInk } from "../fx.js";
 import { thud, primeSound } from "../sound.js";
 import { fillSeal } from "../picture.js";
+import { inPlace } from "../plan.js";
+import { plainBlade } from "./sign.js";
 
 const RULE = "One stamp a day, pressed on the day, where you are. New Year’s Eve gets the fireworks.";
 const STAMPED = "Stamped.";
@@ -108,7 +116,7 @@ function el(tag, cls, text) {
 const list = (v) => (Array.isArray(v) ? v : []);
 const isoMs = (iso) => Date.parse(iso);
 
-export function mountStampBook(root, store, { now = () => Date.now() } = {}) {
+export function mountStampBook(root, store, { now = () => Date.now(), where = null } = {}) {
   const scrim = el("div", "scrim");
   scrim.id = "bookScrim";
   scrim.hidden = true;
@@ -147,10 +155,10 @@ export function mountStampBook(root, store, { now = () => Date.now() } = {}) {
     return { s, defs, mine, t, state: (d) => stateOf(d, defs, mine.has(d.id) ? [d.id] : [], t) };
   }
 
-  function label(d, st) {
+  function label(d, st, here = false) {
     const date = d.date ? monthDay(d.date) : "";
     if (!d.date) return st === "have" ? "The placemat’s own stamp, stamped. Hold it up." : st === "open" ? "Press the placemat’s own stamp" : "The placemat’s own stamp, closed";
-    if (st === "have") return date + ", " + (d.name_en || d.place || "stamp") + ", stamped. Hold it up.";
+    if (st === "have") return date + ", " + (d.name_en || d.place || "stamp") + ", stamped" + (here ? ", pressed in the place" : "") + ". Hold it up.";
     if (st === "open") return "Press the stamp for " + date;
     return st === "soon" ? date + ", not open yet" : date + ", closed";
   }
@@ -168,7 +176,8 @@ export function mountStampBook(root, store, { now = () => Date.now() } = {}) {
     const b = el("button", "bk-cell is-" + st);
     b.type = "button";
     b.dataset.def = d.id;
-    b.setAttribute("aria-label", label(d, st));
+    const marked = st === "have" && !!stamp && stamp.here === true && !!d.date;
+    b.setAttribute("aria-label", label(d, st, marked));
     b.style.left = ((spot.x / MAP_W) * 100).toFixed(2) + "%";
     b.style.top = ((spot.y / MAP_H) * 100).toFixed(2) + "%";
     const well = el("span", "bk-well");
@@ -185,7 +194,14 @@ export function mountStampBook(root, store, { now = () => Date.now() } = {}) {
       well.append(ghost(d, st, n));
     }
     const cap = el("span", "bk-cap");
-    if (d.date) cap.append((ARROW[spot.dir] || "") + (d.place || monthDay(d.date)));
+    if (d.date) {
+      const words = (ARROW[spot.dir] || "") + (d.place || monthDay(d.date));
+      // Pressed in the place: the same words, on a small green sign.
+      if (marked) {
+        cap.classList.add("is-here");
+        cap.append(plainBlade(words, { cls: "g-cap" }));
+      } else cap.append(words);
+    }
     b.append(well, cap);
     return b;
   }
@@ -201,7 +217,7 @@ export function mountStampBook(root, store, { now = () => Date.now() } = {}) {
       const stamp = m.mine.get(d.id) || null;
       // Everything the ring prints: its state, its stamp and the definition. Not whether
       // the press is still on its way: the drawing is the same.
-      const sig = JSON.stringify([st, stamp ? [stamp.seed, stamp.at] : null, d.date, d.name_en, d.place, d.ink, d.shape, spot.x, spot.y, n]);
+      const sig = JSON.stringify([st, stamp ? [stamp.seed, stamp.at, stamp.here === true] : null, d.date, d.name_en, d.place, d.ink, d.shape, spot.x, spot.y, n]);
       let node = grid.querySelector('.bk-cell[data-def="' + CSS.escape(d.id) + '"]');
       if (node && sigs.get(d.id) === sig) {
         want.push(node);
@@ -300,7 +316,10 @@ export function mountStampBook(root, store, { now = () => Date.now() } = {}) {
   function press(d) {
     primeSound();
     hitId = d.id;
-    const token = store.pressStamp(d.id);
+    // In the place? Only a yes goes with the press, never where.
+    const day = d.date ? (store.state.days || []).find((x) => x && x.date === d.date) : null;
+    const here = !!(where && day && inPlace(day, store.state.stops || [], where.current()));
+    const token = store.pressStamp(d.id, { here });
     if (!token) {
       hitId = null;
       return;
@@ -335,6 +354,11 @@ export function mountStampBook(root, store, { now = () => Date.now() } = {}) {
     const day = d.date || (isFinite(at) ? tripDate(at) : "");
     const when = (day ? weekdayOf(day) + " " + monthDay(day) : "") + (isFinite(at) ? (day ? " · " : "") + "stamped " + tripClock(at) : "");
     if (when) t.append(el("i", "", when));
+    if (stamp.here === true && d.date) {
+      const inl = el("i", "bk-in");
+      inl.append(plainBlade(d.place || "Here"), "pressed in " + (d.place || "the day’s place"));
+      t.append(inl);
+    }
     card.append(t);
     b.append(card, el("span", "bk-lx", LOOK_BACK));
     b.addEventListener("click", () => closeLook(true));
