@@ -166,6 +166,7 @@ for (const size of SIZES) {
       assert.equal(await page.evaluate((sel) => document.querySelector(sel + " .r-tk").getAttribute("aria-label"), row(S.jazz)), "Show ticket: reservation, reference only");
       await showTicket(page, S.jazz);
       await expectText(page, "#tix .ref-big", "Reserved · reference onlyJZ-5512We have a booking for 2 at 22:15 under MO.");
+      await expectText(page, "#tix .f-band", "RESERVED · 22:15No. 0003");
       await expectText(page, "#tix .f-nm", "MO");
       await expectText(page, "#tix .f-kt", "TEXTText only, always on this phone.");
       assert.equal(await page.evaluate(() => document.querySelectorAll("#tix .stub-code").length), 0);

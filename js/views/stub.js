@@ -216,7 +216,7 @@ export function mountStub(root, store, keep) {
     me.append(staple());
     const band = el("div", "f-band");
     const stock = stockOf(stop);
-    band.append(el("span", "", kindWord(stock) + (/^\d{2}:\d{2}$/.test(stop.time || "") ? " · " + stop.time : "")), el("span", "ser", "No. " + num));
+    band.append(el("span", "", (kind === null ? "RESERVED" : kindWord(stock)) + (/^\d{2}:\d{2}$/.test(stop.time || "") ? " · " + stop.time : "")), el("span", "ser", "No. " + num));
     const ttl = el("div", "f-ttl");
     ttl.append(el("b", "", str(stop.title) || "Ticket"), el("span", "", [stop.date ? dayHead(stop.date).en : "", /^\d{2}:\d{2}$/.test(stop.time || "") ? stop.time : "", str(stop.detail)].filter(Boolean).join(" · ")));
     me.append(band, ttl, ...codes, el("div", "f-perf"), nameRow(name, seat), ...factRows(stop, { skipName: kind === null }), keptLine(kind, all));

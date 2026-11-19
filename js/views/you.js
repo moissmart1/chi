@@ -77,6 +77,7 @@ const MARKUP = `
     <input type="file" accept="image/*" id="setPicFile" tabindex="-1" aria-hidden="true" hidden>
   </div>
   <button type="button" class="set-r" id="setSound"><span>Stamp sound</span><b id="setSoundV">On</b></button>
+  <button type="button" class="set-r" id="setBulk" hidden><span>Add tickets<small>Many ticket files at once, yours or anyone’s on the trip</small></span><b>Open</b></button>
   <button type="button" class="set-r" id="setTix" hidden><span>Ticket pictures<small id="setTixS"></small></span><b id="setTixV">On Wi‑Fi and mobile</b></button>
   <button type="button" class="set-r" id="setHist"><span>History<small>Every change, with undo</small></span><b>Open</b></button>
   <button type="button" class="set-r" id="setFreshRow"><span>Last updated<small>Tap to fetch the latest</small></span><b id="setFresh" aria-live="polite" data-w="Up to date 00:00"></b></button>
@@ -295,6 +296,7 @@ export function mountYou(root, store, { onHistory = () => {}, onDemo = () => {},
     drawPic(s);
     soundV.textContent = soundOn() ? "On" : "Off";
     drawTix();
+    bulkRow.hidden = store.state.ticketsReady !== true;
     drawDemoDays(s);
     setDemo(!demoDays.hidden);
     if (!fetching && !saying.has(fresh)) fresh.textContent = freshWord(s);
@@ -453,6 +455,8 @@ export function mountYou(root, store, { onHistory = () => {}, onDemo = () => {},
   // Ticket pictures (once the trip has them): every one fetched in the
   // background, or only the one being opened (roaming data).
   const tixRow = $("setTix");
+  const bulkRow = $("setBulk");
+  bulkRow.addEventListener("click", () => onBulk());
   const tixV = $("setTixV");
   const tixS = $("setTixS");
   const TIX_ALL = "Every phone keeps every ticket, so they open with no signal. Up to about 50 MB in all.";
