@@ -15,6 +15,7 @@
 //   js/views/stubs.js tixInfo draws it, the picture keep, and a hook for a
 //   picture arriving), or null; onTicket(stopId, button): the big stub on an
 //   open stop (Show ticket) was tapped.
+// - storage: the phone's storage, for the board's close (js/views/board.js).
 // - The trip taken off this phone (status "nokey": a refused key, Forget
 //   this phone): every check is taken out of the page, tickets and all.
 // - held(): true while a sheet over Days is in use (the stop sheet): coming
@@ -50,6 +51,8 @@ import { cadCents } from "../money.js";
 import { APP_NAME } from "../config.js";
 import { TRIP_TZ } from "../trip.js";
 import { ticketEl } from "./ticket.js";
+import { mountBoard } from "./board.js";
+import { boardFor } from "../board.js";
 import { summary as bookSummary, countText } from "../stampbook.js";
 import { isPhone } from "../shape.js";
 import { tapOnRelease } from "./tap.js";
@@ -139,7 +142,7 @@ function patchTicket(old, fresh) {
   return old;
 }
 
-export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = () => {}, onStop = () => {}, onAddStop = () => {}, onStampBook = () => {}, held = () => false, tickets = null, onTicket = () => {} } = {}) {
+export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = () => {}, onStop = () => {}, onAddStop = () => {}, onStampBook = () => {}, held = () => false, tickets = null, onTicket = () => {}, storage = null } = {}) {
   const count = el("button", "bar-t");
   count.type = "button";
   count.id = "dayCount";
@@ -175,7 +178,9 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
   demo.append(demoText, demoStop);
   demo.hidden = true;
   demoStop.addEventListener("click", () => clock.stop());
-  root.replaceChildren(demo, bar, rail);
+  // The board (js/views/board.js): between the top line and the rail.
+  const board = mountBoard({ storage });
+  root.replaceChildren(demo, board.el, bar, rail);
 
   let dates = []; // the dates of the drawn tickets, in order
   let states = []; // each one's dayState
@@ -503,6 +508,7 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
     openId = null;
     whyId = null;
     chosen = false;
+    board.clear();
     rail.replaceChildren();
     pager.replaceChildren();
     count.replaceChildren();
@@ -519,6 +525,7 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
     const stampToday = showStamps(s);
     const ready = s.status === "ready" && s.trip && s.trip.start && list(s.days).length;
     if (!ready) {
+      board.update(null);
       if (!dates.length) {
         count.hidden = true;
         rail.replaceChildren();
@@ -605,6 +612,7 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
     });
     applyOpen();
     restoreFocus(spot);
+    board.update(boardFor(s, nowMs, null), tz);
 
     if (!opened) {
       opened = true;

@@ -455,6 +455,7 @@ function start() {
   };
   const days = mountDays(document.getElementById("vDays"), store, {
     clock,
+    storage: raw,
     onStay: (id) => {
       closeForDays();
       stayCard.open(id);
