@@ -52,7 +52,7 @@ async function fits(page) {
 
 module.exports = [
   {
-    name: "no planner: no Before tab before or during the trip, four keys in the bar, no Planner payments row, and nothing ever asks for the planner",
+    name: "no planner linked: no Before tab before or during the trip, four keys in the bar, no Planner payments row, and nothing ever asks for the planner",
     async run({ page, newPhone }) {
       const planner = (backend) => backend.requests.filter((r) => /^(syncPayments|syncTodos|tickTodo|claimTodo|linkPlanner)$/.test(r.action)).map((r) => r.action);
       // Before the trip (when a linked planner's list would be in the bar) and during it.

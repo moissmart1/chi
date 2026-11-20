@@ -154,7 +154,7 @@ for (const size of [...SIZES, TAB]) {
           [...document.querySelectorAll("#nav button")].filter((b) => !b.hidden).map((b) => b.getBoundingClientRect()).filter((r) => r.height < 44 || r.width < 44).length,
         );
         assert.equal(small, 0, "every rail button is at least 44 px each way");
-        // The same keys as the portrait bar, stacked in the same order, Ring up in the middle (no planner list here, so no Before key: Days, Money, You, Ring up).
+        // The same keys as the portrait bar, stacked in the same order, Ring up in the middle (no planner linked here, and the Before list has no screen yet, so no Before key: Days, Money, You, Ring up).
         const rail = await page.evaluate(() =>
           [...document.querySelectorAll("#nav button")].filter((b) => !b.hidden).map((b) => {
             const r = b.getBoundingClientRect();

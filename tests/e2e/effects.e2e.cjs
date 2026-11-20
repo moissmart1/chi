@@ -12,7 +12,7 @@ const { SEED, WITH_PLAN, NOON28, makeBackend, open, advance, until, visible } = 
 // 13:20 on Mon Dec 28 in Chicago, Day 3 of the trip.
 const DAY3 = NOON28;
 
-// The Days screen over a plan. This trip has no planner, so no Before tab.
+// The Days screen over a plan. No planner is linked here, and the Before list has no screen yet: no Before tab.
 async function daysReady(page) {
   const backend = makeBackend(WITH_PLAN, { now: DAY3 });
   await open(page, { backend, nowMs: DAY3, tab: "days" });
