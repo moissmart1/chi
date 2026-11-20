@@ -30,6 +30,8 @@ async function ready(page, { storage = { "chi.where": "on" }, coords = true } = 
 async function openCard(page) {
   await page.evaluate((sel) => document.querySelector(sel + " .tk-stay").click(), TODAY);
   await until(() => page.evaluate(() => document.getElementById("stay").classList.contains("is-open")), "the hotel card opens");
+  // Risen all the way (it slides up in real time), for the pictures.
+  await until(() => page.evaluate(() => getComputedStyle(document.getElementById("stay")).transform === "none" || Math.abs(document.getElementById("stay").getBoundingClientRect().bottom - innerHeight) < 1), "the hotel card has risen", 3000);
 }
 async function clean(page, backend, pos) {
   assert.deepEqual(await leaks(page, backend, pos, { latOnly: !!pos }), [], "the phone's position is in no request and no storage");
