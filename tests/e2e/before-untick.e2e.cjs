@@ -50,7 +50,8 @@ module.exports = [
       await until(async () => (await railIds(page)).includes("1"), "back on the rail");
       assert.deepEqual(await railIds(page), ["1", "2", "3", "4", "5", "6"], "in its place");
       assert.equal(await text(page, "#beforeN"), "6");
-      assert.deepEqual(sentSince(backend, from, "history").map((r) => r.args), [{ ref: "1" }]);
+      // The item's own History once (the app's History tape, loaded at start, is then fetched again too).
+      assert.deepEqual(sentSince(backend, from, "history").filter((r) => r.args.ref !== undefined).map((r) => r.args), [{ ref: "1" }]);
       assert.deepEqual(sentSince(backend, from, "undo").map((r) => r.args), [{ logId: tick }]);
       assert.equal(sentSince(backend, from, "tickTodo").length, 0);
       await until(() => statusOf(backend, 1) === "To book", "the planner's cell is put back");
