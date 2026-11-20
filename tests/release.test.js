@@ -163,3 +163,80 @@ test("the release checks use the check key, the old shared key only without one,
   assert.match(ship, /const KEY = checkKey\(env\)/);
   assert.match(ship, /"#k=" \+ encodeURIComponent\(KEY\)/);
 });
+
+// ---------- the permission gate (review of the planner port, 2026-11-20, C1) ----------
+// A backend that asks Google for more than the last release goes to the
+// script's head only until Mo has approved it; the live deployment and the
+// site are left alone. clasp is stubbed: every call is recorded, none is run.
+import { backendPath, headOnlySteps, manifestAsks, manifestGains, shipBackend } from "../scripts/release-lib.mjs";
+
+const OLD = JSON.stringify({ timeZone: "America/Chicago", oauthScopes: ["https://www.googleapis.com/auth/spreadsheets.currentonly", "https://www.googleapis.com/auth/script.external_request"] });
+const NEW = readFileSync(join(ROOT, "backend", "appsscript.json"), "utf8");
+const fakeClasp = (fails = {}) => {
+  const calls = [];
+  const clasp = (args) => {
+    calls.push(args.join(" "));
+    return fails[args[0]] ? { status: 1, stdout: "", stderr: "made-up clasp failure" } : { status: 0, stdout: "", stderr: "" };
+  };
+  return { calls, clasp };
+};
+
+test("C1: manifestGains names each scope and advanced service the next manifest adds, and nothing else", () => {
+  assert.deepEqual(manifestGains(OLD, NEW), ["the permission https://www.googleapis.com/auth/spreadsheets", "the advanced service sheets v4"]);
+  assert.deepEqual(manifestGains(NEW, NEW), [], "the same manifest gains nothing");
+  // Order and other fields do not matter; a scope dropped is not a gain.
+  const shuffled = JSON.stringify({ ...JSON.parse(NEW), timeZone: "UTC", oauthScopes: [...JSON.parse(NEW).oauthScopes].reverse() });
+  assert.deepEqual(manifestGains(NEW, shuffled), []);
+  assert.deepEqual(manifestGains(NEW, OLD), []);
+  // A new version of a service is a gain; no released manifest means everything is new.
+  const v5 = JSON.stringify({ ...JSON.parse(NEW), dependencies: { enabledAdvancedServices: [{ userSymbol: "Sheets", version: "v5", serviceId: "sheets" }] } });
+  assert.deepEqual(manifestGains(NEW, v5), ["the advanced service sheets v5"]);
+  assert.equal(manifestGains(null, OLD).length, 2);
+  assert.equal(manifestGains("not json", OLD).length, 2, "an unreadable released manifest counts as asking for nothing");
+  assert.throws(() => manifestGains(OLD, "{ broken"), /can't be read/);
+  assert.equal(manifestAsks("[]"), null);
+});
+
+test("C1: a backend with new permissions goes to the head only, unless --scopes-approved", () => {
+  const gains = manifestGains(OLD, NEW);
+  assert.equal(backendPath(gains, false), "head");
+  assert.equal(backendPath(gains, true), "deploy");
+  assert.equal(backendPath([], false), "deploy", "nothing new: deployed as always");
+
+  const head = fakeClasp();
+  assert.deepEqual(shipBackend({ path: "head", check: false, clasp: head.clasp, deployId: "dep", label: "v6 abc" }), { ok: true, did: "head" });
+  assert.deepEqual(head.calls, ["push -f"], "pushed to the head; the live deployment is never touched");
+
+  const go = fakeClasp();
+  assert.deepEqual(shipBackend({ path: "deploy", check: false, clasp: go.clasp, deployId: "dep", label: "v6 abc" }), { ok: true, did: "deployed" });
+  assert.deepEqual(go.calls, ["push -f", "create-deployment -i dep -d v6 abc"]);
+
+  const bad = fakeClasp({ push: true });
+  const r = shipBackend({ path: "deploy", check: false, clasp: bad.clasp, deployId: "dep", label: "x" });
+  assert.deepEqual([r.ok, r.did, r.why], [false, "none", "clasp push failed."]);
+  assert.deepEqual(bad.calls, ["push -f"], "no deployment after a failed push");
+});
+
+test("C1: --check says which path it would take and runs nothing", () => {
+  const c = fakeClasp();
+  assert.deepEqual(shipBackend({ path: "head", check: true, clasp: c.clasp, deployId: "dep", label: "x" }), { ok: true, did: "would-head" });
+  assert.deepEqual(shipBackend({ path: "deploy", check: true, clasp: c.clasp, deployId: "dep", label: "x" }), { ok: true, did: "would-deploy" });
+  assert.deepEqual(c.calls, []);
+  const ship = readFileSync(join(ROOT, "scripts", "ship.mjs"), "utf8");
+  assert.match(ship, /out\.did === "would-head"[\s\S]{0,400}head only and stop there/);
+});
+
+test("C1: after a push to the head ship stops with an error and the owner's next steps; it reads the released manifest from origin/main", () => {
+  const steps = headOnlySteps(manifestGains(OLD, NEW), ["--migrate", "--check"]).join("\n");
+  assert.match(steps, /auth\/spreadsheets/);
+  assert.match(steps, /live deployment was not changed and the site was not published/);
+  assert.match(steps, /checkPlanner/);
+  assert.match(steps, /approve/);
+  assert.match(steps, /npm run ship -- --migrate --scopes-approved$/m, "the command to run next keeps --migrate");
+  assert.equal(headOnlySteps(["x"], ["--scopes-approved"]).join("\n").split("--scopes-approved").length - 1, 1);
+  const ship = readFileSync(join(ROOT, "scripts", "ship.mjs"), "utf8");
+  assert.match(ship, /git\(\["show", "origin\/main:backend\/appsscript\.json"\]\)/);
+  assert.match(ship, /out\.did === "head"\) \{[\s\S]{0,200}stop\(headOnlySteps/, "a head-only push ends in stop(), which exits 1");
+  // The deployment is made only through shipBackend, which a head-only path never reaches.
+  assert.equal((ship.match(/create-deployment/g) || []).length, 0);
+});

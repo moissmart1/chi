@@ -204,3 +204,75 @@ export function judgePush({ remoteRef, localSha, receipt, commitStamp, live }) {
   }
   return null;
 }
+
+// --- the permission gate (review of the planner port, 2026-11-20, C1) --------
+// The web app runs as its deployer (Mo). A version whose manifest asks Google
+// for a permission he has not granted fails every request, for everyone, until
+// he approves it in the script editor. So a backend that asks for more than the
+// last release did goes to the script's head only; the live deployment moves
+// only once ship is told the new permission was approved (--scopes-approved).
+
+// What a manifest (backend/appsscript.json, as text) asks Google for: its
+// oauthScopes and its advanced services ("sheets v4"), each sorted. null when
+// the text is not a manifest.
+export function manifestAsks(src) {
+  let m;
+  try {
+    m = JSON.parse(src);
+  } catch {
+    return null;
+  }
+  if (!m || typeof m !== "object" || Array.isArray(m)) return null;
+  const scopes = Array.isArray(m.oauthScopes) ? m.oauthScopes.filter((s) => typeof s === "string") : [];
+  const deps = m.dependencies && Array.isArray(m.dependencies.enabledAdvancedServices) ? m.dependencies.enabledAdvancedServices : [];
+  const services = deps.filter((s) => s && typeof s.serviceId === "string").map((s) => s.serviceId + " " + (s.version || ""));
+  return { scopes: [...new Set(scopes)].sort(), services: [...new Set(services)].sort() };
+}
+
+// What the next manifest asks for that the released one did not, as words for
+// the owner ([] when nothing new). released: the manifest at origin/main, or
+// null when there is none (then everything it asks for is new). Throws when
+// the next manifest can't be read: ship must not guess.
+export function manifestGains(released, next) {
+  const now = manifestAsks(next);
+  if (!now) throw new Error("backend/appsscript.json can't be read as a manifest.");
+  const was = (released !== null && released !== undefined && manifestAsks(released)) || { scopes: [], services: [] };
+  return [
+    ...now.scopes.filter((s) => !was.scopes.includes(s)).map((s) => "the permission " + s),
+    ...now.services.filter((s) => !was.services.includes(s)).map((s) => "the advanced service " + s),
+  ];
+}
+
+// How the backend goes out: "deploy" (push, then a new version on the live
+// deployment) or "head" (push to the script's head only, then stop).
+export function backendPath(gains, approved) {
+  return gains.length && !approved ? "head" : "deploy";
+}
+
+// The owner's next steps after a push to the head only, in plain words.
+// flags: the other ship flags given this time (kept in the command to run next).
+export function headOnlySteps(gains, flags = []) {
+  const next = ["npm", "run", "ship", "--", ...flags.filter((f) => f !== "--scopes-approved" && f !== "--check"), "--scopes-approved"].join(" ");
+  return [
+    "This backend asks Google for something the live one does not: " + gains.join("; ") + ".",
+    "It was pushed to the script's head only. The live deployment was not changed and the site was not published: the app keeps working as before.",
+    "Next:",
+    "  1. Mo: open the Chicago script in the script editor (script.google.com), pick checkPlanner and press Run. Google asks for the new permission: approve it. If that run only asked, run it again.",
+    "  2. Then: " + next,
+  ];
+}
+
+// Step 2 of ship, the backend's own part, with clasp passed in (tests stub it):
+// clasp(args) -> { status, stdout, stderr }. -> { ok, did, why }: did is
+// "would-deploy" or "would-head" (--check: nothing run), "head" (pushed to the
+// head only) or "deployed" (pushed and a new version made on deployId).
+export function shipBackend({ path, check, clasp, deployId, label }) {
+  if (check) return { ok: true, did: path === "head" ? "would-head" : "would-deploy" };
+  const tail = (r) => ((r && (r.stderr || r.stdout)) || "").trim().split("\n").slice(-3).join("\n      ");
+  const push = clasp(["push", "-f"]);
+  if (push.status !== 0) return { ok: false, did: "none", why: "clasp push failed.", detail: tail(push) };
+  if (path === "head") return { ok: true, did: "head" };
+  const dep = clasp(["create-deployment", "-i", deployId, "-d", label]);
+  if (dep.status !== 0) return { ok: false, did: "pushed", why: "The new backend version was pushed but not deployed.", detail: tail(dep) };
+  return { ok: true, did: "deployed" };
+}
