@@ -29,6 +29,8 @@ import { createKeep, fetchMissing, toBase64, fetchesAll, pruneKeep } from "./tic
 import { mountStub } from "./views/stub.js";
 import { tixInfo, forgetThumbs } from "./views/stubs.js";
 import { mountTicketTab } from "./views/tickettab.js";
+import { mountBefore } from "./views/before.js";
+import { mountHand } from "./views/hand.js";
 import { mountBulkAdd } from "./views/bulkadd.js";
 
 // How often a visible phone asks the backend whether anything changed.
@@ -124,10 +126,11 @@ function withKey(storage, keyHere) {
 // The screens. showTab(tab) shows one, marks its button and makes the
 // others inert; with `remember` it keeps the choice (the stored tab) and the trip day
 // it was made on (the stored tabDay, by the real time, never the demo clock).
-// Tickets comes and goes with the trip (from its first day): it is never
-// what the app opens on, and is not remembered.
+// Tickets comes and goes with the trip (from its first day), and Before we go
+// with the planner's list: neither is ever what the app opens on, and neither
+// is remembered.
 function mountTabs(store, storage) {
-  const views = { days: document.getElementById("vDays"), tickets: document.getElementById("vTickets"), money: document.getElementById("vMoney") };
+  const views = { days: document.getElementById("vDays"), before: document.getElementById("vBefore"), tickets: document.getElementById("vTickets"), money: document.getElementById("vMoney") };
   const nav = document.getElementById("nav");
   const read = (k) => {
     try {
@@ -142,12 +145,12 @@ function mountTabs(store, storage) {
   let settled = false; // the opening screen has been decided with the trip known
   const shownHooks = []; // called with the tab's name each time a tab is shown
 
-  // A computer's window (WIDE) shows Money and Days side by side, Tickets
-  // over the Days pane while it is the tab (as the Japan app does). `tab`
+  // A computer's window (WIDE) shows Money and Days side by side, Tickets or
+  // Before we go over the Days pane while it is the tab (as the Japan app does). `tab`
   // stays what a phone would show, so a narrower window goes back to it.
   let wide = isWide();
   let cameFrom = null; // WIDE: the tab Tickets was opened from
-  const inPane = (t) => t === "tickets";
+  const inPane = (t) => t === "tickets" || t === "before";
   const shows = (name, t) => (wide ? name === "money" || name === (inPane(t) ? t : "days") : name === t);
 
   function showTab(t, remember = true) {
@@ -168,7 +171,7 @@ function mountTabs(store, storage) {
     // The hooks are for arriving: a tap on the tab already showing leaves it as it is.
     if (changed) for (const f of shownHooks) f(t);
     // In WIDE there is nothing to choose between, so what is remembered is left as it was.
-    // Tickets comes and goes with the trip: it is not what the app opens on.
+    // Tickets and Before come and go: neither is what the app opens on.
     if (!remember || wide || inPane(t)) return;
     const trip = store.state.trip;
     try {
@@ -208,8 +211,8 @@ function mountTabs(store, storage) {
     const b = ev.target.closest("button[data-tab]");
     if (!b) return;
     settled = true;
-    // WIDE: Tickets takes the Days pane and the Days key brings back the tab
-    // it was opened from (Money's pane never went away).
+    // WIDE: Tickets or Before takes the Days pane and the Days key brings back
+    // the tab it was opened from (Money's pane never went away).
     if (wide && inPane(b.dataset.tab) && !inPane(tab)) cameFrom = tab;
     else if (wide && b.dataset.tab === "days" && inPane(tab)) return showTab(cameFrom || "days");
     showTab(b.dataset.tab);
@@ -321,6 +324,7 @@ function start() {
     allDays.close(false);
     stopSheet.close(false);
     book.close(false);
+    hand.close(false);
   };
   // A tab switch closes them (they belong to Days).
   document.getElementById("nav").addEventListener("click", (ev) => {
@@ -365,7 +369,7 @@ function start() {
     demo: clock,
     where,
     getKey: () => storage.getItem(STORAGE_PREFIX + "key"),
-    screen: () => (tabs.tab() === "tickets" ? "Tickets" : isWide() ? "Days and Money" : tabs.tab() === "days" ? "Days" : "Money"),
+    screen: () => (tabs.tab() === "before" ? "Before we go" : tabs.tab() === "tickets" ? "Tickets" : isWide() ? "Days and Money" : tabs.tab() === "days" ? "Days" : "Money"),
     // Try another day: Days follows the demo clock from the picked day's
     // 07:00. Nothing is stored, so a reload ends it.
     onDemo: (date) => {
@@ -411,6 +415,7 @@ function start() {
     // then the ticket pictures: their open database would hold up its deletion.
     store.forgot();
     stub.close(false);
+    hand.close(false);
     await keep.wipe();
     let session = null;
     try {
@@ -536,6 +541,45 @@ function start() {
     },
     onState: layTickets,
   });
+  // Before we go (js/views/before.js): the planner's Book Now list as order
+  // slips on a rail. Its key is in the bar between Days and Tickets, from the
+  // moment a planner list has come in (before the trip, even with nothing
+  // left; from the trip's first day only while something is still open). A
+  // slip opens in your hand (js/views/hand.js), a sheet over the Days pane.
+  const beforeBtn = document.getElementById("beforeBtn");
+  const beforeN = document.getElementById("beforeN");
+  function layBefore({ show, open }) {
+    const hadFocus = !show && document.activeElement === beforeBtn;
+    beforeBtn.hidden = !show;
+    beforeN.hidden = !show || open < 1;
+    beforeN.textContent = open > 0 ? String(open) : "";
+    beforeBtn.setAttribute("aria-label", open > 0 ? "Before we go, " + open + " to book" : "Before we go");
+    if (!show && tabs.tab() === "before") tabs.showTab("days", false);
+    if (hadFocus) focusAway();
+  }
+  const hand = mountHand(phone, store, {
+    onHistory: () => {
+      register.close();
+      line.close(false);
+      you.close(false);
+      closeDaySheets();
+      history.open();
+    },
+    // The sheet closed by itself after a ring: the slip is on the spike.
+    onSettled: (id) => {
+      before.settled(id);
+      if (!document.getElementById("bfSpikeH").getClientRects().length) focusAway();
+    },
+  });
+  const before = mountBefore(document.getElementById("vBefore"), store, {
+    clock,
+    onState: layBefore,
+    onSlip: (id, button) => {
+      closeForDays();
+      hand.open(id, button);
+    },
+  });
+  tabs.onShown((t) => t === "before" && before.shown());
   mountMoney(document.getElementById("vMoney"), store, {
     onRing: ring,
     onLine: (id) => {
@@ -634,6 +678,7 @@ function start() {
 
   if (connected) store.boot({ candidate: taken.candidate }).then(() => {
     store.autoPayments();
+    before.wake();
     // History is fetched quietly, so it opens at once (it then keeps itself up to date).
     if (store.state.status === "ready") store.loadHistory();
   });
