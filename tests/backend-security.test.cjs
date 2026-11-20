@@ -102,9 +102,12 @@ test("CheckKey.js holds only the hash, as given in the brief", () => {
   assert.match(ctx.CHECK_KEY_HASH, /^[0-9a-f]{64}$/);
 });
 
-test("appsscript.json asks for no new permission (the two scopes as before)", () => {
+// The full spreadsheets scope (the planner sheet) was approved by Mo on
+// 2026-11-20 ("Link it like Japan"); nothing else.
+test("appsscript.json asks for no new permission (the three scopes the Japan app has, the planner's one approved 2026-11-20)", () => {
   const m = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "backend", "appsscript.json"), "utf8"));
-  assert.deepEqual(m.oauthScopes, ["https://www.googleapis.com/auth/spreadsheets.currentonly", "https://www.googleapis.com/auth/script.external_request"]);
+  assert.deepEqual(m.oauthScopes, ["https://www.googleapis.com/auth/spreadsheets.currentonly", "https://www.googleapis.com/auth/script.external_request", "https://www.googleapis.com/auth/spreadsheets"]);
+  assert.deepEqual(m.dependencies, { enabledAdvancedServices: [{ userSymbol: "Sheets", version: "v4", serviceId: "sheets" }] }, "the Sheets service and no other");
   for (const f of fs.readdirSync(path.join(__dirname, "..", "backend")).filter((f) => f.endsWith(".js"))) {
     const src = fs.readFileSync(path.join(__dirname, "..", "backend", f), "utf8");
     assert.equal(/getUi\(|newTrigger\(|ScriptApp\.newTrigger/.test(src), false, f + " has no dialog and no trigger");

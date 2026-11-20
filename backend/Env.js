@@ -94,6 +94,22 @@ function withOwnerRunLock_(fn) {
   }
 }
 
+// Runs fn under the planner lock, a different lock from withLock_'s (the
+// script lock): the document lock of the Sheet this script is bound to (the
+// user lock if it has none; the web app always runs as its deployer, so that
+// is one lock too). The app's lock covers only the app's own Sheet; planner
+// reads and writes happen under this one, never under both (R49). null when
+// it cannot be had within 5 seconds: the planner write stays pending.
+function withPlannerLock_(fn) {
+  var lock = LockService.getDocumentLock() || LockService.getUserLock();
+  if (!lock || !lock.tryLock(5000)) return null;
+  try {
+    return fn();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 // Where a place is, by Apps Script's own geocoder (the Maps service; no key,
 // no Cloud project). -> { lat, lng } for the first answer, or null. Used only
 // by locate (Actions.js), never with a phone's position.
@@ -140,4 +156,97 @@ function claudeToken_() {
 function ensureClaudeToken_() {
   if (claudeToken_()) return;
   setProp_("CLAUDE_TOKEN", Utilities.getUuid().replace(/-/g, ""));
+}
+
+// The planner sheet (R39, R45): Mo's own spreadsheet. The app reads it, and
+// writes only what a "Before we go" tick needs (one Status cell, one Change
+// Log row: Actions.js). Its id is kept only in PLANNER_ID: never logged,
+// never in a reply.
+function plannerId_() {
+  return getProp_("PLANNER_ID") || null;
+}
+
+// A tab's name as an A1 range prefix: 'Book Now'!
+function plannerA1_(tab) {
+  return "'" + String(tab).replace(/'/g, "''") + "'!";
+}
+
+// The most columns a planner read keeps (A to AZ).
+var PLANNER_MAX_COLS_ = 52;
+
+// A whole tab of the planner, from A1 to its last column (cut at
+// PLANNER_MAX_COLS_), through the Sheets advanced service: values
+// unformatted, dates as the sheet shows them. The range is the tab's name
+// alone, so a needed column after Z is read too and no column past the
+// sheet's grid is ever asked for. null when the sheet opens but has no such
+// tab; throws when it cannot read.
+function plannerRange_(tab) {
+  var id = plannerId_();
+  try {
+    var got = Sheets.Spreadsheets.Values.get(id, plannerA1_(tab).slice(0, -1), { valueRenderOption: "UNFORMATTED_VALUE", dateTimeRenderOption: "FORMATTED_STRING" });
+    return ((got && got.values) || []).map(function (row) { return Array.isArray(row) && row.length > PLANNER_MAX_COLS_ ? row.slice(0, PLANNER_MAX_COLS_) : row; });
+  } catch (e) {
+    var info = Sheets.Spreadsheets.get(id, { fields: "sheets.properties.title" });
+    var titles = ((info && info.sheets) || []).map(function (sh) { return sh && sh.properties ? sh.properties.title : ""; });
+    if (titles.indexOf(tab) === -1) return null;
+    throw e;
+  }
+}
+
+// The planner's Payments tab, row 1 its column names.
+function plannerRows_() {
+  return plannerRange_("Payments");
+}
+
+// Another planner tab (Book Now, Change Log) from A1, so row i of what comes
+// back is the sheet's row i + 1.
+function plannerTab_(tab) {
+  return plannerRange_(tab);
+}
+
+// Writes one cell ("E4") of a planner tab, as given (RAW: never a formula).
+// Throws when it cannot (no permission yet, tab gone).
+function plannerSetCell_(tab, cell, value) {
+  Sheets.Spreadsheets.Values.update({ values: [[value]] }, plannerId_(), plannerA1_(tab) + cell, { valueInputOption: "RAW" });
+}
+
+// Whether the planner computes one cell (row is the sheet's row number, col a
+// 0-based column), so the app must never write it: a formula entered in the
+// cell, or a value with nothing entered (spilled there by an array formula
+// placed elsewhere). An empty cell is not computed. -> true (computed) |
+// false (plain) | null (unknown: the read failed, or came back in a shape
+// not expected; write nothing and try again later).
+function plannerCellComputed_(tab, row, col) {
+  try {
+    var got = Sheets.Spreadsheets.get(plannerId_(), { ranges: [plannerA1_(tab) + colLetter(col) + row], fields: "sheets.data.rowData.values(userEnteredValue,effectiveValue)" });
+    var sheet = got && Array.isArray(got.sheets) ? got.sheets[0] : null;
+    var data = sheet && Array.isArray(sheet.data) ? sheet.data[0] : null;
+    if (!data || typeof data !== "object") return null;
+    if (data.rowData === undefined) return false;
+    if (!Array.isArray(data.rowData)) return null;
+    var first = data.rowData[0];
+    if (first === undefined || (first && first.values === undefined)) return false;
+    if (!first || !Array.isArray(first.values)) return null;
+    var cell = first.values[0];
+    if (cell === undefined) return false;
+    if (!cell || typeof cell !== "object") return null;
+    if (cell.userEnteredValue) return cell.userEnteredValue.formulaValue !== undefined;
+    return cell.effectiveValue !== undefined;
+  } catch (e) {
+    return null;
+  }
+}
+
+// Appends one row (RAW) under the table whose header is on row headerRow,
+// inserting a row for it. Throws when it cannot.
+// firstCol (0-based) is the table's first column: Sheets writes an append from
+// there, whatever the range starts at, so values must start at that column.
+function plannerAppendRow_(tab, headerRow, firstCol, values) {
+  var range = plannerA1_(tab) + colLetter(firstCol) + headerRow + ":" + colLetter(firstCol + values.length - 1) + headerRow;
+  Sheets.Spreadsheets.Values.append({ values: [values] }, plannerId_(), range, { valueInputOption: "RAW", insertDataOption: "INSERT_ROWS" });
+}
+
+// Now in Toronto, as the planner's Change Log writes it: "YYYY-MM-DD HH:MM ET".
+function torontoNow_() {
+  return Utilities.formatDate(new Date(), "America/Toronto", "yyyy-MM-dd HH:mm") + " ET";
 }

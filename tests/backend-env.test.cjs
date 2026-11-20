@@ -106,7 +106,7 @@ test("setup() checks the rate after building the tabs", () => {
   assert.match(body, /requireLiveRate_\(\);\s*\}\s*$/);
 });
 
-// ---------- the planner sheet (Task 12, R39) ----------
+// ---------- the planner sheet (ported from the Japan app, R39) ----------
 // Made-up id and rows. Setup.js and Env.js over stand-ins for Sheets and Logger.
 const PLANNER_ID = "fakePlannerSheet_0123456789abcdefXYZ";
 const PHEAD = ["payment_id", "date_paid", "payer", "description", "category", "vendor", "booking_ref", "amount", "currency", "amount_cad", "cad_is_exact", "split_between", "split_type", "status", "include_in_split", "source", "added_by", "notes"];
@@ -138,15 +138,135 @@ function plannerWorld({ props = {}, get, tabs = ["Payments"], noAccess = false, 
   return { ctx, logged, asked, props };
 }
 
-// Book Now and Change Log as the planner holds them (made up), for checkPlanner.
-const BOOK = [["Before we go"], ["#", "Item", "Book by", "Status"], [1, "Secret Tour", "Dec 21", ""], [2, "Hidden Inn", "", "Booked"], ["* footnote"]];
-const CLOG = [["#", "Tab", "Old value", "New value"], [1, "Book Now", "Private old", "Private new"]];
+test("plannerRows_ asks the Sheets service for the whole Payments tab, unformatted, dates as shown; the id is PLANNER_ID, set by the owner", () => {
+  assert.equal(plannerWorld({ props: {}, get: () => ({ values: [PHEAD] }) }).ctx.plannerId_(), null);
+  const w = plannerWorld({ props: { PLANNER_ID }, get: () => ({ values: [PHEAD] }) });
+  assert.equal(typeof w.ctx.setPlannerId_, "undefined", "nothing sets it from outside (linkPlanner is gone)");
+  assert.deepEqual(JSON.parse(JSON.stringify(w.ctx.plannerRows_())), [PHEAD]);
+  // Wave A item 8: the whole tab, so a column after R is read (was: Payments!A1:R).
+  assert.deepEqual(JSON.parse(JSON.stringify(w.asked)), [[PLANNER_ID, "'Payments'", { valueRenderOption: "UNFORMATTED_VALUE", dateTimeRenderOption: "FORMATTED_STRING" }]]);
+  const empty = plannerWorld({ props: { PLANNER_ID }, get: () => ({}) });
+  assert.deepEqual(JSON.parse(JSON.stringify(empty.ctx.plannerRows_())), []);
+  // R40 fix 6: no Payments tab (the range can't be read, but the sheet can): null.
+  const noTab = plannerWorld({ props: { PLANNER_ID }, tabs: ["Budget"], get: () => { throw new Error("Unable to parse range: Payments!A1:R"); } });
+  assert.equal(noTab.ctx.plannerRows_(), null);
+  assert.deepEqual(JSON.parse(JSON.stringify(noTab.asked[1])), [PLANNER_ID, { fields: "sheets.properties.title" }]);
+  // Any other failure still throws.
+  const tabThere = plannerWorld({ props: { PLANNER_ID }, get: () => { throw new Error("quota"); } });
+  assert.throws(() => tabThere.ctx.plannerRows_(), /quota/);
+  const shut = plannerWorld({ props: { PLANNER_ID }, noAccess: true, get: () => { throw new Error("denied"); } });
+  assert.throws(() => shut.ctx.plannerRows_());
+});
+
+// Book Now and Change Log as Chicago's planner lays them out (values made
+// up): a title, a description, the header on row 3 from column B (Days left
+// a formula's number, Status in column F); the Change Log the same way.
+const BHEAD = ["", "#", "Item", "Book by", "Days left", "Status", "Notes", "Booking link", "PASS CHECK before buying"];
+const BOOK = [["", "Made-up title"], ["", "Made-up description"], BHEAD, ["", 1, "Secret Tour", "2026-12-05", 16, "To book", "", "", "Made-up check"], ["", 2, "Hidden Inn", "", "", "Booked", "", "", ""], [], ["", "* footnote"]];
+const CHEAD = ["", "#", "Date / time", "Agent / session", "Tab", "Cell(s)", "Item", "Old value", "New value", "Why", "Proof / source", "Verified?"];
+const CLOG = [["", "Made-up log title"], ["", "Made-up rules"], CHEAD, ["", 1, "2026-11-01 09:00 ET", "Made-up agent", "Book Now", "F4", "Secret Tour", "Private old", "Private new", "", "", ""]];
+// The tab a range names ('Book Now'!A1:Z, Payments!A1:R or the whole tab, 'Book Now').
+const tabOf = (range) => range.replace(/!.*$/, "").replace(/^'(.*)'$/, "$1").replace(/''/g, "'");
 const byRange = (payments, book = BOOK, log = CLOG) => (id, range) => {
-  if (range.startsWith("Payments!")) return { values: payments };
-  if (range.startsWith("'Book Now'!")) { if (book instanceof Error) throw book; return { values: book }; }
-  if (range.startsWith("'Change Log'!")) { if (log instanceof Error) throw log; return { values: log }; }
+  if (tabOf(range) === "Payments") return { values: payments };
+  if (tabOf(range) === "Book Now") { if (book instanceof Error) throw book; return { values: book }; }
+  if (tabOf(range) === "Change Log") { if (log instanceof Error) throw log; return { values: log }; }
   throw new Error("Unable to parse range: " + range);
 };
+
+test("checkPlanner logs the row count or the problem, never a value or the id", () => {
+  const row = PHEAD.map((h) => ({ payment_id: "X7", payer: "Mo", description: "Secret Inn", amount: 247.5, currency: "USD", split_between: "Mo", split_type: "equal", include_in_split: "yes" })[h] || "");
+  const tabs = ["Payments", "Book Now", "Change Log"];
+  const good = plannerWorld({ props: { PLANNER_ID }, tabs, get: byRange([PHEAD, row, [], row.map((c, i) => (i === 0 ? "X8" : c))]) });
+  good.ctx.checkPlanner();
+  assert.deepEqual(good.logged, ["Planner: 2 payment rows, columns ok", "Book Now: 2 items, columns ok", "Book Now: 0 Status cells are formulas (the app leaves those alone).", "Change Log: found"]);
+
+  const missing = plannerWorld({ props: { PLANNER_ID }, tabs, get: byRange([PHEAD.filter((h) => h !== "amount_cad"), row], [["#", "Item", "Book by"]], [["#", "Tab"]]) });
+  missing.ctx.checkPlanner();
+  assert.deepEqual(missing.logged, ["Planner: The planner’s Payments tab is missing the column amount_cad.", "Book Now: The planner’s Book Now tab has no row with the columns #, Item, Book by and Status.", "Change Log: not found"]);
+
+  const fails = plannerWorld({ props: { PLANNER_ID }, tabs, get: () => { throw new Error("Requested entity was not found: " + PLANNER_ID); } });
+  fails.ctx.checkPlanner();
+  assert.deepEqual(fails.logged, ["Planner: couldn’t read its Payments tab. Check the id and that this account can open the sheet.", "Book Now: couldn’t read it.", "Change Log: couldn’t read it."]);
+
+  const noTab = plannerWorld({ props: { PLANNER_ID }, tabs: [], get: () => { throw new Error("Unable to parse range"); } });
+  noTab.ctx.checkPlanner();
+  assert.deepEqual(noTab.logged, ["Planner: The planner has no Payments tab to read.", "Book Now: The planner has no Book Now tab to read.", "Change Log: not found"]);
+
+  const none = plannerWorld({ props: {}, get: () => { throw new Error("not called"); } });
+  none.ctx.checkPlanner();
+  assert.deepEqual(none.logged, ["Planner: not linked yet. Set the Script Property PLANNER_ID to the planner’s spreadsheet id first."]);
+
+  const all = [good, missing, fails, noTab, none].flatMap((w) => w.logged).join("\n");
+  assert.equal(all.includes(PLANNER_ID), false);
+  assert.equal(/Secret Inn|247\.5|X7|Secret Tour|Hidden Inn|Private|Made-up/.test(all), false);
+});
+
+test("checkPlanner asks for every permission first, the full Sheets one included (R46)", () => {
+  const s = src("Setup.js");
+  const body = s.slice(s.indexOf("function checkPlanner()"));
+  assert.ok(body.indexOf("ScriptApp.requireAllScopes") < body.indexOf("plannerId_()"));
+  const manifest = JSON.parse(src("appsscript.json"));
+  assert.deepEqual(manifest.oauthScopes, [
+    "https://www.googleapis.com/auth/spreadsheets.currentonly",
+    "https://www.googleapis.com/auth/script.external_request",
+    "https://www.googleapis.com/auth/spreadsheets",
+  ]);
+});
+
+test("plannerTab_ reads a whole tab, from A1, by its quoted name; null when the sheet has no such tab", () => {
+  const w = plannerWorld({ props: { PLANNER_ID }, tabs: ["Book Now"], get: () => ({ values: BOOK }) });
+  assert.deepEqual(JSON.parse(JSON.stringify(w.ctx.plannerTab_("Book Now"))), BOOK);
+  // Wave A item 8: the whole tab, so a column after Z is read (was: 'Book Now'!A1:Z).
+  assert.deepEqual(JSON.parse(JSON.stringify(w.asked)), [[PLANNER_ID, "'Book Now'", { valueRenderOption: "UNFORMATTED_VALUE", dateTimeRenderOption: "FORMATTED_STRING" }]]);
+  const odd = plannerWorld({ props: { PLANNER_ID }, get: () => ({}) });
+  assert.deepEqual(JSON.parse(JSON.stringify(odd.ctx.plannerTab_("Mo's tab"))), []);
+  assert.equal(odd.asked[0][1], "'Mo''s tab'");
+  const none = plannerWorld({ props: { PLANNER_ID }, tabs: ["Payments"], get: () => { throw new Error("Unable to parse range"); } });
+  assert.equal(none.ctx.plannerTab_("Change Log"), null);
+  const shut = plannerWorld({ props: { PLANNER_ID }, tabs: ["Change Log"], get: () => { throw new Error("denied"); } });
+  assert.throws(() => shut.ctx.plannerTab_("Change Log"), /denied/);
+});
+
+test("the two planner writers: one cell, RAW; one row appended under the table, RAW, rows inserted; Toronto time", () => {
+  const w = plannerWorld({ props: { PLANNER_ID }, get: () => ({}) });
+  w.ctx.plannerSetCell_("Book Now", "E4", "Booked");
+  w.ctx.plannerAppendRow_("Change Log", 2, 1, [8, "x", "", "y"]);
+  assert.equal(w.ctx.torontoNow_(), "2026-12-06 10:00 ET");
+  assert.deepEqual(JSON.parse(JSON.stringify(w.asked)), [
+    ["update", { values: [["Booked"]] }, PLANNER_ID, "'Book Now'!E4", { valueInputOption: "RAW" }],
+    ["append", { values: [[8, "x", "", "y"]] }, PLANNER_ID, "'Change Log'!B2:E2", { valueInputOption: "RAW", insertDataOption: "INSERT_ROWS" }],
+    ["formatDate", "America/Toronto", "yyyy-MM-dd HH:mm"],
+  ]);
+  const refused = plannerWorld({ props: { PLANNER_ID }, get: () => ({}), update: () => { throw new Error("no permission"); } });
+  assert.throws(() => refused.ctx.plannerSetCell_("Book Now", "E4", "Booked"), /no permission/);
+});
+
+test("withPlannerLock_ takes the document lock, never the script lock withLock_ uses; null when it can't be had (R49)", () => {
+  const seen = [];
+  const lock = (name, ok) => ({ tryLock: (ms) => { seen.push(name + ".tryLock:" + ms); return ok; }, releaseLock: () => seen.push(name + ".release") });
+  const mk = (docOk, doc = true) => vm.createContext({
+    LockService: {
+      getScriptLock: () => { seen.push("script"); return lock("script", true); },
+      getDocumentLock: () => (doc ? lock("doc", docOk) : null),
+      getUserLock: () => lock("user", true),
+    },
+  });
+  const w = mk(true);
+  vm.runInContext(src("Env.js"), w, { filename: "Env.js" });
+  assert.equal(w.withPlannerLock_(() => 5), 5);
+  assert.deepEqual(seen, ["doc.tryLock:5000", "doc.release"]);
+  seen.length = 0;
+  const busy = mk(false);
+  vm.runInContext(src("Env.js"), busy, { filename: "Env.js" });
+  assert.equal(busy.withPlannerLock_(() => { throw new Error("not run"); }), null);
+  assert.deepEqual(seen, ["doc.tryLock:5000"]);
+  seen.length = 0;
+  const unbound = mk(true, false);
+  vm.runInContext(src("Env.js"), unbound, { filename: "Env.js" });
+  assert.equal(unbound.withPlannerLock_(() => 1), 1);
+  assert.deepEqual(seen, ["user.tryLock:5000", "user.release"]);
+});
 
 // What Spreadsheets.get answers for one cell, by what the cell holds.
 const oneCell = (v) => ({ sheets: [{ data: [v === undefined ? {} : { rowData: [{ values: [v] }] }] }] });
@@ -159,31 +279,73 @@ const CELLS = {
   E9: { sheets: [{ data: [{ rowData: [{}] }] }] },
 };
 
-test("no planner: the script asks only for its own Sheet and outside fetches, with no advanced Sheets service, and nothing uses either", () => {
-  const manifest = JSON.parse(src("appsscript.json"));
-  assert.deepEqual(manifest.oauthScopes, [
-    "https://www.googleapis.com/auth/spreadsheets.currentonly",
-    "https://www.googleapis.com/auth/script.external_request",
-  ]);
-  assert.equal("dependencies" in manifest, false, "no advanced services");
-  for (const f of fs.readdirSync(BACKEND).filter((n) => n.endsWith(".js"))) {
-    const code = src(f);
-    assert.equal(/\bSheets\.Spreadsheets\b/.test(code), false, f + " uses the advanced Sheets service");
-    assert.equal(/openById|SpreadsheetApp\.open\(/.test(code), false, f + " opens another spreadsheet");
-    assert.equal(/\bplanner(Id|Rows|Tab|SetCell|AppendRow)_\b|checkPlanner|linkPlanner|syncPayments|syncTodos|tickTodo|claimTodo/.test(code), false, f + " still has planner code");
+test("plannerCellComputed_: a formula in the cell or a value spilled into it is computed; a typed value or an empty cell is not", () => {
+  const w = plannerWorld({ props: { PLANNER_ID }, get: () => ({}), cells: (id, opt) => CELLS[opt.ranges[0].replace("'Book Now'!", "")] });
+  const at = (row) => w.ctx.plannerCellComputed_("Book Now", row, 4);
+  assert.deepEqual([4, 5, 6, 7, 8, 9].map(at), [true, true, false, false, false, false]);
+  assert.deepEqual(JSON.parse(JSON.stringify(w.asked[0])), [PLANNER_ID, { ranges: ["'Book Now'!E4"], fields: "sheets.data.rowData.values(userEnteredValue,effectiveValue)" }]);
+});
+
+test("plannerCellComputed_: a read that fails or comes back in an unexpected shape is unknown (null), neither computed nor plain", () => {
+  const fails = plannerWorld({ props: { PLANNER_ID }, get: () => ({}), cells: () => { throw new Error("quota"); } });
+  assert.equal(fails.ctx.plannerCellComputed_("Book Now", 4, 4), null);
+  for (const odd of [null, {}, { sheets: [] }, { sheets: [{}] }, { sheets: [{ data: [] }] }, { sheets: [{ data: [{ rowData: "x" }] }] }, { sheets: [{ data: [{ rowData: [{ values: ["x"] }] }] }] }]) {
+    const w = plannerWorld({ props: { PLANNER_ID }, get: () => ({}), cells: () => odd });
+    assert.equal(w.ctx.plannerCellComputed_("Book Now", 4, 4), null, JSON.stringify(odd));
   }
 });
 
-test("no planner: the old planner actions are unknown to the backend, load carries no planner fields, and the Sheet has no Todos tab or planner_id", async () => {
-  const { createFakeBackend } = require("./fake-backend.cjs");
-  const fake = createFakeBackend();
-  for (const action of ["linkPlanner", "syncPayments", "syncTodos", "tickTodo", "claimTodo"]) {
-    const r = await fake({ key: "test-key", actor: "Mo", action, args: { id: "1", on: true } });
-    assert.deepEqual([r.ok, r.error], [false, "bad_input"], action);
-  }
-  const d = (await fake({ key: "test-key", actor: "Mo", action: "load", args: {} })).data;
-  for (const k of ["plannerLinked", "todos", "todosPulledAt", "paymentsPulledAt", "paymentProblems"]) assert.equal(k in d, false, k);
-  const P = require("../backend/Pure.js");
-  assert.equal("Todos" in P.TABS, false);
-  assert.equal(P.TABS.Expenses.includes("planner_id"), false);
+test("checkPlanner counts the Status cells that are formulas or spilled, with no value in the line", () => {
+  const tabs = ["Payments", "Book Now", "Change Log"];
+  const mk = (held) => plannerWorld({ props: { PLANNER_ID }, tabs, get: byRange([PHEAD]), cells: (id, opt) => held[opt.ranges[0].replace("'Book Now'!", "")] || oneCell() });
+  const none = mk({});
+  none.ctx.checkPlanner();
+  assert.ok(none.logged.includes("Book Now: 0 Status cells are formulas (the app leaves those alone)."), none.logged.join("|"));
+  // Status is column F; the two items are rows 4 and 5.
+  const two = mk({ F4: oneCell({ userEnteredValue: { formulaValue: "=1+1" }, effectiveValue: { numberValue: 2 } }), F5: oneCell({ effectiveValue: { stringValue: "Secret spill" } }) });
+  two.ctx.checkPlanner();
+  assert.ok(two.logged.includes("Book Now: 2 Status cells are formulas (the app leaves those alone)."), two.logged.join("|"));
+  assert.equal(two.logged.join("\n").includes("=1+1"), false);
+  assert.equal(two.logged.join("\n").includes("Secret spill"), false);
+  const unknown = mk({ F5: { sheets: [] } });
+  unknown.ctx.checkPlanner();
+  assert.ok(unknown.logged.includes("Book Now: couldn’t check its Status cells for formulas."), unknown.logged.join("|"));
+  assert.equal(unknown.logged.some((l) => l.includes("Status cells are formulas (")), false);
+});
+
+// A stand-in for Values.get that answers as Sheets does: a range ending in a
+// column (A1:Z) gets the cells up to that column, a whole tab gets them all.
+const gridGet = (rows) => (id, range) => {
+  const m = /!A1:([A-Z]+)$/.exec(range);
+  if (!m) return { values: rows };
+  const last = m[1].split("").reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0);
+  return { values: rows.map((r) => r.slice(0, last)) };
+};
+
+test("wave A 8: a Book Now column placed after Z is read, and every planner read stops at 52 columns", () => {
+  const pad = (n) => Array.from({ length: n }, (_, i) => "Made-up col " + (i + 1));
+  // # Item Book by in A to C, then 24 other columns, then Status in column AB.
+  const head = ["#", "Item", "Book by", ...pad(24), "Status"];
+  const book = [head, [1, "Made-up item", "", ...pad(24).map(() => ""), "Not booked"]];
+  const w = plannerWorld({ props: { PLANNER_ID }, tabs: ["Book Now"], get: gridGet(book) });
+  const read = w.ctx.todosFromRows(w.ctx.plannerTab_("Book Now"), 2026);
+  assert.equal(read.missing, null);
+  assert.deepEqual([read.items[0].status, read.items[0].statusCol], ["Not booked", 27]);
+  // Payments: a needed column after R.
+  const late = [...PHEAD.filter((h) => h !== "notes"), "Made-up extra", "notes"];
+  const pw = plannerWorld({ props: { PLANNER_ID }, get: gridGet([late]) });
+  assert.equal(w.ctx.paymentsFromRows(pw.ctx.plannerRows_()).missing, null);
+  // 60 columns come back as 52.
+  const wide = plannerWorld({ props: { PLANNER_ID }, tabs: ["Book Now"], get: gridGet([pad(60), pad(55)]) });
+  assert.deepEqual(JSON.parse(JSON.stringify(wide.ctx.plannerTab_("Book Now"))).map((r) => r.length), [52, 52]);
+  const widePay = plannerWorld({ props: { PLANNER_ID }, get: gridGet([pad(60)]) });
+  assert.equal(widePay.ctx.plannerRows_()[0].length, 52);
+});
+
+test("fix C2: checkPlanner counts payment rows within the header's columns only", () => {
+  const row = PHEAD.map((h) => ({ payment_id: "X7", payer: "Mo", description: "Made-up inn", amount: 100, currency: "USD", split_between: "Mo", split_type: "equal", include_in_split: "yes" })[h] || "");
+  const boxes = [PHEAD.concat([""]), row.concat([true]), ...Array.from({ length: 5 }, () => PHEAD.map(() => "").concat([false]))];
+  const w = plannerWorld({ props: { PLANNER_ID }, tabs: ["Payments", "Book Now", "Change Log"], get: byRange(boxes) });
+  w.ctx.checkPlanner();
+  assert.equal(w.logged[0], "Planner: 1 payment rows, columns ok");
 });

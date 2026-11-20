@@ -37,8 +37,8 @@ test("freshText and historySentence", () => {
   assert.equal(freshText(Date.parse("2026-12-28T13:20:00")), "Up to date 13:20");
   assert.equal(historySentence({ who: "Izzah", summary: "rang up Tempura US$1.01", via: "app" }), "Izzah rang up Tempura US$1.01");
   assert.equal(historySentence({ who: "Izzah", summary: "renamed A to B", via: "claude" }), "Izzah renamed A to B (through Claude)");
-  // No planner any more: an old "planner" Log row reads as a plain change.
-  assert.equal(historySentence({ who: "Mo", summary: "rang up Rail pass $221.52", via: "planner" }), "Mo rang up Rail pass $221.52");
+  // A line a planner pull brought in says so.
+  assert.equal(historySentence({ who: "Mo", summary: "rang up Rail pass $221.52", via: "planner" }), "Mo rang up Rail pass $221.52 (from the planner)");
 });
 
 test("localDay is the phone's own day, and empty for no time", () => {
