@@ -38,7 +38,7 @@ import { nowIn } from "../plan.js";
 import { fillSeal } from "../picture.js";
 import { calm } from "../fx.js";
 import { clock as hhmm, localDay, dayHead } from "../format.js";
-import { homeToday, dueLine, dueText, openTodos, doneTodos, isDone, plannerPending, isStale, showBeforeTab, todoProblemHead } from "../todos.js";
+import { homeToday, dueLine, dueText, openTodos, doneTodos, plannerPending, isStale, showBeforeTab, todoProblemHead } from "../todos.js";
 import { slipNo, slipTone, statusWord, slipTilt, printText, railWords, emptyWords, spikeShown, daysToGo } from "../before.js";
 import { tapOnRelease } from "./tap.js";
 import { TRIP_TZ } from "../trip.js";

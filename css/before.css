@@ -20,6 +20,7 @@
 .bf-rail{position:relative;z-index:3;height:20px;margin:16px calc(var(--gr) - 11px) 0 calc(var(--gl) - 11px);border-radius:3px;background:var(--steel);box-shadow:0 0 0 1px rgba(0,0,0,.5),0 6px 7px -2px rgba(0,0,0,.45)}
 .bf-rail::before{content:"";position:absolute;left:14px;right:14px;bottom:4px;height:2.5px;border-radius:1px;background:rgba(0,0,0,.5);box-shadow:0 1px 0 rgba(255,255,255,.6)}
 .bf-rail::after{content:"";position:absolute;inset:0;background:radial-gradient(circle,#5d655f 0 2px,#fff 2.2px 2.8px,transparent 3px) 5px 4px/calc(100% - 10px) 7px repeat-x}
+.bf-rail{pointer-events:none}
 .bf-rail+.bf-row{margin-top:-7px}
 .bf-row{position:relative;z-index:2;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;padding:0 calc(var(--gr) + 1px) 0 calc(var(--gl) + 1px);align-items:start}
 .bf-hang{filter:drop-shadow(0 1px 0 rgba(0,0,0,.25)) drop-shadow(0 9px 7px rgba(0,0,0,.3));transform:rotate(var(--r,0deg));transform-origin:50% 0}
@@ -48,7 +49,9 @@ button.bf-t{display:block;width:100%;border:0;text-align:left;font:inherit;curso
 .bf-sp-h{margin:0 -10px 8px;font-weight:900;font-size:14px}
 .bf-sp-h:focus-visible{outline-offset:3px}
 .bf-rod{position:absolute;left:50%;top:26px;bottom:14px;width:5px;margin-left:-2.5px;z-index:3;background:linear-gradient(90deg,#8B948E,#fff 45%,#8B948E);box-shadow:1px 0 2px rgba(0,0,0,.4);
-  clip-path:polygon(50% 0,100% 16px,100% 100%,0 100%,0 16px)}
+  clip-path:polygon(50% 0,100% 16px,100% 100%,0 100%,0 16px);pointer-events:none}
+/* With the long list's key under the base, the rod stops at the base. */
+.bf-sp:has(.bf-more:not([hidden])) .bf-rod{bottom:64px}
 .bf-base{position:relative;z-index:1;height:16px;margin:-4px auto 0;width:120px;border-radius:50%;background:radial-gradient(ellipse at 50% 30%,#fff,#aab1ac 55%,#6f7772);box-shadow:0 5px 6px -2px rgba(0,0,0,.5)}
 .bf-slip{position:relative;z-index:2;display:grid;grid-template-columns:minmax(0,1fr) 30px minmax(0,1fr);align-items:center;width:100%;min-height:46px;margin-top:-5px;padding:6px 9px;border:0;text-align:left;font:inherit;cursor:pointer;
   background:var(--tk-grain),var(--dupe-w);color:var(--dupe-ink);box-shadow:0 1px 1px rgba(0,0,0,.3),0 5px 5px -3px rgba(0,0,0,.4);transform:rotate(var(--r,0deg))}
@@ -60,6 +63,7 @@ button.bf-t{display:block;width:100%;border:0;text-align:left;font:inherit;curso
 .bf-slip s{font-weight:900;font-size:14px;line-height:1.2;text-decoration-thickness:1.5px;overflow-wrap:anywhere}
 .bf-slip .tclock{grid-column:3;justify-self:end;font-size:15px;transform:rotate(-3deg);padding:0 4px 1px}
 .bf-slip small{display:block;grid-column:1 / 4;margin-top:4px;font-size:12px;font-weight:600}
+@media (max-width:350px){ .bf-slip .tclock{grid-column:1 / 4;margin-top:4px} }
 .bf-more{display:block;margin:6px auto 0;border:0;background:none;min-height:44px;padding:0 12px;font-weight:700;font-size:13px;text-decoration:underline dotted;text-underline-offset:3px;color:var(--text)}
 @keyframes bf-drop{0%{transform:translateY(-10px) rotate(var(--r,0deg))}70%{transform:translateY(3px) rotate(var(--r,0deg))}100%{transform:rotate(var(--r,0deg))}}
 .bf-slip.is-new{animation:bf-drop .22s cubic-bezier(.3,.7,.3,1) both}
@@ -83,6 +87,7 @@ button.bf-t{display:block;width:100%;border:0;text-align:left;font:inherit;curso
 .bf-pass{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 132px;align-items:end;gap:6px;margin:6px 4px 0;padding:0 0 0 2px}
 .bf-pass p{margin:0;font-size:13px;font-weight:700;line-height:1.35;padding-bottom:14px}
 .bf-pass p b{display:block;font-weight:900;font-size:17px}
+.bf-defs{position:absolute;width:0;height:0}
 .bf-bell{position:relative;width:132px;height:104px;border:0;background:none;padding:0}
 .bf-bell svg{width:132px;height:104px;filter:drop-shadow(0 8px 6px rgba(0,0,0,.35))}
 .bf-bell:disabled{cursor:default}

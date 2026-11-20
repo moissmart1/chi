@@ -26,7 +26,7 @@ import { fillSeal } from "../picture.js";
 import { calm, wetInk } from "../fx.js";
 import { bell } from "../sound.js";
 import { clock as hhmm, localDay } from "../format.js";
-import { homeToday, dueLine, dueText, openTodos, doneTodos, isDone, isBooked } from "../todos.js";
+import { homeToday, dueLine, openTodos, doneTodos, isDone, isBooked } from "../todos.js";
 import { slipNo, slipTone, statusWord, printText } from "../before.js";
 import { tapOnRelease } from "./tap.js";
 import { el, slipSmall, onWords, shortDay } from "./before.js";
@@ -35,10 +35,10 @@ import { el, slipSmall, onWords, shortDay } from "./before.js";
 export const RING_MS = 1600;
 
 // The bell's picture, drawn once from this constant (no outside text in it).
-const BELL = `<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+const BELL = `<svg class="bf-defs" width="0" height="0" aria-hidden="true" focusable="false"><defs>
 <radialGradient id="bfChrome" cx=".36" cy=".2" r=".95"><stop offset="0" stop-color="#fff"/><stop offset=".28" stop-color="#DDE2DE"/><stop offset=".6" stop-color="#8E9791"/><stop offset=".82" stop-color="#C7CDC8"/><stop offset="1" stop-color="#5E6661"/></radialGradient>
 <linearGradient id="bfKnob" x1="0" x2="1"><stop offset="0" stop-color="#7c857f"/><stop offset=".45" stop-color="#fff"/><stop offset="1" stop-color="#6c746f"/></linearGradient>
-<symbol id="bfBell" viewBox="0 0 132 104">
+<symbol id="bfBellArt" viewBox="0 0 132 104">
 <ellipse cx="66" cy="88" rx="60" ry="13" fill="#141414"/>
 <ellipse cx="66" cy="84" rx="60" ry="13" fill="#2b2b2b"/>
 <path d="M14 82 C14 44 38 26 66 26 C94 26 118 44 118 82 C104 90 28 90 14 82Z" fill="url(#bfChrome)" stroke="#4c544f" stroke-width="1"/>
@@ -104,7 +104,7 @@ export function mountHand(root, store, { now = () => Date.now(), onHistory = () 
     b.id = "bfBell";
     b.disabled = rung;
     b.setAttribute("aria-label", "Booked: " + t.item);
-    b.innerHTML = '<svg viewBox="0 0 132 104" aria-hidden="true" focusable="false"><use href="#bfBell"/></svg>';
+    b.innerHTML = '<svg viewBox="0 0 132 104" aria-hidden="true" focusable="false"><use href="#bfBellArt"/></svg>';
     return b;
   }
 
