@@ -213,8 +213,9 @@ export function judgePush({ remoteRef, localSha, receipt, commitStamp, live }) {
 // only once ship is told the new permission was approved (--scopes-approved).
 
 // What a manifest (backend/appsscript.json, as text) asks Google for: its
-// oauthScopes and its advanced services ("sheets v4"), each sorted. null when
-// the text is not a manifest.
+// oauthScopes and its advanced services ("sheets v4"), each sorted, and whether
+// it lists them at all (hasScopes, hasServices). null when the text is not a
+// manifest.
 export function manifestAsks(src) {
   let m;
   try {
@@ -226,7 +227,8 @@ export function manifestAsks(src) {
   const scopes = Array.isArray(m.oauthScopes) ? m.oauthScopes.filter((s) => typeof s === "string") : [];
   const deps = m.dependencies && Array.isArray(m.dependencies.enabledAdvancedServices) ? m.dependencies.enabledAdvancedServices : [];
   const services = deps.filter((s) => s && typeof s.serviceId === "string").map((s) => s.serviceId + " " + (s.version || ""));
-  return { scopes: [...new Set(scopes)].sort(), services: [...new Set(services)].sort() };
+  const hasServices = !!(m.dependencies && Array.isArray(m.dependencies.enabledAdvancedServices));
+  return { scopes: [...new Set(scopes)].sort(), services: [...new Set(services)].sort(), hasScopes: Array.isArray(m.oauthScopes), hasServices };
 }
 
 // What the next manifest asks for that the released one did not, as words for
@@ -236,8 +238,15 @@ export function manifestAsks(src) {
 export function manifestGains(released, next) {
   const now = manifestAsks(next);
   if (!now) throw new Error("backend/appsscript.json can't be read as a manifest.");
-  const was = (released !== null && released !== undefined && manifestAsks(released)) || { scopes: [], services: [] };
+  const was = (released !== null && released !== undefined && manifestAsks(released)) || { scopes: [], services: [], hasScopes: false, hasServices: false };
+  // A list taken out of the manifest is a change too (re-check 1, R1-M2):
+  // without oauthScopes Apps Script works out the scopes from the code, which
+  // can be more than the released list; the advanced services likewise.
+  const removed = [];
+  if (was.hasScopes && !now.hasScopes) removed.push("the permissions Apps Script works out from the code (oauthScopes was removed from the manifest)");
+  if (was.hasServices && was.services.length && !now.hasServices) removed.push("whatever Apps Script works out without the advanced service list (it was removed from the manifest)");
   return [
+    ...removed,
     ...now.scopes.filter((s) => !was.scopes.includes(s)).map((s) => "the permission " + s),
     ...now.services.filter((s) => !was.services.includes(s)).map((s) => "the advanced service " + s),
   ];
@@ -245,8 +254,16 @@ export function manifestGains(released, next) {
 
 // How the backend goes out: "deploy" (push, then a new version on the live
 // deployment) or "head" (push to the script's head only, then stop).
+// approved is this run's --scopes-approved only: it is never stored, so the
+// next run with a new permission stops at the head again unless given it again.
 export function backendPath(gains, approved) {
   return gains.length && !approved ? "head" : "deploy";
+}
+
+// The plain line ship says when --scopes-approved was given for a backend that
+// asks for nothing new (re-check 1, R1-M1), or null. Ship carries on as usual.
+export function approvalNote(gains, approved) {
+  return approved && !gains.length ? "--scopes-approved was not needed: this backend asks Google for nothing new. It counts for this run only and changes nothing." : null;
 }
 
 // The owner's next steps after a push to the head only, in plain words.

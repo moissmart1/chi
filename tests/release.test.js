@@ -187,7 +187,9 @@ test("C1: manifestGains names each scope and advanced service the next manifest 
   // Order and other fields do not matter; a scope dropped is not a gain.
   const shuffled = JSON.stringify({ ...JSON.parse(NEW), timeZone: "UTC", oauthScopes: [...JSON.parse(NEW).oauthScopes].reverse() });
   assert.deepEqual(manifestGains(NEW, shuffled), []);
-  assert.deepEqual(manifestGains(NEW, OLD), []);
+  // Going back to the old manifest drops a scope (not a gain) but also takes the service list out, which counts (R1-M2, below).
+  assert.deepEqual(manifestGains(NEW, OLD), ["whatever Apps Script works out without the advanced service list (it was removed from the manifest)"]);
+  assert.deepEqual(manifestGains(NEW, JSON.stringify({ ...JSON.parse(NEW), oauthScopes: JSON.parse(OLD).oauthScopes })), [], "a scope dropped, the list kept: no gain");
   // A new version of a service is a gain; no released manifest means everything is new.
   const v5 = JSON.stringify({ ...JSON.parse(NEW), dependencies: { enabledAdvancedServices: [{ userSymbol: "Sheets", version: "v5", serviceId: "sheets" }] } });
   assert.deepEqual(manifestGains(NEW, v5), ["the advanced service sheets v5"]);
@@ -239,4 +241,40 @@ test("C1: after a push to the head ship stops with an error and the owner's next
   assert.match(ship, /out\.did === "head"\) \{[\s\S]{0,200}stop\(headOnlySteps/, "a head-only push ends in stop(), which exits 1");
   // The deployment is made only through shipBackend, which a head-only path never reaches.
   assert.equal((ship.match(/create-deployment/g) || []).length, 0);
+});
+
+// ---------- re-check 1 (R1-M1, R1-M2) ----------
+import { approvalNote } from "../scripts/release-lib.mjs";
+
+test("R1-M2: taking oauthScopes or the advanced service list out of the manifest counts as a change", () => {
+  const m = JSON.parse(NEW);
+  const noScopes = JSON.stringify({ ...m, oauthScopes: undefined });
+  assert.deepEqual(manifestGains(NEW, noScopes), ["the permissions Apps Script works out from the code (oauthScopes was removed from the manifest)"]);
+  assert.equal(backendPath(manifestGains(NEW, noScopes), false), "head");
+  const noServices = JSON.stringify({ ...m, dependencies: undefined });
+  assert.deepEqual(manifestGains(NEW, noServices), ["whatever Apps Script works out without the advanced service list (it was removed from the manifest)"]);
+  const neither = JSON.stringify({ timeZone: "America/Chicago" });
+  assert.equal(manifestGains(NEW, neither).length, 2);
+  // Never listed before and still not listed: nothing new. An empty list kept is not a removal.
+  assert.deepEqual(manifestGains(neither, neither), []);
+  assert.deepEqual(manifestGains(OLD, OLD), [], "the old manifest had no service list to take away");
+  assert.deepEqual(manifestGains(NEW, JSON.stringify({ ...m, oauthScopes: m.oauthScopes.slice(0, 2) })), [], "fewer scopes, still listed: no change");
+});
+
+test("R1-M1: --scopes-approved with nothing new says so plainly and carries on; it is this run's only", () => {
+  assert.match(approvalNote([], true), /^--scopes-approved was not needed: this backend asks Google for nothing new\. It counts for this run only/);
+  assert.equal(approvalNote([], false), null);
+  assert.equal(approvalNote(["the permission x"], true), null, "needed: no note");
+  assert.equal(backendPath([], true), "deploy", "carries on as usual");
+  // Per-run: the flag is read from this command line and nowhere else, and ship writes nothing a later run reads.
+  const ship = readFileSync(join(ROOT, "scripts", "ship.mjs"), "utf8");
+  assert.deepEqual(ship.match(/scopes-approved"\)/g), ['scopes-approved")'], "read once, from process.argv");
+  assert.match(ship, /const scopesApproved = process\.argv\.includes\("--scopes-approved"\);/);
+  assert.equal(/writeFileSync|appendFileSync|setItem|git\(\["config"/.test(ship), false, "ship stores nothing");
+  const lib = readFileSync(join(ROOT, "scripts", "release-lib.mjs"), "utf8");
+  assert.equal(/scopes-?[aA]pproved[^\n]*(writeFileSync|appendFileSync)/.test(lib), false);
+  // A later run with a new permission and no flag goes to the head again.
+  assert.equal(backendPath(manifestGains(OLD, NEW), false), "head");
+  assert.match(ship, /if \(scopesApproved\) step\(approvalNote\(\[\], true\)\)/, "said too when the backend is already live");
+  assert.match(ship, /const note = approvalNote\(gains, scopesApproved\);\s*\n\s*if \(note\) step\(note\);/);
 });

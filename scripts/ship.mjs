@@ -39,12 +39,13 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
-import { ROOT, SITE, askUntil, backendPath, call, checkKey, headOnlySteps, manifestGains, shipBackend, tripLoaded, git, gitOk, liveStamp, privateEnv, readConfig, readReceipt, withoutKeys, writtenBackendStamp } from "./release-lib.mjs";
+import { ROOT, SITE, approvalNote, askUntil, backendPath, call, checkKey, headOnlySteps, manifestGains, shipBackend, tripLoaded, git, gitOk, liveStamp, privateEnv, readConfig, readReceipt, withoutKeys, writtenBackendStamp } from "./release-lib.mjs";
 import { shellList } from "./stamp-sw.mjs";
 
 const check = process.argv.includes("--check");
 const migrate = process.argv.includes("--migrate");
 const backendOnly = process.argv.includes("--backend-only");
+// This run only: read from the command line, never written anywhere.
 const scopesApproved = process.argv.includes("--scopes-approved");
 const step = (s) => console.log("ship: " + s);
 const stop = (why, fix) => {
@@ -75,6 +76,7 @@ const want = writtenBackendStamp();
 let live = await liveStamp(cfg.apiUrl);
 if (live === want) {
   step("backend: the live one is already this commit's (" + want + ")");
+  if (scopesApproved) step(approvalNote([], true));
 } else {
   step("backend: live is " + (live || "older than the stamp") + ", this commit is " + want + ": it must be deployed first");
   // What the manifest asks for beyond the last release's (origin/main, fetched above).
@@ -91,6 +93,8 @@ if (live === want) {
     stop(String(e.message || e), "Nothing was pushed or deployed.");
   }
   const path = backendPath(gains, scopesApproved);
+  const note = approvalNote(gains, scopesApproved);
+  if (note) step(note);
   if (gains.length) step("backend: the manifest asks for more than the last release: " + gains.join("; ") + (scopesApproved ? " (--scopes-approved: Mo has approved it)" : ""));
   if (!check && !existsSync(join(ROOT, ".clasp.json"))) stop("No .clasp.json here, so the backend cannot be deployed.", "It is git-ignored and lives only in /Users/owner/Projects/chi.");
   const clasp = (args) => spawnSync("npx", ["clasp", ...args], { cwd: ROOT, encoding: "utf8" });

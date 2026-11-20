@@ -1161,13 +1161,13 @@ function plannerPerson_(name, people) {
 }
 
 // A currency cell as a code: USD for "USD", "US$" or "US"; CAD for "CAD",
-// "CA$", "C$" or "CA"; a bare "$" is the home dollar, CAD (the app's own rule:
-// js/trip.js HOME_SIGN, money_ above); any other text upper-cased as it is.
-// Any case, spaces and dots ignored.
+// "CA$", "C$" or "CA"; any other text upper-cased as it is. Any case, spaces
+// and dots ignored. A bare "$" is no code: on a US trip it most likely means
+// US dollars, so it is not guessed (with no amount_cad: "no usable amount").
 function plannerCurrency_(v) {
   var t = plannerText_(v).toUpperCase().replace(/[\s.]/g, "");
   if (t === "USD" || t === "US$" || t === "US") return TRIP_CURRENCY_;
-  if (t === "CAD" || t === "CA$" || t === "C$" || t === "CA" || t === "$") return HOME_CURRENCY_;
+  if (t === "CAD" || t === "CA$" || t === "C$" || t === "CA") return HOME_CURRENCY_;
   return t;
 }
 

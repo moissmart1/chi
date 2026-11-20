@@ -631,18 +631,22 @@ test("expenseFromPayment: the amount is amount_cad when there is one, else US or
   }
 });
 
-test("expenseFromPayment: a currency typed as text: US$, US or USD is US dollars; CA$, C$, CA or CAD is Canadian; a bare $ is the home dollar (CAD)", () => {
+test("expenseFromPayment: a currency typed as text: US$, US or USD is US dollars; CA$, C$, CA or CAD is Canadian; a bare $ is not guessed", () => {
   for (const c of ["USD", "usd ", "US$", "us $", "U.S.", "US"]) {
     const v = convert({ amount_cad: "", amount: 12.5, currency: c }).value;
     assert.deepEqual([v.amount, v.currency], [12.5, "USD"], c);
   }
-  for (const c of ["CAD", " cad", "CA$", "C$", "c$", "CA", "$"]) {
+  for (const c of ["CAD", " cad", "CA$", "C$", "c$", "CA"]) {
     const v = convert({ amount_cad: "", amount: 12.5, currency: c }).value;
     assert.deepEqual([v.amount, v.currency, v.note], [12.5, "CAD", "X7 · North Rail · ref AB12"], c);
   }
   // With amount_cad filled, the note words a US charge the same whichever way it was typed.
   for (const c of ["USD", "US$", "us"]) assert.equal(convert({ currency: c }).value.note, "X7 · North Rail · ref AB12 · US$247.50 charged", c);
-  assert.equal(convert({ currency: "$" }).value.note, "X7 · North Rail · ref AB12", "a home-dollar charge needs no note");
+  // Re-check 1, R1-I1: a bare $ with no amount_cad is a problem, never read as CAD (US dollars recorded as Canadian would be 28% low).
+  for (const c of ["$", " $ "]) assert.deepEqual(convert({ amount_cad: "", amount: 12.5, currency: c }), { ok: false, message: "That payment has no usable amount." }, c);
+  // With amount_cad filled, the CAD amount is used; the $ only shows in the note, as typed.
+  const filled = convert({ currency: "$" }).value;
+  assert.deepEqual([filled.amount, filled.currency, filled.note], [221.52, "CAD", "X7 · North Rail · ref AB12 · 247.5 $"]);
   assert.deepEqual(convert({ amount_cad: "", amount: 5, currency: "€" }), { ok: false, message: "That payment has no usable amount." });
 });
 
