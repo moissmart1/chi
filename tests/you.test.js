@@ -60,3 +60,23 @@ test("inviteFor: the one other person by name; two others, or more, by count", (
   assert.equal(inviteFor(["Mo", "Izzah"], null), "For the other one. Keep it between you.");
   assert.equal(inviteFor(["Mo", "Izzah", "Sam"], null), "For the other two. Keep it between you.");
 });
+
+test("plannerWord: the few words the Planner row says after a pull", async () => {
+  const { plannerWord } = await import("../js/views/you.js");
+  assert.equal(plannerWord(null), "Not pulled");
+  assert.equal(plannerWord({ added: 2, changed: 1, problems: [1] }), "Added 2");
+  assert.equal(plannerWord({ added: 0, changed: 1, problems: [1] }), "Changed 1");
+  assert.equal(plannerWord({ added: 0, changed: 0, problems: [{}] }), "1 needs a look");
+  assert.equal(plannerWord({ added: 0, changed: 0, problems: [{}, {}] }), "2 need a look");
+  assert.equal(plannerWord({ added: 0, changed: 0, problems: [] }), "Nothing new");
+  assert.equal(plannerWord({}), "Nothing new");
+});
+
+test("problemHead: id, row and what, each left out when there is none", async () => {
+  const { problemHead } = await import("../js/views/you.js");
+  assert.equal(problemHead({ id: "P11", row: 14, what: "Made-up deposit" }), "P11 · row 14 · Made-up deposit");
+  assert.equal(problemHead({ row: 3 }), "row 3");
+  assert.equal(problemHead({ id: "", what: "Made-up deposit" }), "Made-up deposit");
+  assert.equal(problemHead({}), "A payment row");
+  assert.equal(problemHead(), "A payment row");
+});

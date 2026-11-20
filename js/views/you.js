@@ -19,6 +19,9 @@
 // onDemo(date): a trip day was picked under "Try another day". demo: the trip's
 // clock (js/clock.js), so the row can say a demo is running.
 // screen(): the screen showing, "Days" or "Money", for Report a problem.
+// Planner (only when a planner is linked): when its payments were last pulled
+// and a key that pulls them again, and the Before list with them; what could
+// not be brought in is listed under it, with the same count in red.
 // root is the phone. getKey() gives the trip key for the invite link; the key
 // is only ever put on the clipboard, never drawn, logged or put in the report.
 // The same goes for the Claude connector's token (the Claude link row), which
@@ -59,6 +62,9 @@ const COPIED = "Copied ✓";
 const NOT_COPIED = "Not copied";
 const GETTING = "Getting…";
 const FETCHING = "Fetching…";
+const PULL = "Pull now";
+const PULLING = "Pulling…";
+const PLANNER_SAID_MS = 4000; // how long the Planner row says how a pull went
 const FETCHED = "Up to date ✓";
 const NO_SIGNAL_WORD = "No signal";
 const SAID_MS = 2000; // how long a row says it worked
@@ -91,6 +97,8 @@ const MARKUP = `
   <button type="button" class="set-r" id="setTix" hidden><span>Ticket pictures<small id="setTixS"></small></span><b id="setTixV">On Wi‑Fi and mobile</b></button>
   <button type="button" class="set-r" id="setHist"><span>History<small>Every change, with undo</small></span><b>Open</b></button>
   <button type="button" class="set-r" id="setFreshRow"><span>Last updated<small>Tap to fetch the latest</small></span><b id="setFresh" aria-live="polite" data-w="Up to date 00:00"></b></button>
+  <button type="button" class="set-r" id="setPlanner" hidden><span>Planner<small id="setPlannerS">Not pulled yet</small></span><b id="setPlannerV" aria-live="polite" data-w="2 need a look">Pull now</b></button>
+  <div class="set-pp" id="setPlannerP" hidden></div>
   <button type="button" class="set-r" id="setDemo" aria-expanded="false" aria-controls="setDemoDays"><span>Try another day<small>See how a day will look before you go</small></span><b id="setDemoV">Pick</b></button>
   <div class="set-days" id="setDemoDays" hidden></div>
   <button type="button" class="set-r" id="setHow" aria-expanded="false" aria-controls="setHowLines"><span>How this works</span><b id="setHowV">Show</b></button>
@@ -114,6 +122,32 @@ function el(tag, cls, text) {
 // sentences: the newest history sentences, newest first, or null when the
 // history could not be fetched. setAside: the Sheet rows the app left out
 // (store.state.setAside). The trip key is never part of it.
+// The few words the Planner row shows after a pull, from what
+// store.syncPayments resolved with (null: it did not go through). The full
+// sentence goes to the notice.
+export function plannerWord(r) {
+  if (!r) return "Not pulled";
+  if (r.added) return "Added " + r.added;
+  if (r.changed) return "Changed " + r.changed;
+  if (Array.isArray(r.problems) && r.problems.length) return needsLook(r.problems.length);
+  return "Nothing new";
+}
+
+// "1 needs a look", "2 need a look".
+export function needsLook(n) {
+  return n === 1 ? "1 needs a look" : n + " need a look";
+}
+
+// The first line of a payment that was not brought in: "P011 · row 14 ·
+// Made-up deposit". Each part is left out when the backend had none.
+export function problemHead({ id, row, what } = {}) {
+  const parts = [];
+  if (typeof id === "string" && id !== "") parts.push(id);
+  if (typeof row === "number" && Number.isFinite(row)) parts.push("row " + row);
+  if (typeof what === "string" && what !== "") parts.push(what);
+  return parts.length ? parts.join(" · ") : "A payment row";
+}
+
 export function reportText({ me, screen, version, when, sentences, setAside = [], sizes = [] }) {
   const lines = ["Wendy’s: a problem to look at", "Who: " + (me || "nobody chosen"), "Screen: " + screen, "App version: " + version, "Time: " + when];
   if (setAside.length) lines.push("Lines in the Sheet the app can’t read: " + setAside.map((x) => x.id).join(", "));
@@ -181,6 +215,10 @@ export function mountYou(root, store, { onHistory = () => {}, onDemo = () => {},
   const picFile = $("setPicFile");
   const soundV = $("setSoundV");
   const fresh = $("setFresh");
+  const planner = $("setPlanner");
+  const plannerS = $("setPlannerS");
+  const plannerV = $("setPlannerV");
+  const plannerP = $("setPlannerP");
   const how = $("setHow");
   const howV = $("setHowV");
   const howLines = $("setHowLines");
@@ -297,6 +335,50 @@ export function mountYou(root, store, { onHistory = () => {}, onDemo = () => {},
     picRow.classList.toggle("has-pic", has);
   }
 
+  // ---- the planner row ----
+  // At rest: when the payments were last pulled, and "Pull now" (red words
+  // with how many could not be brought in when some could not). The list of
+  // those is redrawn only when it changes. Planner text: textContent only.
+  let pulling = false;
+  let shownProblems = null;
+  const problemsOf = (s) => {
+    const pp = s.paymentProblems && typeof s.paymentProblems === "object" ? s.paymentProblems : {};
+    const all = Array.isArray(pp.list) ? pp.list.filter((p) => p && typeof p === "object") : [];
+    return { pp, all, more: Number.isFinite(pp.more) && pp.more > 0 ? pp.more : 0 };
+  };
+  const plannerRest = (s) => {
+    const { all, more } = problemsOf(s);
+    return all.length + more > 0 ? needsLook(all.length + more) : PULL;
+  };
+  function setPlannerWord(text, red) {
+    plannerV.textContent = text;
+    plannerV.classList.toggle("red", red);
+  }
+  function drawPlanner(s) {
+    const linked = s.plannerLinked === true;
+    planner.hidden = !linked;
+    const { pp, all, more } = problemsOf(s);
+    const show = linked && all.length > 0;
+    plannerP.hidden = !show;
+    if (linked) {
+      const ms = Date.parse(typeof s.paymentsPulledAt === "string" ? s.paymentsPulledAt : "");
+      plannerS.textContent = Number.isFinite(ms) ? "Last pulled " + whenText(ms) : "Not pulled yet";
+      if (!pulling && !saying.has(plannerV)) setPlannerWord(plannerRest(s), all.length + more > 0);
+    }
+    const key = show ? JSON.stringify([pp.at, all, more]) : "";
+    if (key === shownProblems) return;
+    shownProblems = key;
+    plannerP.replaceChildren();
+    if (!show) return;
+    plannerP.append(el("h4", "", "Not brought in from the planner"));
+    for (const p of all) {
+      const one = el("div");
+      one.append(el("b", "", problemHead(p)), typeof p.message === "string" ? p.message : "");
+      plannerP.append(one);
+    }
+    if (more) plannerP.append(el("div", "", "and " + more + " more"));
+  }
+
   const freshWord = (s) => (s.loadedAt === null ? NOT_YET : freshText(s.loadedAt));
 
   function render(s) {
@@ -309,6 +391,7 @@ export function mountYou(root, store, { onHistory = () => {}, onDemo = () => {},
     bulkRow.hidden = store.state.ticketsReady !== true;
     drawDemoDays(s);
     setDemo(!demoDays.hidden);
+    drawPlanner(s);
     if (!fetching && !saying.has(fresh)) fresh.textContent = freshWord(s);
     // Your own link is yours: no invite row. The Claude link: the owner only.
     inviteRow.hidden = s.personal === true;
@@ -532,6 +615,34 @@ export function mountYou(root, store, { onHistory = () => {}, onDemo = () => {},
       fetching = false;
     }
     say(fresh, ok ? FETCHED : NO_SIGNAL_WORD, SAID_MS, () => freshWord(store.state));
+  });
+  // The Planner row: brings in the payments, and fetches the Before list with
+  // them (not waited for). The row says how it went for a moment.
+  planner.addEventListener("click", async () => {
+    if (pulling) return;
+    pulling = true;
+    planner.disabled = true;
+    setPlannerWord(PULLING, false);
+    clearTimeout(saying.get(plannerV));
+    saying.delete(plannerV);
+    let r = null;
+    try {
+      r = await store.syncPayments();
+    } catch {
+      r = null;
+    }
+    store.syncTodos({ force: true, quiet: true }).catch(() => {});
+    pulling = false;
+    planner.disabled = false;
+    const word = plannerWord(r);
+    setPlannerWord(word, /need/.test(word));
+    saying.set(
+      plannerV,
+      setTimeout(() => {
+        saying.delete(plannerV);
+        drawPlanner(store.state);
+      }, PLANNER_SAID_MS),
+    );
   });
   how.addEventListener("click", () => setHow(howLines.hidden));
   demoRow.addEventListener("click", () => setDemo(demoDays.hidden));

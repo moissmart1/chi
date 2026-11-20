@@ -596,6 +596,20 @@ function start() {
       closeDaySheets();
       history.open();
     },
+    // The pill: You, on the Planner row (it lists what could not be brought in).
+    onPlanner: () => {
+      register.close();
+      line.close(false);
+      history.close(false);
+      closeDaySheets();
+      bulk.close(false);
+      you.open();
+      const row = document.getElementById("setPlanner");
+      if (row && !row.hidden) {
+        row.scrollIntoView({ block: "nearest" });
+        row.focus({ preventScroll: true });
+      }
+    },
   });
   mountUndoBar(phone, store);
   mountNet(phone, store);
