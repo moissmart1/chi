@@ -1160,6 +1160,17 @@ function plannerPerson_(name, people) {
   return null;
 }
 
+// A currency cell as a code: USD for "USD", "US$" or "US"; CAD for "CAD",
+// "CA$", "C$" or "CA"; a bare "$" is the home dollar, CAD (the app's own rule:
+// js/trip.js HOME_SIGN, money_ above); any other text upper-cased as it is.
+// Any case, spaces and dots ignored.
+function plannerCurrency_(v) {
+  var t = plannerText_(v).toUpperCase().replace(/[\s.]/g, "");
+  if (t === "USD" || t === "US$" || t === "US") return TRIP_CURRENCY_;
+  if (t === "CAD" || t === "CA$" || t === "C$" || t === "CA" || t === "$") return HOME_CURRENCY_;
+  return t;
+}
+
 // An included payment as the expense fields the planner owns, plus the day
 // and kind a new expense starts with. -> { ok, value } | { ok: false, message }
 function expenseFromPayment(p, people, dayDates) {
@@ -1175,7 +1186,7 @@ function expenseFromPayment(p, people, dayDates) {
     split.push(who);
   }
   if (p.amountCad !== null && isNaN(p.amountCad)) return fail_("That payment’s CAD amount can’t be read.");
-  var charged = p.currency.toUpperCase();
+  var charged = plannerCurrency_(p.currency);
   var useCad = p.amountCad > 0;
   var amount, currency;
   if (useCad) {
