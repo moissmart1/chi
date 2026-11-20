@@ -846,8 +846,8 @@ test("load returns the typed plan, and migrate is safe to repeat", async () => {
   assert.deepEqual([sky.travelMin, sky.fixed, sky.signJp, sky.deleted], [30, true, "渋谷", false]);
   assert.equal(l.data.days.find((d) => d.date === "2026-12-28").lineJp, "山手線");
   assert.equal(l.data.stays[0].firstNight, "2026-12-26");
-  assert.deepEqual((await call("migrate", {}, AS(undefined))).data, { added: [] });
-  assert.deepEqual((await call("migrate", {}, AS(undefined))).data, { added: [] });
+  assert.deepEqual((await call("migrate", {}, AS(undefined))).data, { added: [], stamp: "" });
+  assert.deepEqual((await call("migrate", {}, AS(undefined))).data, { added: [], stamp: "" });
 });
 
 test("every new write needs a known actor; nothing is written without one", async () => {
@@ -1014,7 +1014,7 @@ test("an older Sheet with no Stays.photo: stays load with no photo, a photo is r
   assert.equal(call.fake.tables.Stays.length, 1);
   assert.equal((await call("saveStay", { stay: { ...stayFull(), note: "edited" } })).ok, true, "a save without a photo keeps working");
   assert.equal((await call("saveStay", { stay: { ...stayFull(), photo: "" , note: "again" } })).ok, true, "an empty photo is not a photo");
-  assert.deepEqual((await call.fake({ key: KEY, action: "migrate", args: {} })).data, { added: ["Stays.photo"] });
+  assert.deepEqual((await call.fake({ key: KEY, action: "migrate", args: {} })).data, { added: ["Stays.photo"], stamp: "" });
   assert.equal((await call("saveStay", { stay: { ...stayFull(), note: "again", photo: SPIC } })).ok, true);
   assert.equal(await stayPhoto(call), SPIC);
 });
@@ -1420,7 +1420,7 @@ test("R40 migrate: an older Sheet gets Expenses.planner_id; until then a pull is
   assert.deepEqual(await call("syncPayments"), { ok: false, error: "needs_migrate", message: "The trip sheet needs updating first. Ask Mo to run migrate.", rev: 0 });
   assert.equal(call.fake.tables.Expenses.length, 0);
   const m = await call.fake({ key: KEY, action: "migrate", args: {} });
-  assert.deepEqual(m.data, { added: ["Expenses.planner_id"] });
+  assert.deepEqual(m.data, { added: ["Expenses.planner_id"], stamp: "" });
   assert.equal((await call("syncPayments")).data.added, 2);
   assert.equal(byPayment(call, "X7").length, 1);
 });
@@ -1732,8 +1732,8 @@ test("migrate adds People.photo to an older Sheet once; until then a picture is 
   assert.deepEqual([early.ok, early.error, early.message], [false, "needs_migrate", "The trip sheet needs updating first. Ask Mo to run migrate."]);
   assert.equal(call.fake.tables.Log.length, 0);
   assert.equal((await asOwn(call, "Mo")("setPerson", { name: "Mo", patch: { etransfer: "m@example.com" } })).ok, true, "other details still change");
-  assert.deepEqual((await call.fake({ key: KEY, action: "migrate", args: {} })).data, { added: ["People.photo"] });
-  assert.deepEqual((await call.fake({ key: KEY, action: "migrate", args: {} })).data, { added: [] });
+  assert.deepEqual((await call.fake({ key: KEY, action: "migrate", args: {} })).data, { added: ["People.photo"], stamp: "" });
+  assert.deepEqual((await call.fake({ key: KEY, action: "migrate", args: {} })).data, { added: [], stamp: "" });
   assert.equal((await call("setPerson", { name: "Mo", patch: { photo: JPEG } })).ok, true);
   assert.equal((await call("load")).data.people[0].photo, JPEG);
 });
