@@ -792,6 +792,7 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
       if (op.lost) track(checkRev());
       else if (op.logId !== null) stepRev(r.rev);
       if (op.logId === null && !isAdd(op)) op.noop = true; // the backend already had it so
+      if (op.kind === "todo") op.saved = copy(item); // what it left, so untickTodo knows its own tick
       settleTicket(op, { saved: true, item: copy(item) });
       const lc = state.lastChange;
       if (op.quiet) {
@@ -1605,7 +1606,13 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
   }
 
   function undoEntry(logId) {
-    const entry = state.history.entries.find((e) => e.id === logId);
+    return undoLogged(logId, state.history.entries.find((e) => e.id === logId), true);
+  }
+
+  // An undo of one History entry (`entry` as History gave it, when known).
+  // fromTape: asked from History itself, whose tape is then marked and loaded
+  // again; otherwise (untickTodo) only when History has been loaded.
+  function undoLogged(logId, entry, fromTape) {
     // A picture change belongs to its person: it waits behind their other changes.
     const key = entry ? chainKey(entry.kind === "picture" ? "person" : entry.kind, entry.ref) : "log:" + logId;
     return enqueue(key, async () => {
@@ -1634,6 +1641,10 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
       // An undone tick that left something in the planner says so.
       const left = kind === "todo" ? untickOutcome(shownBefore, r.data) : null;
       if (left) state.lastChange.planner = left;
+      if (!fromTape && !historyLoaded) {
+        changed();
+        return true;
+      }
       const top = r.data.entry;
       const rest = state.history.entries.map((e) => {
         if (e.id === logId) return { ...e, undoneBy: r.data.logId, canUndo: false };
@@ -1645,6 +1656,69 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
       await loadHistory(); // the tape starts again from its first page, with whatever others did meanwhile
       return true;
     });
+  }
+
+  // ---- taking a tick back ("Not booked after all") ----
+
+  const unticking = new Set(); // items whose untick is on its way
+
+  // This phone's own write of the tick an item shows, while it holds it: on
+  // its way, unsure (the undo then settles it against the backend), or saved
+  // and still what the item shows. A refused tick, or one taken back and made
+  // again elsewhere since, is not.
+  function ownTick(cur) {
+    let own = null;
+    for (const op of writes.values()) {
+      if (op.kind === "todo" && op.id === cur.id && op.action === "tick" && !op.undone) own = op;
+    }
+    if (!own) return null;
+    if (ops.includes(own) || unsure(own)) return own;
+    const s = own.saved;
+    return s && s.tickedBy === cur.tickedBy && s.tickedAt === cur.tickedAt ? own : null;
+  }
+
+  // Takes back a tick made in the app, from any visit. This phone's own write
+  // is undone as Undo does; otherwise the item's newest tick in History (not
+  // undone) goes through the same path as an undo from History (the same
+  // queue, the same refusals, the same planner line on the undo bar). Nothing
+  // changes on screen until the backend has it. No such entry, or no signal:
+  // a notice, and nothing changes. A Booked typed in the planner (no tickedBy)
+  // is never taken back here. Resolves true once the tick is taken back.
+  async function untickTodo(id) {
+    const cur = find("todo", id);
+    if (!cur || String(cur.tickedBy || "").trim() === "" || unticking.has(id)) return false;
+    unticking.add(id);
+    try {
+      const own = ownTick(cur);
+      if (own) {
+        await undo(own.token);
+        const now = find("todo", id);
+        return !!now && String(now.tickedBy || "").trim() === "";
+      }
+      let entries;
+      try {
+        entries = await call("history", { ref: id });
+      } catch (err) {
+        state.notice = codeOf(err) === "network" ? NO_SIGNAL : UNDO_FAILED;
+        changed();
+        return false;
+      }
+      const ticks = (Array.isArray(entries.data && entries.data.entries) ? entries.data.entries : []).filter((e) => e && e.kind === "todo" && e.ref === id && e.action === "tick");
+      const newest = ticks.reduce((a, e) => (!a || Number(e.id) > Number(a.id) ? e : a), null);
+      const again = find("todo", id);
+      if (!again || String(again.tickedBy || "").trim() === "") {
+        changed();
+        return false; // taken back meanwhile
+      }
+      if (!newest || (newest.undoneBy !== null && newest.undoneBy !== undefined && newest.undoneBy !== "")) {
+        state.notice = UNDO_FAILED;
+        changed();
+        return false;
+      }
+      return await undoLogged(newest.id, newest, false);
+    } finally {
+      unticking.delete(id);
+    }
   }
 
   // ---- small settings ----
@@ -1709,7 +1783,7 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
     },
     boot, refresh, checkRev, flush, idle,
     setMe, setPerson, markSeen, forgot, unsentCount, notify, clearNotice, claudeToken, syncPayments, autoPayments,
-    syncTodos, tickTodo, claimTodo,
+    syncTodos, tickTodo, claimTodo, untickTodo,
     pressStamp,
     addTicket, ticketOutcome, fetchTicket,
     removeTicket: (id) => takeBackLive("ticket", id) || change("ticket", id, "remove", "removeTicket", { gone: true }),

@@ -167,7 +167,7 @@ module.exports = [
     },
   },
   {
-    name: "a slip rung here can be taken back from the spike; one from an earlier visit goes to History; the planner's own is final",
+    name: "a slip rung here can be taken back from the spike; so can one from an earlier visit; the planner's own is final",
     async run({ page }) {
       const backend = await makeBook();
       await openBefore(page, backend);
@@ -182,16 +182,13 @@ module.exports = [
       await until(async () => (await railIds(page)).includes("1"), "back on the rail");
       assert.equal(await focusedIs(page, "#bfTitle"), true, "focus is on the title after a take-back");
       await until(() => statusOf(backend, 1) === "To book", "the planner has it back");
-      // #7 was ticked before this visit: History.
+      // #7 was ticked before this visit: the same key (stage 2; before-untick.e2e.cjs takes it back).
       await page.locator("#bfDone [data-id='7'] .bf-slip").click();
       await until(() => isOpen(page), "open #7");
-      assert.equal(await text(page, "#bfHand .bf-ctl p"), "To undo this, open History.");
-      assert.equal(await text(page, "#bfHand .bf-ctl button"), "History");
-      assert.equal(await page.locator("#bfHand [data-act='untick']").count(), 0);
-      await page.locator("#bfHand [data-act='history']").click();
-      await until(async () => !(await isOpen(page)), "the sheet closes");
-      await until(() => page.locator("#hist").evaluate((n) => n.classList.contains("is-open")), "History opens");
-      await page.locator("#histDone, #hist .hist-top button").first().click();
+      assert.equal(await text(page, "#bfHand .bf-ctl button"), "Not booked after all");
+      assert.equal(await page.locator("#bfHand [data-act='history'], #bfHand .bf-ctl p").count(), 0, "no History words or key");
+      await page.locator("#bfBack").click();
+      await until(async () => !(await isOpen(page)), "put back");
       // #8 is booked in the planner: nothing to undo here.
       await page.locator("#bfDone [data-id='8'] .bf-slip").click();
       await until(() => isOpen(page), "open #8");

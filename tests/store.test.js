@@ -3622,3 +3622,162 @@ test("a position never leaves the phone: not in any request, not in storage, eve
   for (const digits of ["41.9090", "87.6377", "9090286", "6377472"]) assert.equal(everything.includes(digits), false, digits);
   assert.equal(p.net.sent.some((b) => JSON.stringify(b).includes("\"lat\"") || JSON.stringify(b).includes("\"lng\"")), false);
 });
+
+// ---------- untickTodo (stage 2 of the Before screens): "Not booked after all" from the spike ----------
+// Any tick made in the app can be taken back: this phone's own write while it
+// holds it, otherwise the item's newest tick in History, through the same path
+// as an undo from History. Every item is made up.
+
+const todoLog = (p, id) => p.fake.tables.Log.filter((r) => r.kind === "todo" && r.ref === id);
+const sentOf = (p, action) => p.net.sent.filter((b) => b.action === action);
+async function tickedElsewhere(seed = bookSeed(2)) {
+  const fake = createFakeBackend(seed);
+  await backend(fake, "syncTodos", { force: true }, "Mo");
+  await backend(fake, "tickTodo", { id: "1" }, "Mo"); // an earlier visit, or another phone
+  const p = phone({ fake });
+  await p.store.boot();
+  return p;
+}
+
+test("untickTodo: a tick this phone still holds is undone with its own write (no History call)", async () => {
+  const p = phone({ seed: bookSeed(2) });
+  await p.store.boot();
+  await p.store.syncTodos();
+  p.store.tickTodo("1");
+  await p.store.idle();
+  const tickId = Number(todoLog(p, "1").find((r) => r.action === "tick").id);
+  assert.equal(await p.store.untickTodo("1"), true);
+  await p.store.idle();
+  assert.equal(sentOf(p, "history").length, 0);
+  assert.deepEqual(sentOf(p, "undo").map((b) => b.args), [{ logId: tickId }]);
+  const t = byId(p.store.state.todos, "1");
+  assert.deepEqual([t.tickedBy, t.done], ["", false]);
+  assert.equal(p.store.state.lastChange.action, "undo");
+});
+
+test("untickTodo: a tick from an earlier visit is undone from History: the newest tick, not an older one, a claim or an undone one", async () => {
+  const fake = createFakeBackend(bookSeed(2));
+  await backend(fake, "syncTodos", { force: true }, "Mo");
+  await backend(fake, "claimTodo", { id: "1", on: true }, "Mo");
+  await backend(fake, "tickTodo", { id: "1" }, "Mo");
+  const first = Number(fake.tables.Log.at(-1).id);
+  await backend(fake, "undo", { logId: first }, "Mo"); // taken back once
+  await backend(fake, "tickTodo", { id: "1" }, "Izzah"); // and ticked again
+  const newest = Number(fake.tables.Log.at(-1).id);
+  const p = phone({ fake });
+  await p.store.boot();
+  assert.equal(byId(p.store.state.todos, "1").tickedBy, "Izzah");
+  assert.equal(await p.store.untickTodo("1"), true);
+  await p.store.idle();
+  assert.deepEqual(sentOf(p, "history").map((b) => b.args), [{ ref: "1" }]);
+  assert.deepEqual(sentOf(p, "undo").map((b) => b.args), [{ logId: newest }]);
+  const t = byId(p.store.state.todos, "1");
+  assert.deepEqual([t.tickedBy, t.done], ["", false]);
+  assert.equal(fake.tables.Todos.find((r) => r.id === "1").ticked_by, "");
+  assert.deepEqual([p.store.state.lastChange.action, p.store.state.lastChange.kind], ["undo", "todo"]);
+  assert.equal(p.store.state.notice, null);
+});
+
+test("untickTodo: the undo bar says what the planner kept, as an undo from History does", async () => {
+  const p = await tickedElsewhere();
+  p.fake.planner.cellFails = true; // the planner can't be written back
+  await p.store.untickTodo("1");
+  await p.store.idle();
+  assert.equal(byId(p.store.state.todos, "1").tickedBy, "");
+  assert.ok(p.store.state.lastChange.planner, "a planner line on the undo bar: " + JSON.stringify(p.store.state.lastChange));
+});
+
+test("untickTodo: no tick entry to undo (the newest one was undone and put back by an undo) says so; nothing is sent or changed", async () => {
+  const fake = createFakeBackend(bookSeed(2));
+  await backend(fake, "syncTodos", { force: true }, "Mo");
+  await backend(fake, "tickTodo", { id: "1" }, "Mo");
+  const tick = Number(fake.tables.Log.at(-1).id);
+  const u = await backend(fake, "undo", { logId: tick }, "Mo");
+  await backend(fake, "undo", { logId: u.logId }, "Mo"); // the undo undone: ticked again, by an undo entry
+  const p = phone({ fake });
+  await p.store.boot();
+  assert.equal(byId(p.store.state.todos, "1").tickedBy, "Mo");
+  assert.equal(await p.store.untickTodo("1"), false);
+  assert.equal(sentOf(p, "undo").length, 0);
+  assert.equal(p.store.state.notice, UNDO_FAILED);
+  assert.equal(byId(p.store.state.todos, "1").tickedBy, "Mo");
+});
+
+test("untickTodo: with no signal the notice says so and the slip stays on the spike", async () => {
+  const p = await tickedElsewhere();
+  p.net.knownOffline = true;
+  assert.equal(await p.store.untickTodo("1"), false);
+  assert.equal(p.store.state.notice, "No signal. Try again.");
+  assert.equal(byId(p.store.state.todos, "1").tickedBy, "Mo");
+  p.net.knownOffline = false;
+  p.store.clearNotice();
+  p.net.offline = true; // sent, but no reply
+  assert.equal(await p.store.untickTodo("1"), false);
+  assert.equal(p.store.state.notice, "No signal. Try again.");
+  assert.equal(byId(p.store.state.todos, "1").tickedBy, "Mo");
+  assert.equal(sentOf(p, "undo").length, 0);
+});
+
+test("untickTodo: a newer change by someone else refuses it with the backend's words; the slip stays ticked", async () => {
+  const p = await tickedElsewhere();
+  const tick = Number(todoLog(p, "1").find((r) => r.action === "tick").id);
+  const release = p.net.hold("history"); // History answers; the reply is slow
+  const u = p.store.untickTodo("1");
+  await until(() => sentOf(p, "history").length === 1);
+  // Meanwhile Izzah takes Mo's tick back and ticks it herself.
+  await backend(p.fake, "undo", { logId: tick }, "Izzah");
+  await backend(p.fake, "tickTodo", { id: "1" }, "Izzah");
+  release();
+  assert.equal(await u, false);
+  await p.store.idle();
+  assert.deepEqual(sentOf(p, "undo").map((b) => b.args), [{ logId: tick }]);
+  assert.equal(p.store.state.notice, "That’s already been undone.");
+  const t = byId(p.store.state.todos, "1");
+  assert.equal(t.tickedBy, "Izzah", "the phone now shows what the backend has");
+  assert.equal(p.fake.tables.Todos.find((r) => r.id === "1").ticked_by, "Izzah");
+});
+
+test("untickTodo: nothing for an item that is not ticked or not there; two taps send one undo", async () => {
+  const p = await tickedElsewhere(bookSeed(2));
+  assert.equal(await p.store.untickTodo("2"), false);
+  assert.equal(await p.store.untickTodo("nope"), false);
+  assert.equal(p.net.sent.filter((b) => b.action === "history" || b.action === "undo").length, 0);
+  const a = p.store.untickTodo("1");
+  const b = p.store.untickTodo("1");
+  assert.deepEqual(await Promise.all([a, b]), [true, false]);
+  await p.store.idle();
+  assert.equal(sentOf(p, "history").length, 1);
+  assert.equal(sentOf(p, "undo").length, 1);
+});
+
+test("untickTodo: a tick of this phone's that the backend refused is not mistaken for its own write", async () => {
+  const p = phone({ seed: bookSeed(2) });
+  await p.store.boot();
+  await p.store.syncTodos();
+  await backend(p.fake, "tickTodo", { id: "2" }, "Izzah"); // another phone ticked it first
+  p.store.tickTodo("2"); // refused: already done
+  await p.store.idle();
+  await p.store.refresh();
+  assert.equal(byId(p.store.state.todos, "2").tickedBy, "Izzah");
+  p.store.clearNotice();
+  assert.equal(await p.store.untickTodo("2"), true);
+  await p.store.idle();
+  assert.equal(sentOf(p, "history").length, 1, "found in History");
+  assert.equal(byId(p.store.state.todos, "2").tickedBy, "");
+});
+
+test("untickTodo: while the tick itself is still on its way, it waits for it and then undoes it", async () => {
+  const p = phone({ seed: bookSeed(2) });
+  await p.store.boot();
+  await p.store.syncTodos();
+  const release = p.net.hold("tickTodo");
+  p.store.tickTodo("1");
+  const u = p.store.untickTodo("1");
+  release();
+  await u;
+  await p.store.idle();
+  assert.equal(sentOf(p, "history").length, 0);
+  assert.equal(sentOf(p, "undo").length, 1);
+  assert.equal(byId(p.store.state.todos, "1").tickedBy, "");
+  assert.equal(p.fake.tables.Todos.find((r) => r.id === "1").ticked_by, "");
+});

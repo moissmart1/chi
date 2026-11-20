@@ -6,16 +6,15 @@
 // printed BOOKED, the sheet closes by itself after a moment and the slip is on
 // the spike. A slip already on the spike opens white, with its way back.
 //
-// mountHand(root, store, { now, onHistory, onSettled(id) }) -> { open(id, opener), close(refocus), isOpen() }
+// mountHand(root, store, { now, onSettled(id) }) -> { open(id, opener), close(refocus), isOpen() }
 // - root is the phone. The sheet draws from store.state and redraws when
 //   what it shows has changed; it closes itself when its item is gone.
 // - Put it back (the one closing key), Escape and the scrim close it; focus
 //   goes back to the slip that opened it, or to the screen's title when that
 //   slip has moved on.
-// - The bell is the only write to the planner (store.tickTodo, and its undo);
-//   the sheet never calls the backend itself. The tick's token is kept for
-//   this visit, so a slip rung here can be taken back from the spike.
-// - onHistory(): a tick made before this visit is undone in History.
+// - The bell is the only write to the planner (store.tickTodo, and its undo:
+//   store.untickTodo, "Not booked after all" on any slip ticked in the app,
+//   on this visit or an earlier one); the sheet never calls the backend itself.
 // - onSettled(id): the sheet closed by itself after a ring.
 // Everything from the planner goes in with textContent only; a link becomes
 // an <a> only through safeHref and only when it starts https://.
@@ -49,7 +48,7 @@ const BELL = `<svg class="bf-defs" width="0" height="0" aria-hidden="true" focus
 
 const list = (v) => (Array.isArray(v) ? v : []);
 
-export function mountHand(root, store, { now = () => Date.now(), onHistory = () => {}, onSettled = () => {} } = {}) {
+export function mountHand(root, store, { now = () => Date.now(), onSettled = () => {} } = {}) {
   const scrim = el("div", "scrim");
   scrim.id = "bfHandScrim";
   scrim.hidden = true;
@@ -80,7 +79,6 @@ export function mountHand(root, store, { now = () => Date.now(), onHistory = () 
   let rungId = null; // the item whose bell was rung here and whose sheet is about to close
   let rungBuilt = false;
   let timer = null;
-  const tokens = new Map(); // item id -> the tick's token, for this visit
 
   const todos = () => list(store.state.todos).filter((t) => t && typeof t.id === "string" && t.id);
   const current = () => todos().find((t) => t.id === openId) || null;
@@ -217,17 +215,11 @@ export function mountHand(root, store, { now = () => Date.now(), onHistory = () 
     const ctl = el("div", "bf-ctl");
     if (!by && (isBooked(t.status) || t.done === true)) {
       ctl.append(el("p", "", "Booked in the planner. Change it there."));
-    } else if (tokens.has(t.id)) {
+    } else {
       const u = el("button", "", "Not booked after all");
       u.type = "button";
       u.dataset.act = "untick";
       ctl.append(u);
-    } else {
-      ctl.append(el("p", "", "To undo this, open History."));
-      const h = el("button", "", "History");
-      h.type = "button";
-      h.dataset.act = "history";
-      ctl.append(h);
     }
     slip.append(ctl);
     return [big];
@@ -263,7 +255,7 @@ export function mountHand(root, store, { now = () => Date.now(), onHistory = () 
     const today = homeToday(now());
     const position = positionOf(t);
     const o = store.state;
-    const sig = JSON.stringify([rung ? "rung" : isDone(t) ? "done" : "open", t.id, t.item, t.status, t.bookBy, t.note, t.link, t.claimedBy, t.tickedBy, t.tickedAt, !!t.pending, t.plannerComputes === true, o.me, o.personal === true, o.online !== false, picKey(t.claimedBy), tokens.has(t.id), today, position]);
+    const sig = JSON.stringify([rung ? "rung" : isDone(t) ? "done" : "open", t.id, t.item, t.status, t.bookBy, t.note, t.link, t.claimedBy, t.tickedBy, t.tickedAt, !!t.pending, t.plannerComputes === true, o.me, o.personal === true, o.online !== false, picKey(t.claimedBy), today, position]);
     if (sig === shownSig) return;
     shownSig = sig;
     no.textContent = slipNo(t.id, position);
@@ -341,7 +333,6 @@ export function mountHand(root, store, { now = () => Date.now(), onHistory = () 
       rungId = null;
       return;
     }
-    tokens.set(id, token);
     bell();
     render();
     sheet.focus({ preventScroll: true }); // the bell is spent; focus rests on the sheet (a held Enter does nothing there)
@@ -362,14 +353,12 @@ export function mountHand(root, store, { now = () => Date.now(), onHistory = () 
       const btn = body.querySelector('[data-act="claim"]');
       store.claimTodo(t.id, !btn || btn.dataset.on === "1");
     } else if (what === "untick") {
-      const token = tokens.get(t.id);
-      if (!token || !isDone(t)) return;
-      tokens.delete(t.id);
-      store.undo(token);
-      close(true);
-    } else if (what === "history") {
+      if (!isDone(t) || !String(t.tickedBy || "").trim()) return;
+      store.untickTodo(t.id);
+      // Taken back: the sheet goes and focus is on the screen's title.
       close(false);
-      onHistory();
+      const title = document.getElementById("bfTitle");
+      if (visible(title)) title.focus({ preventScroll: true });
     }
   }
 

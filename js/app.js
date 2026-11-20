@@ -602,13 +602,6 @@ function start() {
   // left); from the first day its open items are reached from Tickets. A slip
   // opens in your hand (js/views/hand.js), a sheet over the Days pane.
   const hand = mountHand(phone, store, {
-    onHistory: () => {
-      register.close();
-      line.close(false);
-      you.close(false);
-      closeDaySheets();
-      history.open();
-    },
     // The sheet closed by itself after a ring: the slip is on the spike.
     onSettled: (id) => {
       before.settled(id);
