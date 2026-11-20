@@ -92,7 +92,7 @@ test("daysToGo: whole days to the trip's first day; null once it is 0 or less or
 });
 
 // The small words the screens print under and beside a slip (js/views/before.js, no DOM needed).
-import { onWords, slipSmall, shortDay, PENDING, COMPUTES, WAITING } from "../js/views/before.js";
+import { onWords, slipSmall, shortDay, PENDING, COMPUTES } from "../js/views/before.js";
 
 test("onWords: who is on it", () => {
   assert.equal(onWords({ claimedBy: "" }, "Mo"), "");
@@ -100,10 +100,10 @@ test("onWords: who is on it", () => {
   assert.equal(onWords({ claimedBy: "Izzah" }, "Mo"), "Izzah’s on it");
 });
 
-test("slipSmall: waiting for signal, the planner computing it, the planner not updated yet; else nothing", () => {
+test("slipSmall: the planner computing it, the planner not updated yet; else nothing (no waiting line: an offline tick is not saved)", () => {
   const up = { online: true };
   const down = { online: false };
-  assert.equal(slipSmall({ pending: true, tickedBy: "Mo" }, down), WAITING);
+  assert.equal(slipSmall({ pending: true, tickedBy: "Mo" }, down), "", "no signal: nothing (the store puts the slip back)");
   assert.equal(slipSmall({ pending: true, tickedBy: "Mo" }, up), "", "in flight with signal: nothing to say yet");
   assert.equal(slipSmall({ tickedBy: "Mo", plannerComputes: true, status: "To book" }, up), COMPUTES);
   assert.equal(slipSmall({ tickedBy: "Mo", status: "To book" }, up), PENDING);

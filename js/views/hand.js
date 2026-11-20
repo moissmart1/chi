@@ -164,8 +164,6 @@ export function mountHand(root, store, { now = () => Date.now(), onSettled = () 
       w.append(seal(t.claimedBy), who);
       slip.append(w);
     }
-    const wait = slipSmall(t, store.state);
-    if (wait) slip.append(el("p", "bf-ctl-note bf-note", wait));
     const say = el("p");
     say.id = "bfSay";
     say.setAttribute("aria-live", "polite");
@@ -255,7 +253,7 @@ export function mountHand(root, store, { now = () => Date.now(), onSettled = () 
     const today = homeToday(now());
     const position = positionOf(t);
     const o = store.state;
-    const sig = JSON.stringify([rung ? "rung" : isDone(t) ? "done" : "open", t.id, t.item, t.status, t.bookBy, t.note, t.link, t.claimedBy, t.tickedBy, t.tickedAt, !!t.pending, t.plannerComputes === true, o.me, o.personal === true, o.online !== false, picKey(t.claimedBy), today, position]);
+    const sig = JSON.stringify([rung ? "rung" : isDone(t) ? "done" : "open", t.id, t.item, t.status, t.bookBy, t.note, t.link, t.claimedBy, t.tickedBy, t.tickedAt, !!t.pending, t.plannerComputes === true, o.me, o.personal === true, picKey(t.claimedBy), today, position]);
     if (sig === shownSig) return;
     shownSig = sig;
     no.textContent = slipNo(t.id, position);

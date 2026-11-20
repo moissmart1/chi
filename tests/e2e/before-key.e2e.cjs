@@ -65,6 +65,12 @@ const fiveKeys = (name, size) => ({
     await page.locator("#ttBefore").click();
     await until(() => padUp(page), "the pad is up as a sheet");
     assert.equal(await page.evaluate(() => document.activeElement.id), "beforeDone", "focus is on Done");
+    // "Before we go" once: the sheet's own top; the list's title is kept for the screen reader, out of sight.
+    const titles = await page.evaluate(() => [...document.querySelectorAll("#vBefore *")].filter((n) => n.children.length === 0 && n.textContent.trim() === "Before we go").filter((n) => { const r = n.getBoundingClientRect(); return r.width > 1 && r.height > 1; }).length);
+    assert.equal(titles, 1, "the title shows once");
+    assert.equal(await page.locator("#before").getAttribute("aria-labelledby"), "bfTitle");
+    assert.equal(await text(page, "#bfTitle"), "Before we go");
+    if (name.startsWith("390")) await shot(page, "s2-4-single-title-sheet");
     // Without "days to go": the trip has started.
     assert.equal(await text(page, "#bfCount"), "7 on the rail");
     await page.locator("#beforeDone").click();

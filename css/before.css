@@ -164,6 +164,11 @@ button.bf-t{display:block;width:100%;border:0;text-align:left;font:inherit;curso
 #vBefore.as-sheet{z-index:24;top:max(10%, calc(76px + var(--inset-t)));padding-top:0;padding-bottom:calc(24px + env(safe-area-inset-bottom, 0px));
   background:var(--dots), var(--ground);border-top:1px solid rgba(31,26,20,.25);border-radius:18px 18px 0 0;box-shadow:0 -24px 40px -10px rgba(31,26,20,.5);transition:none;animation:bsUp .5s var(--sheet) both}
 #vBefore.as-sheet .bs-top{display:flex;position:sticky;top:0;z-index:2;margin:0 0 4px;padding:12px var(--gr) 6px var(--gl);background:var(--ground)}
+/* As a sheet its own top says "Before we go": the list's title stays (the
+   screen reader's name for the list, and where focus goes after a take-back)
+   but out of sight, and the count sits under the top. */
+#vBefore.as-sheet .bf-bar-d{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+#vBefore.as-sheet .bf-bar{padding-top:0}
 @keyframes bsUp{from{transform:translateY(104%)}to{transform:none}}
 @media (prefers-reduced-motion: reduce){ #vBefore.as-sheet{animation:none} }
 @media (orientation:landscape) and (max-height:520px){ #vBefore.as-sheet{top:16px} }

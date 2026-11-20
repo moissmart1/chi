@@ -53,7 +53,6 @@ const NOT_FETCHED = "Not fetched";
 const PROBLEMS = "Not read from the planner";
 export const PENDING = "The planner hasn’t been updated yet.";
 export const COMPUTES = "The planner works this one out itself, so the app left it as it was.";
-export const WAITING = "will send when signal returns";
 const AUTO_FAILED = "Couldn’t fetch the list from the planner.";
 
 export function el(tag, cls, text) {
@@ -72,10 +71,10 @@ export function shortDay(ms) {
   return isFinite(ms) ? dayHead(localDay(ms), []).en.split(" ").slice(1).join(" ") : "";
 }
 
-// The small line under a slip, when one applies: a tick waiting for signal,
-// one the planner computes itself, one the planner has not taken yet.
-export function slipSmall(t, s) {
-  if (t.pending && !online(s)) return WAITING;
+// The small line under a slip, when one applies: one the planner computes
+// itself, one the planner has not taken yet. (A tick or claim with no signal
+// is not saved: the store puts the slip back and says so.)
+export function slipSmall(t) {
   if (t.plannerComputes === true && String(t.tickedBy || "").trim() !== "") return COMPUTES;
   if (plannerPending(t)) return PENDING;
   return "";
