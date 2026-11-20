@@ -190,9 +190,19 @@ module.exports = [
     name: "no key: says so and loads nothing",
     async run({ page }) {
       const backend = await open(page, { seed: SEED, nowMs: NOON28, key: null });
-      await expectText(page, "#gate p", "This phone needs the trip link. Open it from your chat again, or paste it here.");
+      await expectText(page, "#gate p", "This phone needs the trip link. Open it from your email again, or paste it here.");
       assert.ok(await visible(page, "#gate"));
       assert.equal(await page.evaluate(() => document.getElementById("rc").childElementCount), 0, "#rc is empty");
+      assert.equal(backend.requests.length, 0, "no calls without a key");
+    },
+  },
+  {
+    name: "no key on the Home Screen app: says to copy the link from the email and paste it (mat#58)",
+    async run({ page }) {
+      await page.addInitScript(() => Object.defineProperty(navigator, "standalone", { value: true, configurable: true }));
+      const backend = await open(page, { seed: SEED, nowMs: NOON28, key: null });
+      await expectText(page, "#gate p", "The Home Screen app keeps its own sign-in. Find the email with your own Wendy’s link, press and hold the link, tap Copy Link, then paste it here.");
+      assert.ok(await visible(page, "#keyPaste"), "the paste field is there");
       assert.equal(backend.requests.length, 0, "no calls without a key");
     },
   },
@@ -200,7 +210,7 @@ module.exports = [
     name: "no key: pasting the trip link opens the trip without a reload, and keeps the key off the screen and the address",
     async run({ page }) {
       const backend = await open(page, { seed: SEED, nowMs: NOON28, key: null });
-      await expectText(page, "#gate p", "This phone needs the trip link. Open it from your chat again, or paste it here.");
+      await expectText(page, "#gate p", "This phone needs the trip link. Open it from your email again, or paste it here.");
       assert.ok(await visible(page, "#keyPaste"));
       assert.equal(await page.locator('label[for="keyPaste"]').count(), 0, "no label: the sentence says what the field is for");
       assert.equal(await page.getAttribute("#keyPaste", "aria-label"), "Trip link");
@@ -322,7 +332,7 @@ module.exports = [
       assert.deepEqual(lines, ["Ring up what you paid.", "The slip says who pays whom.", "Stamp it the moment you send."]);
       // In a Safari tab (not from the Home Screen), one more line under them, dimmer.
       assert.ok(await visible(page, "#how #howHome"));
-      assert.equal(await text(page, "#howHome"), "Add it to your Home Screen from You, so this phone stays signed in.");
+      assert.equal(await text(page, "#howHome"), "Add it to your Home Screen from You. The Home Screen app asks for your link once: paste it from your email.");
       const dim = await page.evaluate(() => [getComputedStyle(document.querySelector("#how .how-l")).opacity, getComputedStyle(document.getElementById("howHome")).opacity].map(Number));
       assert.ok(dim[1] < dim[0], "dimmer than the three lines: " + dim);
 

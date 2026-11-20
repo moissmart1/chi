@@ -37,7 +37,7 @@ module.exports = [
 
       await page.reload();
       await until(() => visible(page, "#gate"), "the no-key screen after a reload");
-      assert.equal(await text(page, "#gate p"), "This phone needs the trip link. Open it from your chat again, or paste it here.");
+      assert.equal(await text(page, "#gate p"), "This phone needs the trip link. Open it from your email again, or paste it here.");
       assert.equal(await drawsTrip(page), false);
       assert.equal(await store(page, () => globalThis.__matTest.store.state.expenses.length), 0);
       assert.deepEqual(await chiKeys(page), []);
@@ -76,7 +76,7 @@ module.exports = [
       await page.dispatchEvent("#setForget", "click");
       await page.dispatchEvent("#setForget", "click");
       await until(() => visible(page, "#gate"), "the no-key screen shows");
-      assert.equal(await text(page, "#gate p"), "This phone needs the trip link. Open it from your chat again, or paste it here.");
+      assert.equal(await text(page, "#gate p"), "This phone needs the trip link. Open it from your email again, or paste it here.");
       assert.deepEqual(await chiKeys(page), []);
       assert.equal(await page.evaluate(() => document.getElementById("you").classList.contains("is-open")), false, "Settings closed");
       assert.equal(await drawsTrip(page), false);

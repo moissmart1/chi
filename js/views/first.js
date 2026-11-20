@@ -16,8 +16,11 @@ import { fillSeal } from "../picture.js";
 
 export const HOW_LINES = ["Ring up what you paid.", "The slip says who pays whom.", "Stamp it the moment you send."];
 // Under the three lines, only in Safari (not from the Home Screen).
-const HOW_HOME = "Add it to your Home Screen from You, so this phone stays signed in.";
-const NO_KEY = "This phone needs the trip link. Open it from your chat again, or paste it here.";
+const HOW_HOME = "Add it to your Home Screen from You. The Home Screen app asks for your link once: paste it from your email.";
+const NO_KEY = "This phone needs the trip link. Open it from your email again, or paste it here.";
+// The Home Screen app keeps storage of its own, so opening the email's link (which
+// opens Safari) never signs it in: it says how to paste the link instead (mat#58).
+const NO_KEY_HOME = "The Home Screen app keeps its own sign-in. Find the email with your own Wendy’s link, press and hold the link, tap Copy Link, then paste it here.";
 const KEY_REFUSED = "That trip link didn’t work. Ask Mo for the current one.";
 // After a refused key the trip is taken off the phone (js/store.js), and the screen says so.
 const CLEARED = "The trip was taken off this phone.";
@@ -212,7 +215,7 @@ export function mountFirst(root, store, { connected = true, storage = defaultSto
 
   function render(s) {
     const keyless = connected && s.status === "nokey";
-    const refused = s.keyRefused ? KEY_REFUSED + (s.cleared ? " " + clearedText(s.cleared.kept) : "") : NO_KEY;
+    const refused = s.keyRefused ? KEY_REFUSED + (s.cleared ? " " + clearedText(s.cleared.kept) : "") : standalone() ? NO_KEY_HOME : NO_KEY;
     const blocked = !connected ? NOT_CONNECTED : keyless ? refused : s.tripProblem || null;
     gate.hidden = !blocked;
     if (blocked) gateText.textContent = blocked;
