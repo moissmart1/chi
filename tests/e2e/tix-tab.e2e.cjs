@@ -37,7 +37,7 @@ const noSideways = (page) => page.evaluate(() => {
 const cases = [];
 
 cases.push({
-  name: "the key: none before the first day, Tickets from 00:00 on Day 1 beside Days, Ring up still last; reached by keyboard; not remembered as the opening tab",
+  name: "the key: none before the first day, Tickets from 00:00 on Day 1 beside Days, Ring up in the middle (five keys); reached by keyboard; not remembered as the opening tab",
   async run({ page }) {
     const backend = await ticketed({ now: EVE });
     await ready(page, { backend, nowMs: EVE });
@@ -45,7 +45,7 @@ cases.push({
     assert.deepEqual(await keys(page), ["days", "money", "youBtn", "ring"]);
     await advance(page, backend, 3 * 60 * 1000 + 31000);
     await until(() => visible(page, "#ticketsBtn"), "Day 1: the Tickets key");
-    assert.deepEqual(await keys(page), ["days", "tickets", "money", "youBtn", "ring"]);
+    assert.deepEqual(await keys(page), ["days", "tickets", "ring", "money", "youBtn"]);
     await expectText(page, "#ticketsBtn", "TicketsStubs1"); // the flight in is that day
     await page.focus('#nav [data-tab="days"]');
     await page.keyboard.press("Tab");
@@ -203,7 +203,7 @@ cases.push({
 
 for (const width of [320, 393]) {
   cases.push({
-    name: "the bar at " + width + " px with the Tickets key: Days, Tickets, Money, You, Ring up on one line, nothing clipped, the badge inside its key",
+    name: "the bar at " + width + " px with the Tickets key: Days, Tickets, Ring up, Money, You on one line, nothing clipped, the badge inside its key",
     viewport: { width, height: 700 },
     async run({ page }) {
       const backend = await ticketed();
@@ -221,7 +221,7 @@ for (const width of [320, 393]) {
           const k = document.getElementById("ticketsBtn").getBoundingClientRect();
           return { ids: items.map((b) => b.dataset.tab || b.id), overlap, clipped, inside: rects.every((r) => r.left >= nav.left - 0.5 && r.right <= nav.right + 0.5), pill: p.left >= k.left - 0.5 && p.right <= k.right + 0.5 && p.top >= k.top - 0.5, page: document.documentElement.scrollWidth <= innerWidth };
         });
-        assert.deepEqual(shape, { ids: ["days", "tickets", "money", "youBtn", "ring"], overlap: false, clipped: [], inside: true, pill: true, page: true }, "on " + tab);
+        assert.deepEqual(shape, { ids: ["days", "tickets", "ring", "money", "youBtn"], overlap: false, clipped: [], inside: true, pill: true, page: true }, "on " + tab);
       }
     },
   });
@@ -263,7 +263,7 @@ cases.push({
     await open(page, { backend, nowMs: NOW, tab: "money" });
     await until(() => page.evaluate(() => document.querySelectorAll("#rail .pg .tk").length === 7), "both panes draw");
     await until(() => visible(page, "#ticketsBtn"), "the Tickets key is in the rail");
-    assert.deepEqual(await keys(page), ["tickets", "youBtn", "ring"]);
+    assert.deepEqual(await keys(page), ["tickets", "ring", "youBtn"]);
     await page.click("#ticketsBtn");
     await until(() => page.evaluate(() => document.getElementById("vTickets").classList.contains("is-active") && !!document.querySelector("#vTickets .ck")), "the tab shows");
     const r = await page.evaluate(() => {
@@ -274,7 +274,7 @@ cases.push({
     assert.ok(Math.abs(r.t.left - r.d.left) < 1 && Math.abs(r.t.width - r.d.width) < 1, "the tab stands where the Days pane stands");
     assert.equal(r.mShown, true, "Money is still shown and usable");
     assert.equal(r.dInert, true);
-    assert.deepEqual(await keys(page), ["days", "tickets", "youBtn", "ring"], "the Days key is the way back");
+    assert.deepEqual(await keys(page), ["days", "tickets", "ring", "youBtn"], "the Days key is the way back");
     await page.click("#ttShow");
     await ticketUp(page);
     const tix = await page.evaluate(() => document.getElementById("tix").getBoundingClientRect().toJSON());
@@ -282,7 +282,7 @@ cases.push({
     await closeTicket(page);
     await page.click('#nav [data-tab="days"]');
     await until(() => page.evaluate(() => document.getElementById("vDays").classList.contains("is-active")), "Days is back");
-    assert.deepEqual(await keys(page), ["tickets", "youBtn", "ring"]);
+    assert.deepEqual(await keys(page), ["tickets", "ring", "youBtn"]);
     assert.equal(await page.evaluate(() => localStorage.getItem("chi.tab")), "money", "what the app remembers is left alone");
   },
 });

@@ -265,8 +265,8 @@ for (const size of [BIG, LAPTOP]) {
             const a = document.activeElement;
             if (!a || a === document.body) return null;
             const s = getComputedStyle(a);
-            // Look C: one ink, on the paper as on the mint counter.
-            const ink = ["rgb(19, 38, 31)"];
+            // Look C: one ink, on the paper as on the linen counter.
+            const ink = ["rgb(31, 26, 20)"];
             return { tag: a.tagName, id: a.id, ok: a.matches(":focus-visible") && s.outlineStyle !== "none" && parseFloat(s.outlineWidth) >= 2 && ink.includes(s.outlineColor), color: s.outlineColor };
           });
           if (f) seen.push(f);
@@ -278,7 +278,7 @@ for (const size of [BIG, LAPTOP]) {
         await page.focus("#histBtn");
         await page.keyboard.press("Shift+Tab");
         await page.keyboard.press("Tab");
-        assert.equal(await page.evaluate(() => getComputedStyle(document.activeElement).outlineColor), "rgb(19, 38, 31)");
+        assert.equal(await page.evaluate(() => getComputedStyle(document.activeElement).outlineColor), "rgb(31, 26, 20)");
         // Hover: a key on the rail changes under the mouse.
         const bg = () => page.evaluate(() => getComputedStyle(document.getElementById("youBtn")).backgroundColor);
         const plain = await bg();

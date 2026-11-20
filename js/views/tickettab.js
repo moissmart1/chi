@@ -7,14 +7,20 @@
 // (beside Days), as the Japan app's Tickets key is (its version 30), but
 // only once a stop has a ticket: until then the bar is as it was.
 //
-// mountTicketTab(root, store, { clock, keep, onTicket, onState }) -> { update() }
+// mountTicketTab(root, store, { clock, keep, onTicket, onBefore, onState }) -> { update(), setBefore(n) }
 // - root: #vTickets.
 // - The order and the counts are js/passcase.js passCase; this only draws it.
 // - onTicket(stopId, button): the big stub, Show ticket or a stub was tapped;
 //   the app holds up the same ticket a stop's Show ticket does (js/views/stub.js).
-// - onState({ on, todayLeft }): told on every change whether the key is in the
-//   bar (the trip's first day has begun, by the Days clock, and a stop has a
-//   ticket) and its badge.
+// - onState({ on, started, todayLeft }): told on every change whether the key
+//   is in the bar and its badge. on: the trip's first day has begun (by the
+//   Days clock) and a stop has a ticket, or the Before list still has
+//   something open (its slip is on this tab, so the key must be there).
+//   started: the trip's first day has begun.
+// - setBefore(n): how many Before items are still open (the app tells it from
+//   the first day on; 0 once none is). With n > 0 a slip is at the top,
+//   "N still to book", and onBefore(button) is called when it is tapped: the
+//   app puts the Before pad up as a sheet over this tab (the Japan app's way).
 // - A ticket's first picture, small on the big stub, comes from the keep
 //   (the pictures already on this phone); nothing is fetched here.
 // - The "in N min" of the lead line is changed where it stands each minute:
@@ -38,13 +44,14 @@ function button(cls) {
   return b;
 }
 
-export function mountTicketTab(root, store, { clock, keep, onTicket = () => {}, onState = () => {} } = {}) {
+export function mountTicketTab(root, store, { clock, keep, onTicket = () => {}, onBefore = () => {}, onState = () => {} } = {}) {
   const section = el("section", "tt");
   section.setAttribute("aria-labelledby", "ttTitle");
   root.replaceChildren(section);
 
   let sig = "";
   let lastState = "";
+  let beforeOpen = 0; // Before items still open, from the trip's first day
 
   const stopOf = (id) => (store.state.stops || []).find((x) => x && x.id === id) || null;
   const have = (id) => !!keep && keep.have(id);
@@ -176,6 +183,14 @@ export function mountTicketTab(root, store, { clock, keep, onTicket = () => {}, 
     bar.append(h);
     if (c.toCome > 0) bar.append(el("span", "tt-come", c.toCome + " to come"));
     nodes.push(bar);
+    if (beforeOpen > 0) {
+      const slip = button("tt-bf");
+      slip.id = "ttBefore";
+      slip.dataset.act = "before";
+      slip.setAttribute("aria-label", "Before we go: " + beforeOpen + " still to book. Open");
+      slip.append(el("b", "", "Before we go"), el("span", "", beforeOpen + " still to book"), el("u", "", "Open"));
+      nodes.push(slip);
+    }
 
     const ahead = [c.next, ...c.today, ...c.later].filter(Boolean);
     if (!c.next) {
@@ -211,8 +226,9 @@ export function mountTicketTab(root, store, { clock, keep, onTicket = () => {}, 
 
     if (spot) {
       let target = null;
-      if (spot.id) target = section.querySelector('[data-act="' + spot.act + '"][data-id="' + CSS.escape(spot.id) + '"]') || section.querySelector('button[data-id="' + CSS.escape(spot.id) + '"]');
-      if (!target) target = section.querySelector("#ttShow") || document.getElementById("ticketsBtn");
+      if (spot.act === "before") target = section.querySelector("#ttBefore");
+      else if (spot.id) target = section.querySelector('[data-act="' + spot.act + '"][data-id="' + CSS.escape(spot.id) + '"]') || section.querySelector('button[data-id="' + CSS.escape(spot.id) + '"]');
+      if (!target) target = section.querySelector("#ttShow") || section.querySelector("#ttBefore") || document.getElementById("ticketsBtn");
       if (target) target.focus({ preventScroll: true });
     }
   }
@@ -223,11 +239,12 @@ export function mountTicketTab(root, store, { clock, keep, onTicket = () => {}, 
     const c = passCase(s, nowMs, { have });
     // The key is in the bar once the trip has begun and has a ticket (a trip
     // with none keeps the bar as it was).
-    const on = c.on && !c.empty;
-    const st = JSON.stringify([on, c.todayLeft]);
+    // The slip of Before items still open is also kept here, so with one the key stays even with no ticket.
+    const on = c.on && (!c.empty || beforeOpen > 0);
+    const st = JSON.stringify([on, c.on, c.todayLeft]);
     if (st !== lastState) {
       lastState = st;
-      onState({ on, todayLeft: c.todayLeft });
+      onState({ on, started: c.on, todayLeft: c.todayLeft });
     }
     // The trip was taken off this phone (or the trip has not begun, or has no ticket): nothing of it stays here.
     if (s.status === "nokey" || !on) {
@@ -241,7 +258,7 @@ export function mountTicketTab(root, store, { clock, keep, onTicket = () => {}, 
     // stands. Anything else that changed (a picture arriving, a stop changed) redraws.
     const pics = (s.tickets || []).filter((t) => t && !t.gone).map((t) => [t.id, t.stop, t.who, t.seat, t.page, have(t.id)]);
     const stops = (s.stops || []).filter((x) => x && (x.tkRef || x.tkName || x.tkPeople || x.tkSeat || pics.some((p) => p[1] === x.id))).map((x) => [x.id, x.title, x.detail, x.tkRef, x.tkName, x.tkPeople, x.tkSeat]);
-    const next = JSON.stringify([c.next ? { ...c.next, lead: !!c.next.lead } : null, { ...c, next: null }, pics, stops, s.me, (s.days || []).map((d) => d && [d.date, d.title])]);
+    const next = JSON.stringify([beforeOpen, c.next ? { ...c.next, lead: !!c.next.lead } : null, { ...c, next: null }, pics, stops, s.me, (s.days || []).map((d) => d && [d.date, d.title])]);
     if (next === sig) {
       const lt = section.querySelector(".f-nx .tt-lt");
       const want = c.next && c.next.lead ? c.next.lead : "";
@@ -257,9 +274,11 @@ export function mountTicketTab(root, store, { clock, keep, onTicket = () => {}, 
   const tap = tapOnRelease(section, {
     pick: (t) => {
       const b = t.closest("button[data-act]");
+      if (b && b.dataset.act === "before") return { act: "before", id: "" };
       return b && b.dataset.id ? { act: b.dataset.act, id: b.dataset.id } : null;
     },
     act: ({ act, id }) => {
+      if (act === "before") return onBefore(section.querySelector("#ttBefore"));
       const b = section.querySelector('button[data-act="' + act + '"][data-id="' + CSS.escape(id) + '"]') || section.querySelector('button[data-id="' + CSS.escape(id) + '"]');
       if (b) onTicket(id, b);
     },
@@ -267,6 +286,7 @@ export function mountTicketTab(root, store, { clock, keep, onTicket = () => {}, 
   section.addEventListener("click", (ev) => {
     if (tap.skip(ev)) return;
     const b = ev.target.closest("button[data-act]");
+    if (b && section.contains(b) && b.dataset.act === "before") return onBefore(b);
     if (!b || !section.contains(b) || !b.dataset.id) return;
     onTicket(b.dataset.id, b);
   });
@@ -290,5 +310,13 @@ export function mountTicketTab(root, store, { clock, keep, onTicket = () => {}, 
   wake();
   update();
 
-  return { update };
+  return {
+    update,
+    setBefore(n) {
+      const v = Number.isFinite(n) && n > 0 ? n : 0;
+      if (v === beforeOpen) return;
+      beforeOpen = v;
+      update();
+    },
+  };
 }

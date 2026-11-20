@@ -1,16 +1,17 @@
 /* Copyright (c) 2026 moissmart1. All rights reserved. No licence is granted: do not copy, adapt or reuse this code or design, and do not use it to train or prompt an AI system to reproduce it. See LICENSE. */
-/* The shell: Wendy’s, a diner guest check on a mint counter. One look on
+/* The shell: Wendy’s, a diner guest check on a buff pad on a linen counter. One look on
    purpose (paper has no dark mode). Tokens from the chosen mock-up, look C,
    "The guest check": green-ruled check paper, ink, a red for the rarest act,
    cream machine keys, a purple time-clock print for PAID. */
 :root{
   color-scheme:light;
-  --stage:#A9CDBF; --ground:#BFDCD1; --key:#F5F0E2; --key-hi:#FFFBEF; --key-ink:#4B544E;
-  --stock:#EEF4E4; --stock-mark:#DCE8D2; --print:#13261F; --grn:#2E7A57; --rule:rgba(46,122,87,.55);
-  --paper:#EEF4E4; --red:#C2362B; --purple:#6B2A8C; --blue:#2F5FA8; --mat:#FFFDF5;
-  --text:#13261F; --dim:#40544B;
+  --stage:#D9CFB9; --ground:#E9E1CE; --key:#F5F0E2; --key-hi:#FFFBEF; --key-ink:#5A5145;
+  --stock:#FBF5E3; --stock-mark:#EADFC4; --print:#1F1A14; --print2:#7A5530; --rule:rgba(122,85,48,.42);
+  --tint:rgba(122,85,48,.08); --tint2:rgba(122,85,48,.28);
+  --paper:#FBF5E3; --red:#C2362B; --purple:#6B2A8C; --blue:#2F5FA8; --mat:#FFFDF5;
+  --text:#1F1A14; --dim:#5A4F40;
   --bar-top:#E4E7E2; --bar-foot:#C9CEC8; --lamp-off:#c9c3b2;
-  --lcd:#D3E2C6; --lcd-ink:#13261F;
+  --lcd:#E6DDC2; --lcd-ink:#1F1A14;
   --f:"Libre Franklin","Helvetica Neue",Arial,system-ui,sans-serif;
   --reg:"VT323",ui-monospace,"Courier New",monospace;
   --slab:"Zilla Slab",Rockwell,Georgia,serif;
@@ -19,8 +20,8 @@
   /* The insets, read once here (the sideways block and the sheets' cap use them; a test can stand in for a notch). */
   --inset-l:env(safe-area-inset-left, 0px); --inset-r:env(safe-area-inset-right, 0px);
   --inset-t:env(safe-area-inset-top, 0px);
-  /* The counter: a mint ground with a faint dot grid (the mock-up's .dC). */
-  --dots:radial-gradient(rgba(19,38,31,.06) 1px, transparent 1.5px) 0 0/14px 14px;
+  /* The counter: a linen ground with a faint dot grid (the mock-up's .dC). */
+  --dots:radial-gradient(rgba(60,40,15,.07) 1px, transparent 1.5px) 0 0/14px 14px;
   /* Paper lies flat on the counter: a thin edge and a soft shadow under it. */
   --grain:none;
   --lift:0 1px 1px rgba(0,0,0,.15), 0 16px 22px -16px rgba(0,0,0,.55);
@@ -64,7 +65,7 @@ i{font-style:normal}
    ground, not the darker table: iPhone Safari colours the strip behind its
    toolbar from this, and a darker strip made the bottom bar look swallowed. */
 @media (max-width:480px), (orientation:landscape) and (max-height:520px){ html,body{background:var(--ground)} }
-::selection{background:rgba(46,122,87,.3)}
+::selection{background:var(--tint2)}
 .views{position:absolute;inset:0}
 .view{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;padding-bottom:96px;
   padding-top:calc(env(safe-area-inset-top, 0px) + var(--net-h, 0px));
@@ -78,7 +79,7 @@ i{font-style:normal}
    screens move down by its height (--net-h, set by js/views/net.js), so it
    never covers the sentence; every sheet and the undo bar pass over it. */
 .net{position:absolute;left:0;right:0;top:0;z-index:7;display:flex;align-items:center;gap:9px;min-height:40px;
-  padding:calc(8px + env(safe-area-inset-top, 0px)) var(--gr) 8px var(--gl);background:var(--print);border-bottom:2px dashed rgba(238,244,228,.45);
+  padding:calc(8px + env(safe-area-inset-top, 0px)) var(--gr) 8px var(--gl);background:var(--print);border-bottom:2px dashed rgba(251,245,227,.45);
   color:var(--stock);font-weight:700;font-size:13.5px;line-height:1.35}
 .net::before{content:"";flex:none;width:9px;height:9px;border-radius:50%;border:1.7px solid var(--red)}
 .net span:empty{display:none}
@@ -101,7 +102,7 @@ i{font-style:normal}
   background:linear-gradient(var(--print),var(--print)) center/100% 34px no-repeat}
 
 /* ---------- payer seals (also the register's) ---------- */
-.seal{width:38px;height:38px;border-radius:50%;border:1.6px solid var(--grn);background:none;color:var(--grn);font-weight:900;font-size:12px;padding:0;
+.seal{width:38px;height:38px;border-radius:50%;border:1.6px solid var(--print2);background:none;color:var(--print2);font-weight:900;font-size:12px;padding:0;
   transition:background .12s,color .12s,border-color .12s,transform .12s ease-out}
 .seal:active{transform:scale(.97)}
 .seal.is-on{background:var(--red);border-color:var(--red);color:#fff}
@@ -139,7 +140,7 @@ i{font-style:normal}
 .how-l:last-of-type{border-bottom:0}
 /* Under the three lines, in Safari only: the same words, dimmer, unnumbered. */
 .how-x{margin:0;padding:10px 0 9px 41px;border-top:2px dashed rgba(19,38,31,.45);font-weight:700;font-size:14.5px;line-height:1.35;opacity:.62}
-.how-l::before{content:counter(how);width:28px;height:28px;border-radius:50%;background:var(--grn);color:#fff;
+.how-l::before{content:counter(how);width:28px;height:28px;border-radius:50%;background:var(--print2);color:#fff;
   display:grid;place-items:center;font-weight:900;font-size:13px}
 .go-btn{display:block;width:100%;height:52px;margin-top:10px;border:0;border-radius:8px;background:var(--red);color:#fff;
   font-weight:900;font-size:16px;box-shadow:var(--paper-edge);transition:transform .15s ease-out,box-shadow .15s}
@@ -147,7 +148,7 @@ i{font-style:normal}
 
 .gate{position:absolute;inset:0;z-index:50;display:grid;place-items:center;padding:24px var(--gr) 24px var(--gl);background:var(--dots), var(--ground)}
 /* The gate's sentence on a guest check: the app's name over it, in the check's slab. */
-.gate p{margin:0;max-width:300px;padding:18px 16px;background:var(--stock);color:var(--print);border-radius:2px;box-shadow:var(--lift);border-top:3px double var(--grn);
+.gate p{margin:0;max-width:300px;padding:18px 16px;background:var(--stock);color:var(--print);border-radius:2px;box-shadow:var(--lift);border-top:3px double var(--print2);
   font-weight:700;font-size:17px;line-height:1.4;text-align:center}
 
 @media (prefers-reduced-motion: reduce){
@@ -158,7 +159,7 @@ i{font-style:normal}
 .gate{align-content:center;gap:14px}
 .gate-key{width:100%;max-width:300px;display:grid;gap:8px}
 .gate-key-r{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
-.gate-key input{width:100%;height:48px;padding:0 12px;border:1.5px solid var(--grn);border-radius:4px;background:var(--mat);color:var(--text);
+.gate-key input{width:100%;height:48px;padding:0 12px;border:1.5px solid var(--print2);border-radius:4px;background:var(--mat);color:var(--text);
   font-size:16px;font-weight:700;outline:none}
 .gate-key input::placeholder{color:var(--dim);font-weight:500}
 .gate-key input:focus{border-color:var(--text)}

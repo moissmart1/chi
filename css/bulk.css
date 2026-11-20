@@ -58,7 +58,7 @@
 
 /* The sure ones, untied: one line each, a stop picker and who it is for. */
 .ba-list{display:grid;gap:4px;margin-top:10px;padding:8px 10px;background:var(--stock);border-radius:2px;box-shadow:var(--lift)}
-.ba-lh{margin-top:6px;font-family:var(--slab);font-weight:700;font-size:13px;color:var(--grn)}
+.ba-lh{margin-top:6px;font-family:var(--slab);font-weight:700;font-size:13px;color:var(--print2)}
 .ba-lh:first-child{margin-top:0}
 .ba-line{border-bottom:1px solid var(--rule)}
 .ba-line:last-child{border-bottom:0}
@@ -69,9 +69,9 @@
 .ba-lb .chip{grid-area:s}
 .ba-ed{display:grid;gap:8px;padding:4px 0 10px}
 .ba-for{display:flex;flex-wrap:wrap;align-items:center;gap:5px;font-size:12.5px;font-weight:700}
-.ba-for button{height:34px;min-width:34px;padding:0 9px;border:1.5px solid var(--grn);border-radius:17px;background:none;color:var(--print);font-size:12.5px;font-weight:900}
+.ba-for button{height:34px;min-width:34px;padding:0 9px;border:1.5px solid var(--print2);border-radius:17px;background:none;color:var(--print);font-size:12.5px;font-weight:900}
 .ba-for button.is-on{background:var(--red);border-color:var(--red);color:#fff}
-.ba-pick{width:100%;min-height:44px;padding:0 10px;border:1.5px solid var(--grn);border-radius:4px;background:var(--mat);color:var(--print);font-size:15px;font-weight:700}
+.ba-pick{width:100%;min-height:44px;padding:0 10px;border:1.5px solid var(--print2);border-radius:4px;background:var(--mat);color:var(--print);font-size:15px;font-weight:700}
 .ba-out,.ba-put{min-height:44px;padding:0 14px;border:1.5px solid var(--print);border-radius:4px;background:none;color:var(--print);font-size:14px;font-weight:900}
 .ba-put{background:var(--print);color:var(--stock)}
 
@@ -79,7 +79,7 @@
 .secl{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:16px 2px 7px;font-weight:900;font-size:14px}
 .pips{display:flex;gap:4px;flex:none}
 .pips i{display:block;width:16px;height:5px;border-radius:3px;background:rgba(19,38,31,.25)}
-.pips i.is-done{background:var(--grn)}
+.pips i.is-done{background:var(--print2)}
 .pips i.on{width:24px;background:var(--print)}
 .f-odd{position:relative;z-index:2;padding:12px;background:var(--tk-grain),#FBFAF6;color:var(--print);box-shadow:0 1px 1px rgba(0,0,0,.3),0 10px 12px -8px rgba(0,0,0,.5);transform:rotate(-.5deg)}
 .odd-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
@@ -95,11 +95,11 @@
 .ba-opts{display:block}
 /* Each choice a line of that day's check. */
 .f-ch{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:stretch;width:100%;min-height:52px;margin-top:8px;padding:0;background:var(--stock);color:var(--print);text-align:left;
-  border:0;border-top:2px solid var(--grn);border-bottom:1px solid var(--rule);box-shadow:0 1px 2px rgba(0,0,0,.3);font-weight:700;font-size:13px;line-height:1.2;transition:transform .12s ease-out}
+  border:0;border-top:2px solid var(--print2);border-bottom:1px solid var(--rule);box-shadow:0 1px 2px rgba(0,0,0,.3);font-weight:700;font-size:13px;line-height:1.2;transition:transform .12s ease-out}
 .f-ch:active{transform:translateY(1.5px)}
 .f-ch>span{display:block;padding:5px 8px;min-width:0}
-.f-ch .dt{border-right:1px solid var(--grn)}
-.f-ch small{display:block;font-family:var(--slab);font-weight:600;font-size:10.5px;color:var(--grn);line-height:1.1}
+.f-ch .dt{border-right:1px solid var(--print2)}
+.f-ch small{display:block;font-family:var(--slab);font-weight:600;font-size:10.5px;color:var(--print2);line-height:1.1}
 .f-ch .dt b{font-weight:900;font-size:14px;white-space:nowrap}
 .f-ch .nm{align-self:center;overflow-wrap:anywhere}
 .f-ch .nm b{display:block;font-weight:900;font-size:15px}
@@ -116,7 +116,7 @@
 /* The quiet lines: already there, not a ticket, not active, the list. */
 .quiet{display:grid;gap:6px;margin-top:14px}
 .quiet-l{display:grid;grid-template-columns:24px minmax(0,1fr);gap:8px;align-items:start;font-size:13px;font-weight:600;line-height:1.35;overflow-wrap:anywhere}
-.quiet-l em{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;border:1.5px solid var(--grn);color:var(--grn);font-size:10.5px;font-weight:900;font-style:normal}
+.quiet-l em{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;border:1.5px solid var(--print2);color:var(--print2);font-size:10.5px;font-weight:900;font-style:normal}
 .quiet-l b{font-weight:900}
 .quiet-l.is-warn em{border-color:var(--red);color:var(--red)}
 .ba-link{min-height:32px;padding:0;border:0;background:none;color:var(--print);font-weight:900;text-decoration:underline dotted 2px;text-underline-offset:4px}
@@ -125,8 +125,8 @@
 .meter{margin-top:12px;font-size:13px;font-weight:700}
 .meter b{font-weight:900}
 .meter .m{height:7px;border-radius:2px;background:rgba(19,38,31,.14);margin-top:5px;position:relative;overflow:hidden}
-.meter .m i{position:absolute;left:0;top:0;bottom:0;background:var(--grn)}
-.meter .m i+i{background:repeating-linear-gradient(45deg,var(--grn) 0 3px,rgba(46,122,87,.45) 3px 6px)}
+.meter .m i{position:absolute;left:0;top:0;bottom:0;background:var(--print2)}
+.meter .m i+i{background:repeating-linear-gradient(45deg,var(--print2) 0 3px,var(--tint2) 3px 6px)}
 
 /* The red stapler on a cream register key. */
 .staplek{position:relative;display:grid;grid-template-columns:128px minmax(0,1fr);align-items:center;width:100%;min-height:84px;margin-top:16px;padding:0 12px 0 6px;border:0;border-radius:8px;text-align:left;color:var(--print);

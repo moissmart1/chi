@@ -53,7 +53,7 @@
 
 /* ---------- uneven split: a paper slip that stands above the register ---------- */
 .un{position:absolute;left:var(--gl);right:var(--gr);bottom:calc(100% + 8px);padding:8px 12px 10px;border-radius:8px;
-  background:var(--stock);color:var(--print);box-shadow:0 14px 28px -8px rgba(19,38,31,.5);border-top:3px double var(--grn);animation:roll .22s ease-out;
+  background:var(--stock);color:var(--print);box-shadow:0 14px 28px -8px rgba(19,38,31,.5);border-top:3px double var(--print2);animation:roll .22s ease-out;
   display:flex;flex-direction:column;max-height:calc(var(--un-room, 100vh) - env(safe-area-inset-top, 0px))}
 .un[hidden]{display:none}
 /* Only the rows scroll: the title with Set split, the mode chips and what is left stay put. */
@@ -90,7 +90,7 @@ input.un-val{grid-column:2 / span 3;width:100%;height:40px;border:0;border-radiu
   font-size:18px;text-align:right;outline:none;box-shadow:inset 0 2px 5px rgba(0,0,0,.3)}
 input.un-val::placeholder{color:rgba(31,38,27,.45)}
 input.un-val:focus{box-shadow:inset 0 2px 5px rgba(0,0,0,.3),0 0 0 2px var(--print)}
-.un-left{margin-top:4px;padding-top:8px;border-top:2px solid var(--grn);color:var(--red);font-weight:900;font-size:15.5px;font-variant-numeric:tabular-nums}
+.un-left{margin-top:4px;padding-top:8px;border-top:2px solid var(--print2);color:var(--red);font-weight:900;font-size:15.5px;font-variant-numeric:tabular-nums}
 
 /* ---------- pending lines ---------- */
 .rc-row small.rc-wait{opacity:1;font-weight:700}
@@ -98,7 +98,7 @@ input.un-val:focus{box-shadow:inset 0 2px 5px rgba(0,0,0,.3),0 0 0 2px var(--pri
 /* ---------- undo bar ---------- */
 .ubar{position:absolute;left:var(--gl);right:var(--gr);bottom:calc(86px + env(safe-area-inset-bottom, 0px));z-index:30;display:flex;justify-content:space-between;align-items:center;gap:10px;
   min-height:52px;padding:8px 6px 8px 16px;border-radius:2px;background:var(--stock);color:var(--print);font-weight:700;font-size:14.5px;
-  border-left:4px solid var(--grn);box-shadow:0 14px 28px -8px rgba(19,38,31,.5);animation:roll .22s ease-out}
+  border-left:4px solid var(--print2);box-shadow:0 14px 28px -8px rgba(19,38,31,.5);animation:roll .22s ease-out}
 .ubar span{min-width:0;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
 .ubar button{flex:none;border:0;background:none;color:var(--red);font-weight:900;font-size:15.5px;height:44px;padding:0 12px;touch-action:manipulation}
 .ubar button:active{transform:scale(.97)}

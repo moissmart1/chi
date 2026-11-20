@@ -16,7 +16,7 @@
   clip-path:polygon(0% 7px,2.5% 0,5% 7px,7.5% 0,10% 7px,12.5% 0,15% 7px,17.5% 0,20% 7px,22.5% 0,25% 7px,27.5% 0,30% 7px,32.5% 0,35% 7px,37.5% 0,40% 7px,42.5% 0,45% 7px,47.5% 0,50% 7px,52.5% 0,55% 7px,57.5% 0,60% 7px,62.5% 0,65% 7px,67.5% 0,70% 7px,72.5% 0,75% 7px,77.5% 0,80% 7px,82.5% 0,85% 7px,87.5% 0,90% 7px,92.5% 0,95% 7px,97.5% 0,100% 7px,100% 100%,0 100%)}
 .tape::-webkit-scrollbar{display:none}
 .tp-msg{margin:0;padding:8px 0;font-weight:700;font-size:15px;text-align:center}
-.tp-day{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-weight:900;font-size:14px;margin-top:12px;padding:11px 0 3px;border-top:2px solid var(--grn)}
+.tp-day{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-weight:900;font-size:14px;margin-top:12px;padding:11px 0 3px;border-top:2px solid var(--print2)}
 .tp-day:first-child{margin-top:0;padding-top:0;border-top:0}
 .tp-day i{font-weight:700;font-size:12px;opacity:.6}
 .tp-row{display:grid;grid-template-columns:38px minmax(0,1fr) auto;column-gap:8px;align-items:center;min-height:46px;padding:6px 0;border-bottom:1px solid var(--rule)}

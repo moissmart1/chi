@@ -36,8 +36,8 @@
 .bk-cell{position:absolute;width:max(44px, 10.5cqw);min-height:44px;transform:translate(-50%,-50%);display:grid;justify-items:center;align-content:start;
   border:0;background:none;padding:0;color:var(--print);text-align:center}
 .bk-well{position:relative;display:grid;place-items:center;width:10.5cqw;aspect-ratio:1}
-.bk-ghost{width:100%;aspect-ratio:1;border-radius:50%;border:1.5px dashed var(--grn);background:rgba(255,255,255,.6);display:grid;place-items:center;
-  color:var(--grn);line-height:1;transition:transform .15s ease-out,border-color .2s}
+.bk-ghost{width:100%;aspect-ratio:1;border-radius:50%;border:1.5px dashed var(--print2);background:rgba(255,255,255,.6);display:grid;place-items:center;
+  color:var(--print2);line-height:1;transition:transform .15s ease-out,border-color .2s}
 .bk-ghost b{font-weight:900;font-size:12px}
 /* New Year's Eve: a dashed burst where the ring would be (the fireworks). */
 .bk-ghost.is-nye{border:0;border-radius:0;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath d='M24 1L27.6 13.8 37.8 5.2 33 17.6 46.2 17.8 35.4 25.4 44.4 35.2 31.4 32.8 31.2 46 24 35 16.8 46 16.6 32.8 3.6 35.2 12.6 25.4 1.8 17.8 15 17.6 10.2 5.2 20.4 13.8Z' fill='none' stroke='%23C2362B' stroke-width='1.6' stroke-dasharray='4 3'/%3E%3C/svg%3E") center/contain no-repeat;color:var(--red)}
@@ -63,11 +63,11 @@
 
 /* The legend, on check paper: number, place and date, what it says now. */
 .bk-leg{margin:12px 4px 0;padding:2px 10px;border-radius:2px;background:var(--stock);color:var(--print);box-shadow:var(--lift)}
-.bk-row{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:8px;align-items:center;width:100%;min-height:44px;padding:8px 0;border:0;border-bottom:1px solid rgba(46,122,87,.4);
+.bk-row{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:8px;align-items:center;width:100%;min-height:44px;padding:8px 0;border:0;border-bottom:1px solid var(--rule);
   background:none;color:var(--print);text-align:left}
 .bk-row:last-child{border-bottom:0}
-.bk-k{width:22px;height:22px;border-radius:50%;border:1.6px solid var(--grn);display:grid;place-items:center;font-size:11px;font-weight:900;color:var(--grn)}
-.bk-k.is-got{background:var(--grn);color:#fff}
+.bk-k{width:22px;height:22px;border-radius:50%;border:1.6px solid var(--print2);display:grid;place-items:center;font-size:11px;font-weight:900;color:var(--print2)}
+.bk-k.is-got{background:var(--print2);color:#fff}
 .bk-row b{min-width:0;font-size:14.5px;font-weight:900;overflow-wrap:anywhere}
 .bk-row b small{font-weight:500;font-size:12.5px;margin-left:6px;white-space:nowrap}
 .bk-row em{font-style:normal;font-size:12px;font-weight:700;white-space:nowrap}
@@ -85,7 +85,7 @@
 .bk-p b{display:block;font-weight:900;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bk-p span i{display:block;color:var(--dim);font-variant-numeric:tabular-nums}
 .bk-seal{flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-family:var(--f);font-weight:900;font-size:12px;overflow:hidden;
-  border:1.5px dashed var(--grn);color:var(--grn);transition:background .2s,color .2s,border-color .2s}
+  border:1.5px dashed var(--print2);color:var(--print2);transition:background .2s,color .2s,border-color .2s}
 .bk-seal img{display:block;width:100%;height:100%;object-fit:cover;opacity:.4;pointer-events:none}
 .bk-p.is-in .bk-seal{border:2px solid var(--red);background:var(--mat);color:var(--red)}
 .bk-p.is-in .bk-seal img{opacity:1}
@@ -116,7 +116,7 @@
 .tk-stampline svg .d{stroke-width:1.6;stroke-dasharray:2.6 2.8}
 .tk-stampline span{flex:1;min-width:0}
 .tk-stampline i{flex:none;font-size:18px;font-weight:700;opacity:.6}
-.tk-stampline:active{background:rgba(46,122,87,.08)}
+.tk-stampline:active{background:var(--tint)}
 
 @media (prefers-reduced-motion: reduce){
   .bk-st.hit,.bk-page.thump,.bk-cell.nope .bk-ghost{animation:none}

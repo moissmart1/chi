@@ -3,7 +3,7 @@
    book hangs from the kitchen's ticket rail as order slips; booked is ringing
    the counter bell and the slip goes on the spike. Rules copied from the
    mock-up's option K (js/views/before.js and js/views/hand.js draw it). The
-   Before key's six-key bar, the Planner row in You and the pill in Money are
+   Before key's five-key bar, the Planner row in You and the pill in Money are
    at the end. */
 
 :root{
@@ -132,19 +132,46 @@ button.bf-t{display:block;width:100%;border:0;text-align:left;font:inherit;curso
 /* While the slip is in hand the undo bar sits at the top, clear of its keys. */
 .phone.bfhand-open .ubar{top:calc(12px + env(safe-area-inset-top, 0px));bottom:auto}
 
-/* Six keys: only once the trip has started and something is still open. */
-.nav:has(#beforeBtn:not([hidden])):has(#ticketsBtn:not([hidden])){gap:4px;padding-left:6px;padding-right:6px}
-.nav:has(#beforeBtn:not([hidden])):has(#ticketsBtn:not([hidden])) button{font-size:13px}
-.nav:has(#beforeBtn:not([hidden])):has(#ticketsBtn:not([hidden])) button small{font-size:9.5px}
+/* Five keys (before the trip: Days, Before, Ring up, Money, You; from the first day Tickets in Before's place): a fifth of the bar each, Ring up in the middle. Four keys leave the bar as it was. */
+.nav.five{gap:4px;padding-left:6px;padding-right:6px}
+.nav.five button{font-size:min(14px,calc((100vw - 40px) / 22))}
+.nav.five button small{font-size:9.5px}
+.nav.five .ring-w{font-size:9.5px}
 @media (max-width:350px){
-  .nav:has(#beforeBtn:not([hidden])):has(#ticketsBtn:not([hidden])){gap:3px;padding-left:4px;padding-right:4px}
-  .nav:has(#beforeBtn:not([hidden])):has(#ticketsBtn:not([hidden])) button{font-size:11.5px}
-  .nav:has(#beforeBtn:not([hidden])):has(#ticketsBtn:not([hidden])) button small{font-size:9px}
-  .nav #beforeBtn .cnt{right:1px}
+  .nav.five{gap:3px;padding-left:4px;padding-right:4px}
+  .nav.five button small,.nav.five .ring-w{font-size:9px}
+  .nav.five .cnt{right:1px}
 }
+/* Held sideways and on a computer the same keys are a rail: the five stand one under another, nothing is squeezed. */
+@media (orientation:landscape) and (max-height:520px), (min-width:1000px) and (min-height:521px){
+  .nav.five{gap:6px;padding-left:8px;padding-right:8px}
+  .nav.five button{font-size:15px}
+  .nav.five button small,.nav.five .ring-w{font-size:10.5px}
+}
+
+/* ---------- the Before pad as a sheet over the Tickets tab, and its slip there ---------- */
+#vBefore .bs-top{display:none}
+#vBefore.as-sheet{z-index:24;top:max(10%, calc(76px + var(--inset-t)));padding-top:0;padding-bottom:calc(24px + env(safe-area-inset-bottom, 0px));
+  background:var(--dots), var(--ground);border-top:1px solid rgba(31,26,20,.25);border-radius:18px 18px 0 0;box-shadow:0 -24px 40px -10px rgba(31,26,20,.5);transition:none;animation:bsUp .5s var(--sheet) both}
+#vBefore.as-sheet .bs-top{display:flex;position:sticky;top:0;z-index:2;margin:0 0 4px;padding:12px var(--gr) 6px var(--gl);background:var(--ground)}
+@keyframes bsUp{from{transform:translateY(104%)}to{transform:none}}
+@media (prefers-reduced-motion: reduce){ #vBefore.as-sheet{animation:none} }
+@media (orientation:landscape) and (max-height:520px){ #vBefore.as-sheet{top:16px} }
+/* A slip held in the hand while the pad is up dims the pad too. */
+.phone.before-open #bfHandScrim{z-index:25}
+.phone.before-open #bfHand{z-index:26}
+/* The slip on the Tickets tab: the Before items still open, on a yellow order slip (the rail's own paper). */
+.tt-bf{position:relative;display:flex;align-items:baseline;gap:8px;width:calc(100% - 2 * var(--gl) - 4px);min-height:44px;margin:10px var(--gr) 2px calc(var(--gl) + 2px);padding:8px 12px 9px;border:0;
+  background:var(--tk-grain),var(--dupe-y);color:var(--dupe-ink);text-align:left;transform:rotate(-.8deg);box-shadow:0 1px 1px rgba(0,0,0,.3),0 8px 9px -6px rgba(0,0,0,.45);transition:transform .12s ease-out}
+.tt-bf:active{transform:rotate(-1.4deg) translateY(1.5px)}
+.tt-bf b{font-size:14.5px;font-weight:900;white-space:nowrap}
+.tt-bf span{min-width:0;font-size:13.5px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tt-bf u{margin-left:auto;font-size:13.5px;font-weight:900;text-decoration:none;border-bottom:1.5px dotted var(--dupe-ink);white-space:nowrap}
+.tt-bf:focus-visible{outline-offset:3px}
+@media (prefers-reduced-motion: reduce){ .tt-bf{transition:none} }
 @media (min-width:1000px) and (min-height:521px){
   #vBefore{right:50%}
-  #bfHand,#bfHandScrim{left:0;right:calc(50% + var(--rail) / 2)}
+  #bfHand,#bfHandScrim,#beforeScrim{left:0;right:calc(50% + var(--rail) / 2)}
   .phone:has(#vBefore.is-active) .nav button[data-tab="days"]{display:grid}
 }
 @media (prefers-reduced-motion: reduce){
