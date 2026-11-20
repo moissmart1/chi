@@ -286,11 +286,14 @@ function bumpRev_() {
 
 // Appends one Log row and returns it as written. Called inside the write lock.
 // The id is one above both LOGSEQ and the Log's highest id, so ids stay unique
-// even if Script Properties were reset.
+// even if Script Properties were reset. An expense's fromPlanner is never
+// kept there (logSnap_).
 function appendLog_(ctx, action, kind, ref, summary, before, after, undoes) {
   var seq = Number(getProp_("LOGSEQ"));
   var id = Math.max(isFinite(seq) ? Math.floor(seq) : 0, maxLogId_()) + 1;
   setProp_("LOGSEQ", String(id));
+  before = logSnap_(kind, before);
+  after = logSnap_(kind, after);
   var row = {
     id: id, at: nowIso_(), who: ctx.actor, via: ctx.via, action: action, kind: kind, ref: ref, summary: summary,
     before: before ? JSON.stringify(before) : "", after: after ? JSON.stringify(after) : "",

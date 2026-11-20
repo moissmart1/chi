@@ -498,7 +498,19 @@ function expenseFromRow(o) {
     addedBy: cellText_(o.added_by),
     addedAt: cellStamp_(o.added_at),
     deleted: cellSet_(o.deleted_at),
+    // Brought in from the planner (tied to a payment there): the phone shows
+    // it locked. Only whether it is tied; the payment's id never leaves.
+    fromPlanner: cellText_(o.planner_id) !== "",
   };
+}
+
+// What the Log keeps of an item: the item, minus what is read from the row
+// each time and never written back (an expense's fromPlanner).
+function logSnap_(kind, x) {
+  if (kind !== "expense" || !x || typeof x !== "object" || !("fromPlanner" in x)) return x;
+  var out = {};
+  Object.keys(x).forEach(function (k) { if (k !== "fromPlanner") out[k] = x[k]; });
+  return out;
 }
 
 function paymentFromRow(o) {
@@ -1606,6 +1618,6 @@ function ticketSnap_(t, stopTitle) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { TABS, KINDS, tripMismatch, rateRounded, TRIP_TZ_, TRIP_UTC_OFFSET_MS_, TRIP_ZONE_WORD_, HOME_CURRENCY_, TRIP_CURRENCY_, TRIP_FIRST_DAY_, TRIP_LAST_DAY_, isTextColumn, sanitizeCell, unsanitizeCell, rowToObj, objToRow, validateExpense, validatePayment, validatePersonPatch, validateStop, validateStay, validateDayPatch, DAY_PATCH_KEYS, safeUrl, safeHttpsUrl, dayLabel, stopFromRow, stopToRow, stayFromRow, stayToRow, dayFromRow, dayToRow, expenseFromRow, paymentFromRow, personFromRow, cellDate_, cellStamp_, summarize, undoTarget, canUndo, entryFromRow, parseLogRow, expenseToRow, paymentToRow, setupSeedRows, shouldFetchRate, rateSource, sameKey, hexOfBytes, personKeysFrom, personKeysReadable, keyHolder, blankSecrets, shortDay_, stampWindow, pressRefusal, stampDefFromRow, stampFromRow, stampSnap_, TICKET_LIMITS, validateTicket, ticketChunks, joinTicketChunks, ticketFromRow, ticketSnap_, coordsOf_, pointFromLink, metresBetween_,
+  module.exports = { TABS, KINDS, tripMismatch, rateRounded, TRIP_TZ_, TRIP_UTC_OFFSET_MS_, TRIP_ZONE_WORD_, HOME_CURRENCY_, TRIP_CURRENCY_, TRIP_FIRST_DAY_, TRIP_LAST_DAY_, isTextColumn, sanitizeCell, unsanitizeCell, rowToObj, objToRow, validateExpense, validatePayment, validatePersonPatch, validateStop, validateStay, validateDayPatch, DAY_PATCH_KEYS, safeUrl, safeHttpsUrl, dayLabel, stopFromRow, stopToRow, stayFromRow, stayToRow, dayFromRow, dayToRow, expenseFromRow, paymentFromRow, personFromRow, cellDate_, cellStamp_, summarize, undoTarget, canUndo, entryFromRow, parseLogRow, expenseToRow, paymentToRow, setupSeedRows, shouldFetchRate, rateSource, sameKey, hexOfBytes, personKeysFrom, personKeysReadable, keyHolder, blankSecrets, shortDay_, stampWindow, pressRefusal, stampDefFromRow, stampFromRow, stampSnap_, TICKET_LIMITS, validateTicket, ticketChunks, joinTicketChunks, ticketFromRow, ticketSnap_, logSnap_, coordsOf_, pointFromLink, metresBetween_,
     paymentsFromRows, expenseFromPayment, paymentIdOf, todosFromRows, bookByDay, todoFromRow, isBooked, colLetter, changeLogRow, plannerWhat_ };
 }

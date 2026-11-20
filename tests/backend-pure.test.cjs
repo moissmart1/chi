@@ -754,3 +754,17 @@ test("stamp rows and the History sentence", () => {
   assert.equal(P.summarize("press", "stamp", null, { day: "2030-01-05" }), "stamped Jan 5");
   assert.equal(P.summarize("press", "stamp", null, { day: "" }), "stamped the book");
 });
+
+test("stage 2: expenseFromRow says fromPlanner, true only when the row has a planner_id; expenseToRow never writes it", () => {
+  const row = { id: "x", day: "pre", title: "T", amount: 80, currency: "CAD", rate: 0.72, paid_by: "Mo", split: "Mo,Izzah", split_mode: "equal", split_vals: "", note: "n", kind: "", added_by: "Mo", added_at: "t", deleted_at: "" };
+  assert.equal(P.expenseFromRow(row).fromPlanner, false, "no planner_id column at all");
+  assert.equal(P.expenseFromRow({ ...row, planner_id: "" }).fromPlanner, false);
+  assert.equal(P.expenseFromRow({ ...row, planner_id: " " }).fromPlanner, true, "a cell with anything in it is a tie, as the pull reads it");
+  assert.equal(P.expenseFromRow({ ...row, planner_id: "X7" }).fromPlanner, true);
+  assert.equal(P.expenseFromRow({ ...row, planner_id: 12 }).fromPlanner, true, "a number cell");
+  assert.equal(JSON.stringify(P.expenseFromRow({ ...row, planner_id: "X7" })).includes("X7"), false, "the payment's id itself is not in it");
+  const back = P.expenseToRow({ ...P.expenseFromRow({ ...row, planner_id: "X7" }), fromPlanner: true });
+  assert.equal("fromPlanner" in back, false);
+  assert.equal("planner_id" in back, false);
+  assert.equal("from_planner" in back, false);
+});

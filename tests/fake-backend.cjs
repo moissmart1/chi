@@ -6,7 +6,8 @@
 // back the way Sheets hands them back (a stored "'=x" reads as "=x").
 //
 // seed = { expenses?, payments?, people?, addPeople?, days?, stops?, stays?,
-// missingColumns?, missingTabs? } (see constraints R6). addPeople: more
+// missingColumns?, missingTabs? } (see constraints R6). An expense may carry
+// plannerId: it is then a line brought in from the planner (its planner_id). addPeople: more
 // People rows ({ name, initials, ... }) after the seed's Mo and Izzah;
 // missingColumns: ["Tab.column", ...] an older Sheet lacks until migrate
 // (ensureColumns_) adds them; missingTabs: ["Tab", ...] an older Sheet lacks
@@ -531,8 +532,10 @@ function seedWorld(P, prim, tables, props, seed, now) {
     const row = P.expenseToRow(e);
     row.added_at = e.addedAt;
     if (e.deleted) row.deleted_at = e.addedAt;
+    // plannerId: a line brought in from the planner (its tie, as a pull writes it).
+    if (typeof e.plannerId === "string" && e.plannerId) row.planner_id = e.plannerId;
     prim.appendObj_("Expenses", row);
-    const saved = P.expenseFromRow(lastRow("Expenses"));
+    const saved = P.logSnap_("expense", P.expenseFromRow(lastRow("Expenses")));
     const live = { ...saved, deleted: false };
     const base = { at: e.addedAt, who: e.addedBy, kind: "expense", ref: saved.id };
     events.push({ ...base, action: "add", summary: P.summarize("add", "expense", null, live), before: null, after: live });
