@@ -19,7 +19,7 @@
 //   script.googleusercontent.com), and anything else not listed here.
 // - Only OK answers are ever kept.
 
-const SW_VERSION = "d0844cdb02";
+const SW_VERSION = "461abbca73";
 // Cache Storage is shared by every app on this origin (another trip's app
 // can sit beside this one), so every name this worker makes or deletes
 // starts with this app's own prefix.
@@ -37,6 +37,7 @@ const SHELL = [
   "icons/icon-192.png",
   "icons/icon-512.png",
   "css/base.css",
+  "css/before.css",
   "css/bulk.css",
   "css/days.css",
   "css/history.css",
@@ -49,6 +50,7 @@ const SHELL = [
   "css/where.css",
   "js/api.js",
   "js/app.js",
+  "js/before.js",
   "js/board.js",
   "js/bulk.js",
   "js/clip.js",
@@ -70,14 +72,17 @@ const SHELL = [
   "js/store.js",
   "js/tickets.js",
   "js/time.js",
+  "js/todos.js",
   "js/trip.js",
   "js/update.js",
   "js/where.js",
   "js/views/alldays.js",
+  "js/views/before.js",
   "js/views/board.js",
   "js/views/bulkadd.js",
   "js/views/days.js",
   "js/views/first.js",
+  "js/views/hand.js",
   "js/views/history.js",
   "js/views/line.js",
   "js/views/money.js",
@@ -201,7 +206,7 @@ async function font(event) {
 // Opening the app with nothing kept and no signal: a plain page, not an error.
 function offlinePage() {
   const html = '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">' +
-    "<title>Wendy’s</title><body style=\"margin:0;min-height:100vh;display:grid;place-items:center;background:#BFDCD1;color:#13261F;" +
+    "<title>Wendy’s</title><body style=\"margin:0;min-height:100vh;display:grid;place-items:center;background:#E9E1CE;color:#1F1A14;" +
     'font:700 17px/1.4 system-ui,sans-serif;text-align:center;padding:24px;box-sizing:border-box"><p>No signal. Open again when you have some.</p></body>';
   return new Response(html, { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } });
 }

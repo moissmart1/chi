@@ -67,3 +67,34 @@ export function thud() {
     // no sound: the stamp still lands
   }
 }
+
+// The counter bell (the Before list's bell): two bright sine tones that ring
+// out for about a second. Same switch as the thud (Stamp sound), same rule:
+// never needed, every failure is swallowed.
+export function bell() {
+  if (!soundOn()) return;
+  try {
+    const AC = globalThis.AudioContext || globalThis.webkitAudioContext;
+    if (!AC) return;
+    if (!ac) ac = new AC();
+    if (ac.state === "suspended") {
+      const p = ac.resume();
+      if (p && typeof p.catch === "function") p.catch(() => {});
+    }
+    const t = ac.currentTime;
+    for (const [hz, peak, ring] of [[2217, 0.22, 0.9], [5540, 0.08, 0.5]]) {
+      const o = ac.createOscillator();
+      const g = ac.createGain();
+      o.type = "sine";
+      o.frequency.setValueAtTime(hz, t);
+      g.gain.setValueAtTime(peak, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + ring);
+      o.connect(g);
+      g.connect(ac.destination);
+      o.start(t);
+      o.stop(t + 1);
+    }
+  } catch {
+    // no sound: the slip still goes on the spike
+  }
+}

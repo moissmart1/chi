@@ -52,14 +52,15 @@ async function fits(page) {
 
 module.exports = [
   {
-    name: "no planner: no Before tab before or during the trip, four keys in the bar, no Planner payments row, and nothing ever asks for the planner",
+    name: "no planner linked: no Before tab before or during the trip, four keys in the bar, no Planner row, and nothing ever asks for the planner",
     async run({ page, newPhone }) {
       const planner = (backend) => backend.requests.filter((r) => /^(syncPayments|syncTodos|tickTodo|claimTodo|linkPlanner)$/.test(r.action)).map((r) => r.action);
       // Before the trip (when a linked planner's list would be in the bar) and during it.
       for (const [p, nowMs] of [[page, DEC1], [await newPhone(), Date.parse("2026-12-28T13:20:00-06:00")]]) {
         const backend = await open(p, { seed: WITH_PLAN, nowMs, tab: "days" });
         await showing(p, "#vDays");
-        assert.equal(await p.locator("#beforeBtn, #vBefore").count(), 0, "no Before key or screen at all");
+        assert.equal(await p.locator("#beforeBtn").isHidden(), true, "no Before key");
+        assert.equal(await p.locator("#before").isHidden(), true, "and its screen is not shown");
         assert.equal(await p.evaluate(() => [...document.querySelectorAll("#nav button")].filter((b) => b.getClientRects().length).length), 4, "Days, Money, You, Ring up");
         // Half an hour of checks, looks and coming back to the app.
         for (let i = 0; i < 6; i++) {
@@ -68,7 +69,8 @@ module.exports = [
         }
         await p.click("#youBtn");
         await until(() => visible(p, "#setHist"), "You opens");
-        assert.equal(await p.locator("#setPlanner, #setPlannerP").count(), 0, "no Planner payments row at all");
+        assert.equal(await p.locator("#setPlanner").isHidden(), true, "no Planner row");
+        assert.equal(await p.locator("#setPlannerP").isHidden(), true, "and no list of problems");
         assert.ok(backend.requests.some((r) => r.action === "rev"), "the phone did check in");
         assert.deepEqual(planner(backend), [], "no planner calls");
       }

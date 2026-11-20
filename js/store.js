@@ -44,6 +44,7 @@ import { HOME_CURRENCY, TRIP_CURRENCY } from "./trip.js";
 import { newId } from "./time.js";
 import { LOST as TICKET_LOST } from "./tickets.js";
 import { clearTrip } from "./forget.js";
+import { untickOutcome } from "./todos.js";
 
 const BUSY_RETRIES = 3;
 const BUSY_DELAY_MS = 400;
@@ -54,16 +55,23 @@ const NOT_SAVED = "No signal. That wasn’t saved.";
 const UNCONFIRMED = "Couldn’t confirm that. Checking…";
 const STALE = "That was changed again since. Undo the newer change first.";
 const NO_SIGNAL = "No signal. Try again.";
-const DATA_KEYS = ["trip", "people", "days", "stops", "stays", "expenses", "payments", "rateToday", "rateSource", "sheetUrl", "stampDefs", "stamps", "tickets"];
+// A pull from the planner writes a few rows at a time: asked again while more
+// remain, up to this many calls in a row.
+const TODO_PULLS = 4;
+
+// How often an open phone asks for the planner's payments on its own.
+const PAY_AUTO_MS = 10 * 60 * 1000;
+const DATA_KEYS = ["trip", "people", "days", "stops", "stays", "expenses", "payments", "rateToday", "rateSource", "sheetUrl", "plannerLinked", "todos", "todosPulledAt", "paymentsPulledAt", "stampDefs", "stamps", "paymentProblems", "todoProblems", "tickets"];
 // Every kind of item the store keeps, the field it is found by and the flag
 // that marks it gone. Stays and day headers only ever change here through an
-// undo from History (their writes come in later tasks).
+// undo from History (their writes come in later tasks). A todo is an item
+// of the planner's Book Now list ("Before we go"): ticked and claimed here.
 // A stamp of the book (js/stampbook.js) is one person's press of one stamp:
 // found by its definition and who pressed it ("def|who", as the backend's Log
 // names it), and marked gone when it is lifted from History.
 // A ticket is one picture of a stop's ticket (js/tickets.js), marked gone when removed.
-const LIST = { expense: "expenses", payment: "payments", person: "people", stop: "stops", stay: "stays", day: "days", stamp: "stamps", ticket: "tickets" };
-const KEY_FIELD = { expense: "id", payment: "id", person: "name", stop: "id", stay: "id", day: "date", ticket: "id" };
+const LIST = { expense: "expenses", payment: "payments", person: "people", stop: "stops", stay: "stays", day: "days", todo: "todos", stamp: "stamps", ticket: "tickets" };
+const KEY_FIELD = { expense: "id", payment: "id", person: "name", stop: "id", stay: "id", day: "date", todo: "id", ticket: "id" };
 const FLAG = { expense: "deleted", payment: "removed", stop: "deleted", stay: "deleted", stamp: "gone", ticket: "gone" };
 const keyOf = (kind, x) => (kind === "stamp" ? x.def + "|" + x.who : x[KEY_FIELD[kind]]);
 // Adds kept in the stored queue and resent with the same id until the backend has
@@ -98,6 +106,15 @@ const fateUnknown = (err) => noReply(err) && !neverSent(err);
 const transient = (err) => noReply(err) || codeOf(err) === "busy";
 const refusedAsStale = (err) => codeOf(err) === "stale" || codeOf(err) === "not_found";
 
+// s cut to max letters as the backend's plannerCut_ does: at max - 1, less a
+// trailing part-word, then "…".
+function cutText(s, max) {
+  if (s.length <= max) return s;
+  let t = s.slice(0, max - 1);
+  if (s.charAt(max - 1) !== " " && t.charAt(t.length - 1) !== " " && t.lastIndexOf(" ") > 0) t = t.slice(0, t.lastIndexOf(" "));
+  return t.replace(/\s+$/, "") + "…";
+}
+
 function bare(item) {
   if (!item) return item;
   const out = { ...item };
@@ -125,6 +142,21 @@ function unreadable(kind, x, names) {
   if (!isName(names, x.from) || !isName(names, x.to)) return "name";
   if (!positive(x.cad)) return "amount";
   return null;
+}
+
+// What a pull from the planner says it did.
+function plannerNotice(d) {
+  const plural = (n, one, many) => (n === 1 ? one : many);
+  let said;
+  if (d.added && d.changed) said = "Added " + d.added + " and changed " + d.changed + " to match the planner.";
+  else if (d.added) said = "Added " + d.added + plural(d.added, " payment", " payments") + " from the planner.";
+  else if (d.changed) said = "Changed " + d.changed + plural(d.changed, " payment", " payments") + " to match the planner.";
+  else said = "Nothing new in the planner.";
+  const bad = Array.isArray(d.problems) ? d.problems.length : 0;
+  if (bad) said += " " + bad + plural(bad, " payment needs a look in the planner.", " payments need a look in the planner.") + " See You for which.";
+  if (d.capped) said += " Only the first 300 payments were read.";
+  if (d.more) said += " More to bring in: tap Fetch again.";
+  return said;
 }
 
 function isData(d) {
@@ -174,7 +206,7 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
 
   const state = {
     status: "boot", online: true, rev: null, me: null,
-    trip: null, people: [], days: [], stops: [], stays: [], expenses: [], payments: [], rateToday: null, rateSource: null, sheetUrl: "", stampDefs: [], stamps: [], tickets: [], ticketsReady: false,
+    trip: null, people: [], days: [], stops: [], stays: [], expenses: [], payments: [], rateToday: null, rateSource: null, sheetUrl: "", plannerLinked: false, todos: [], todosPulledAt: "", paymentsPulledAt: "", stampDefs: [], stamps: [], paymentProblems: { at: "", list: [], more: 0 }, todoProblems: { at: "", list: [], more: 0 }, tickets: [], ticketsReady: false,
     loadedAt: null, seenAt: null, lastChange: null, notice: null, setAside: [], keyRefused: false, tripProblem: null,
     // personal: this phone opened its own person's link (load said so); me is then theirs.
     // cleared: the trip was taken off this phone after its key was refused ({ kept: own unsent lines kept }).
@@ -388,7 +420,8 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
     myName = null;
     for (const k of DATA_KEYS) state[k] = Array.isArray(state[k]) ? [] : null;
     Object.assign(state, {
-      rev: null, me: null, personal: false, sheetUrl: "", tripProblem: null, ticketsReady: false,
+      rev: null, me: null, personal: false, sheetUrl: "", tripProblem: null, ticketsReady: false, plannerLinked: false, todosPulledAt: "", paymentsPulledAt: "",
+      paymentProblems: { at: "", list: [], more: 0 }, todoProblems: { at: "", list: [], more: 0 },
       loadedAt: null, lastChange: null, notice: null, setAside: [],
       history: { entries: [], more: false, loading: false, error: null },
       cleared: had ? { kept: mine.length } : null,
@@ -759,6 +792,7 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
       if (op.lost) track(checkRev());
       else if (op.logId !== null) stepRev(r.rev);
       if (op.logId === null && !isAdd(op)) op.noop = true; // the backend already had it so
+      if (op.kind === "todo") op.saved = copy(item); // what it left, so untickTodo knows its own tick
       settleTicket(op, { saved: true, item: copy(item) });
       const lc = state.lastChange;
       if (op.quiet) {
@@ -788,10 +822,11 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
       } else {
         removeOp(op);
         state.notice = failNotice(err);
-        // A stop with no reply is asked about at once, not at the next
-        // 20-second check, so a stop that did land is back on screen before
-        // anyone types it again. (A reload only: the write is never resent.)
-        if (op.kind === "stop" && fateUnknown(err)) track(checkRev());
+        // A stop or a todo (a tick, a claim) with no reply is asked about at
+        // once, not at the next 20-second check, so one that did land (a slow
+        // tick outlasting the 30-second wait) is back on screen before anyone
+        // taps it again. (A reload only: the write is never resent.)
+        if ((op.kind === "stop" || op.kind === "todo") && fateUnknown(err)) track(checkRev());
       }
     }
     saveQueue();
@@ -1182,7 +1217,8 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
       // Nothing is shown as undone until the backend says what there is to undo.
       return enqueue(chainKey(op.kind, op.id), () => undoUnsure(op, true));
     }
-    state.lastChange = { token: newId(), action: "undo", kind: op.kind, item: bare(undoneView(op, bare(find(op.kind, op.id)))), canUndo: false };
+    const shownBefore = bare(find(op.kind, op.id));
+    state.lastChange = { token: newId(), action: "undo", kind: op.kind, item: bare(undoneView(op, shownBefore)), canUndo: false };
     const uop = { kind: op.kind, id: op.id, status: "sending", view: (cur) => undoneView(op, cur) };
     ops.push(uop);
     changed();
@@ -1201,6 +1237,9 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
         confirm(op.kind, r.data[op.kind]);
         stepRev(r.rev);
         saveCache();
+        // An undone tick that left something in the planner says so (a new line on the bar).
+        const left = op.kind === "todo" ? untickOutcome(shownBefore, r.data) : null;
+        if (left) state.lastChange = { token: newId(), action: "undo", kind: "todo", item: copy(r.data.todo), canUndo: false, planner: left };
       } catch (err) {
         removeOp(uop);
         op.undone = false;
@@ -1392,6 +1431,134 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
     throw err;
   }
 
+  // ---- payments from the planner sheet ----
+
+  // Asks the backend to bring in the planner's payments (R39): a plain call,
+  // never queued. On success it reloads, so the lines are on the receipt, and
+  // says what came in; resolves with the counts, or null when it did not
+  // go through (the notice says why).
+  async function syncPayments() {
+    let r;
+    try {
+      r = await call("syncPayments", {});
+    } catch (err) {
+      state.notice = neverSent(err) ? NO_SIGNAL : failNotice(err);
+      changed();
+      return null;
+    }
+    const d = r.data;
+    await refresh();
+    state.notice = plannerNotice(d);
+    changed();
+    return { added: d.added, changed: d.changed, same: d.same, removed: d.removed, notCounted: d.notCounted, problems: d.problems, more: !!d.more, capped: !!d.capped };
+  }
+
+  // The planner's payments, asked for on their own while the app is open
+  // (Mo, 2026-11-17: "needs to be updated more often"): at most once every
+  // PAY_AUTO_MS on this phone, and not while the last pull by any phone (load
+  // says when) is that recent; the backend holds to the same gap. Quiet: it
+  // says something only when lines came in or changed. Resolves with the
+  // counts, or null when it did not ask or it did not go through.
+  let autoBusy = false;
+  let autoAt = -Infinity;
+  async function autoPayments() {
+    if (autoBusy || state.status !== "ready" || state.plannerLinked !== true) return null;
+    const t = now();
+    const last = Date.parse(state.paymentsPulledAt || "");
+    if (t - autoAt < PAY_AUTO_MS) return null;
+    if (Number.isFinite(last) && t - last >= 0 && t - last < PAY_AUTO_MS) return null;
+    autoBusy = true;
+    autoAt = t;
+    try {
+      let r;
+      try {
+        r = await call("syncPayments", { auto: true });
+      } catch (err) {
+        // Never sent (no signal): ask again on the next look, not in 10 minutes.
+        if (neverSent(err)) autoAt = -Infinity;
+        return null;
+      }
+      const d = (r && r.data) || {};
+      if (d.skipped) return null;
+      // Cut short (ten at a time): carry on at the next look, not in 10 minutes.
+      if (d.more) autoAt = -Infinity;
+      // The list under Planner payments on You: brought up to date when it differs, without a word.
+      const shown = (state.paymentProblems && state.paymentProblems.list) || [];
+      const key = (l) => l.slice(0, 20).map((x) => x.id + "|" + x.row + "|" + x.message).join("\n");
+      const stale = Array.isArray(d.problems) && (d.problems.length !== shown.length + ((state.paymentProblems && state.paymentProblems.more) || 0) || key(d.problems) !== key(shown));
+      if (d.added || d.changed || stale) {
+        await refresh();
+        // Never over something already being said (a failed save matters more).
+        if (!state.notice && (d.added || d.changed)) state.notice = plannerNotice(d);
+        changed();
+      }
+      return { added: d.added, changed: d.changed, same: d.same, removed: d.removed, notCounted: d.notCounted, problems: d.problems, more: !!d.more, capped: !!d.capped };
+    } finally {
+      autoBusy = false;
+    }
+  }
+
+  // ---- "Before we go": the planner's Book Now list ----
+
+  // Brings the list in from the planner: a plain call, never queued. While
+  // the backend says more rows remain it is asked again (force), up to
+  // TODO_PULLS calls in a row. Resolves { ok: true, more, pulledAt, stored }
+  // (stored: the backend answered with its stored list, read from the
+  // planner at pulledAt) or { ok: false, code, message }; unless quiet, a
+  // failure is said the usual way. An unfinished pull keeps the last fetched
+  // time.
+  async function syncTodos({ force = false, quiet = false } = {}) {
+    let r = null;
+    let more = false;
+    // What the backend answered: into base (an unfinished pull keeps the last
+    // fetched time). A real pull's problems replace the ones shown, kept as
+    // the backend keeps them (at most 20, and how many more); a stored answer
+    // leaves them alone.
+    const keep = (got) => {
+      const d = (got && got.data) || {};
+      if (!base || !Array.isArray(d.todos)) return;
+      const pulledAt = typeof d.pulledAt === "string" && d.pulledAt ? d.pulledAt : base.todosPulledAt || "";
+      base = { ...base, todos: copy(d.todos), todosPulledAt: pulledAt };
+      if (!d.stored && Array.isArray(d.problems)) {
+        // This fetch's time (a pull cut short keeps the old pulledAt), each message cut to 160 as the backend stores it.
+        const list = copy(d.problems.slice(0, 20)).map((p) => (p && typeof p.message === "string" ? { ...p, message: cutText(p.message, 160) } : p));
+        base.todoProblems = { at: (typeof d.pulledAt === "string" && d.pulledAt) || new Date(now()).toISOString(), list, more: Math.max(0, d.problems.length - 20) };
+      }
+      saveCache();
+    };
+    try {
+      for (let n = 0; n < TODO_PULLS; n++) {
+        r = await call("syncTodos", { force: n === 0 ? force : true });
+        more = !!(r.data && r.data.more);
+        if (!more) break;
+      }
+    } catch (err) {
+      // A later call failed: what the earlier ones brought in still counts.
+      if (r) keep(r);
+      if (!quiet) state.notice = neverSent(err) ? NO_SIGNAL : failNotice(err);
+      changed();
+      return { ok: false, code: codeOf(err), message: (err && err.message) || "" };
+    }
+    keep(r);
+    changed();
+    return { ok: true, more, pulledAt: state.todosPulledAt || "", stored: !!(r && r.data && r.data.stored) };
+  }
+
+  // A tick, shown at once (done, by me, now); the backend then tries to
+  // write Booked into the planner.
+  function tickTodo(id) {
+    return change("todo", id, "tick", "tickTodo", { tickedBy: myName, tickedAt: new Date(now()).toISOString(), done: true });
+  }
+
+  // on: I take it (from anyone: "claim", or "takeover" from someone else);
+  // off: I hand it back ("unclaim").
+  function claimTodo(id, on) {
+    const cur = find("todo", id);
+    if (!cur) return null;
+    const action = !on ? "unclaim" : cur.claimedBy && cur.claimedBy !== myName ? "takeover" : "claim";
+    return change("todo", id, action, "claimTodo", { claimedBy: on ? myName : "" }, { args: { id, on: !!on } });
+  }
+
   // ---- history ----
 
   let historySeq = 0; // numbers each first-page load
@@ -1439,10 +1606,17 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
   }
 
   function undoEntry(logId) {
-    const entry = state.history.entries.find((e) => e.id === logId);
+    return undoLogged(logId, state.history.entries.find((e) => e.id === logId), true);
+  }
+
+  // An undo of one History entry (`entry` as History gave it, when known).
+  // fromTape: asked from History itself, whose tape is then marked and loaded
+  // again; otherwise (untickTodo) only when History has been loaded.
+  function undoLogged(logId, entry, fromTape) {
     // A picture change belongs to its person: it waits behind their other changes.
     const key = entry ? chainKey(entry.kind === "picture" ? "person" : entry.kind, entry.ref) : "log:" + logId;
     return enqueue(key, async () => {
+      const shownBefore = entry && entry.kind === "todo" ? bare(find("todo", entry.ref)) : null;
       let r;
       try {
         r = await call("undo", { logId });
@@ -1464,6 +1638,13 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
       stepRev(r.rev);
       saveCache();
       state.lastChange = { token: newId(), action: "undo", kind, item: copy(item), canUndo: false };
+      // An undone tick that left something in the planner says so.
+      const left = kind === "todo" ? untickOutcome(shownBefore, r.data) : null;
+      if (left) state.lastChange.planner = left;
+      if (!fromTape && !historyLoaded) {
+        changed();
+        return true;
+      }
       const top = r.data.entry;
       const rest = state.history.entries.map((e) => {
         if (e.id === logId) return { ...e, undoneBy: r.data.logId, canUndo: false };
@@ -1475,6 +1656,69 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
       await loadHistory(); // the tape starts again from its first page, with whatever others did meanwhile
       return true;
     });
+  }
+
+  // ---- taking a tick back ("Not booked after all") ----
+
+  const unticking = new Set(); // items whose untick is on its way
+
+  // This phone's own write of the tick an item shows, while it holds it: on
+  // its way, unsure (the undo then settles it against the backend), or saved
+  // and still what the item shows. A refused tick, or one taken back and made
+  // again elsewhere since, is not.
+  function ownTick(cur) {
+    let own = null;
+    for (const op of writes.values()) {
+      if (op.kind === "todo" && op.id === cur.id && op.action === "tick" && !op.undone) own = op;
+    }
+    if (!own) return null;
+    if (ops.includes(own) || unsure(own)) return own;
+    const s = own.saved;
+    return s && s.tickedBy === cur.tickedBy && s.tickedAt === cur.tickedAt ? own : null;
+  }
+
+  // Takes back a tick made in the app, from any visit. This phone's own write
+  // is undone as Undo does; otherwise the item's newest tick in History (not
+  // undone) goes through the same path as an undo from History (the same
+  // queue, the same refusals, the same planner line on the undo bar). Nothing
+  // changes on screen until the backend has it. No such entry, or no signal:
+  // a notice, and nothing changes. A Booked typed in the planner (no tickedBy)
+  // is never taken back here. Resolves true once the tick is taken back.
+  async function untickTodo(id) {
+    const cur = find("todo", id);
+    if (!cur || String(cur.tickedBy || "").trim() === "" || unticking.has(id)) return false;
+    unticking.add(id);
+    try {
+      const own = ownTick(cur);
+      if (own) {
+        await undo(own.token);
+        const now = find("todo", id);
+        return !!now && String(now.tickedBy || "").trim() === "";
+      }
+      let entries;
+      try {
+        entries = await call("history", { ref: id });
+      } catch (err) {
+        state.notice = codeOf(err) === "network" ? NO_SIGNAL : UNDO_FAILED;
+        changed();
+        return false;
+      }
+      const ticks = (Array.isArray(entries.data && entries.data.entries) ? entries.data.entries : []).filter((e) => e && e.kind === "todo" && e.ref === id && e.action === "tick");
+      const newest = ticks.reduce((a, e) => (!a || Number(e.id) > Number(a.id) ? e : a), null);
+      const again = find("todo", id);
+      if (!again || String(again.tickedBy || "").trim() === "") {
+        changed();
+        return false; // taken back meanwhile
+      }
+      if (!newest || (newest.undoneBy !== null && newest.undoneBy !== undefined && newest.undoneBy !== "")) {
+        state.notice = UNDO_FAILED;
+        changed();
+        return false;
+      }
+      return await undoLogged(newest.id, newest, false);
+    } finally {
+      unticking.delete(id);
+    }
   }
 
   // ---- small settings ----
@@ -1538,7 +1782,8 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
       return () => subs.delete(fn);
     },
     boot, refresh, checkRev, flush, idle,
-    setMe, setPerson, markSeen, forgot, unsentCount, notify, clearNotice, claudeToken,
+    setMe, setPerson, markSeen, forgot, unsentCount, notify, clearNotice, claudeToken, syncPayments, autoPayments,
+    syncTodos, tickTodo, claimTodo, untickTodo,
     pressStamp,
     addTicket, ticketOutcome, fetchTicket,
     removeTicket: (id) => takeBackLive("ticket", id) || change("ticket", id, "remove", "removeTicket", { gone: true }),

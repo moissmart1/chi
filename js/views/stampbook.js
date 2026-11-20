@@ -94,8 +94,8 @@ function matSVG(sub) {
     '<rect x="7" y="7" width="' + (W - 14) + '" height="' + (H - 14) + '" fill="#FFFDF5"/><g fill="#FFFDF5">' + sc + "</g>" +
     '<rect x="16" y="16" width="' + (W - 32) + '" height="' + (H - 32) + '" fill="none" stroke="#C2362B" stroke-width="1.5"/>' +
     '<text x="' + W / 2 + '" y="46" text-anchor="middle" font-family="Zilla Slab,Rockwell,Georgia,serif" font-weight="700" font-size="24" fill="#C2362B">Souvenir of Chicago</text>' +
-    '<text x="' + W / 2 + '" y="62" text-anchor="middle" font-family="Libre Franklin,Helvetica Neue,Arial,sans-serif" font-weight="700" font-size="11" fill="#13261F">' + esc(sub) + "</text>" +
-    '<g stroke="rgba(46,122,87,.18)" stroke-width="1">' + grid + "</g>" +
+    '<text x="' + W / 2 + '" y="62" text-anchor="middle" font-family="Libre Franklin,Helvetica Neue,Arial,sans-serif" font-weight="700" font-size="11" fill="#1F1A14">' + esc(sub) + "</text>" +
+    '<g stroke="rgba(122,85,48,.18)" stroke-width="1">' + grid + "</g>" +
     '<path d="M300 70 C 292 130, 306 170, 290 210 S 300 300, 284 ' + (H - 22) + " L " + (W - 17) + " " + (H - 22) + " L " + (W - 17) + ' 70 Z" fill="#CDE4EE"/>' +
     '<text transform="translate(322 300) rotate(-90)" text-anchor="middle" font-family="Zilla Slab,Rockwell,Georgia,serif" font-weight="600" font-size="14" fill="#2F5FA8">Lake Michigan</text>' +
     '<path d="M292 206 L 150 206 L 132 196 L 118 72 M150 206 L 140 222 L 150 ' + (H - 22) + '" fill="none" stroke="#7FB4D3" stroke-width="7" stroke-linejoin="round"/>' +

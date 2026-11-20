@@ -11,7 +11,7 @@
 //   person, the owner (security, 2026-11-18). Nothing here
 //   touches the Sheet itself; the reads are handle_'s load and history, and
 //   People for who the writes are made as.
-// - A reply never holds the trip key, the token, an
+// - A reply never holds the trip key, the token, the planner sheet's id, an
 //   e-Transfer address or an email (mcpScrub_), and an error reply says
 //   nothing about the trip.
 // - Nothing here logs.
@@ -197,9 +197,9 @@ function mcpWrite_(kind, action, args, who) {
 // in "Tokyo Tower").
 // The secrets hidden wherever they appear, in a connector reply or in the
 // owner's error log (reportError_ in Actions.js): the shared key while it
-// exists and the token.
+// exists, the token and the planner's id.
 function secretsAnywhere_() {
-  return [tripKey_(), claudeToken_()].filter(function (s) { return typeof s === "string" && s !== ""; });
+  return [tripKey_(), claudeToken_(), plannerId_()].filter(function (s) { return typeof s === "string" && s !== ""; });
 }
 
 function mcpSecrets_(people) {
@@ -302,8 +302,17 @@ function mcpGetTrip_(args, who) {
       payments: t.payments,
       owed: mcpOwed_(owedList(t.names, t.expenses, t.payments, true)),
       owed_direct: mcpOwed_(owedList(t.names, t.expenses, t.payments, false)),
+      todos: mcpTodos_(t.d.todos || []),
     },
   };
+}
+
+// "Before we go": each item still open, and how many are done.
+function mcpTodos_(todos) {
+  var open = todos.filter(function (x) { return !x.done; }).map(function (x) {
+    return { id: x.id, item: x.item, book_by: x.bookBy, claimed_by: x.claimedBy };
+  });
+  return { open: open, done: todos.length - open.length };
 }
 
 function mcpExplainDebt_(args, who) {
@@ -352,7 +361,7 @@ function mcpGetHistory_(args, who) {
         // The sentence the app's History shows (js/format.js historySentence).
         // An e-Transfer change is kept, as its sentence only: the address is
         // never in a sentence (summarize in Pure.js).
-        var by = e.via === "claude" ? " (through Claude)" : "";
+        var by = e.via === "claude" ? " (through Claude)" : e.via === "planner" ? " (from the planner)" : "";
         return { id: e.id, when: e.at, who: e.who, sentence: e.who + " " + e.summary + by, can_undo: e.canUndo };
       }),
     },
@@ -423,6 +432,15 @@ function mcpSetDay_(args, who) {
   return mcpWrite_("day", "setDay", { date: args.date, patch: patch }, who);
 }
 
+// A pull from the planner sheet: its counts, the problems it met, whether
+// more remain to bring in (more) and whether it read only the first 300 (capped).
+function mcpSyncPayments_(args, who) {
+  var r = mcpAsk_("syncPayments", {}, who.actor);
+  if (!r.ok) return r;
+  var d = r.data;
+  return { ok: true, value: { added: d.added, changed: d.changed, same: d.same, removed: d.removed, not_counted: d.notCounted, problems: d.problems, more: d.more, capped: d.capped } };
+}
+
 function mcpUndo_(args, who) {
   var r = mcpAsk_("undo", { logId: args.log_id }, who.actor);
   if (!r.ok) return r;
@@ -431,6 +449,10 @@ function mcpUndo_(args, who) {
   // A picture's undo answers with the person: only whether they now have one.
   if (kind === "picture") value.person = { name: r.data.person.name, has_picture: !!r.data.person.photo };
   else value[kind] = r.data[kind];
+  // A "Before we go" undo through Claude never touches the planner (R49):
+  // "pending" when it took off a tick the planner had taken (the put-back is
+  // left to the next pull), "kept" otherwise.
+  if (kind === "todo") value.planner = r.data.planner;
   value.log_id = r.data.logId;
   return { ok: true, value: value };
 }
@@ -481,7 +503,7 @@ function mcpTools_() {
   return [
     {
       name: "get_trip",
-      description: "Use this first to see the whole trip: its days, stops (each with its ticket details as text in tkRef, tkName, tkPeople and tkSeat, but never the ticket pictures, which only the app can add, read or remove), stays, expenses and payments, who owes whom now. Amounts owed are in Canadian dollars.",
+      description: "Use this first to see the whole trip: its days, stops (each with its ticket details as text in tkRef, tkName, tkPeople and tkSeat, but never the ticket pictures, which only the app can add, read or remove), stays, expenses and payments, who owes whom now, and the bookings still to make before the trip. Amounts owed are in Canadian dollars.",
       args: {},
       run: mcpGetTrip_,
     },
@@ -559,6 +581,13 @@ function mcpTools_() {
       description: "Use this to undo one change from get_history, as the app’s Undo does; only the newest change to an item can be undone. The undo shows in the app’s History too.",
       args: { log_id: arg("integer", "The change’s id, from get_history or a write’s log_id.", true) },
       run: mcpUndo_,
+    },
+    {
+      name: "sync_payments",
+      write: true,
+      description: "Use this to bring in what’s been paid from the planner sheet’s Payments tab: new payments are added and changed ones updated. " + MCP_UNDOABLE_,
+      args: {},
+      run: mcpSyncPayments_,
     },
   ];
 }

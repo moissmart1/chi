@@ -1,0 +1,195 @@
+/* Copyright (c) 2026 moissmart1. All rights reserved. No licence is granted: do not copy, adapt or reuse this code or design, and do not use it to train or prompt an AI system to reproduce it. See LICENSE. */
+/* "Before we go", look K, "the rail" (Mo's pick, 2026-11-20): what is still to
+   book hangs from the kitchen's ticket rail as order slips; booked is ringing
+   the counter bell and the slip goes on the spike. Rules copied from the
+   mock-up's option K (js/views/before.js and js/views/hand.js draw it). The
+   Before key's five-key bar, the Planner row in You and the pill in Money are
+   at the end. */
+
+:root{
+  --dupe-y:#F5E79C; --dupe-p:#F4CBCF; --dupe-w:#F8F6EC; --dupe-ink:#1B1B1B;
+}
+
+/* The title line (as Days). */
+.bf-bar{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:12px var(--gr) 0 var(--gl)}
+.bf-bar-d{margin:0;font-weight:900;font-size:20px;white-space:nowrap;cursor:default}
+.bf-bar-t{font-weight:700;font-size:14px;opacity:.82;text-align:right}
+.bf-bar-d:focus-visible{outline-offset:3px}
+
+/* The rail and the slips hanging from it. */
+.bf-rail{position:relative;z-index:3;height:20px;margin:16px calc(var(--gr) - 11px) 0 calc(var(--gl) - 11px);border-radius:3px;background:var(--steel);box-shadow:0 0 0 1px rgba(0,0,0,.5),0 6px 7px -2px rgba(0,0,0,.45)}
+.bf-rail::before{content:"";position:absolute;left:14px;right:14px;bottom:4px;height:2.5px;border-radius:1px;background:rgba(0,0,0,.5);box-shadow:0 1px 0 rgba(255,255,255,.6)}
+.bf-rail::after{content:"";position:absolute;inset:0;background:radial-gradient(circle,#5d655f 0 2px,#fff 2.2px 2.8px,transparent 3px) 5px 4px/calc(100% - 10px) 7px repeat-x}
+.bf-rail{pointer-events:none}
+.bf-rail+.bf-row{margin-top:-7px}
+.bf-row{position:relative;z-index:2;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;padding:0 calc(var(--gr) + 1px) 0 calc(var(--gl) + 1px);align-items:start}
+.bf-hang{filter:drop-shadow(0 1px 0 rgba(0,0,0,.25)) drop-shadow(0 9px 7px rgba(0,0,0,.3));transform:rotate(var(--r,0deg));transform-origin:50% 0}
+.bf-t{position:relative;padding:15px 10px 18px;color:var(--dupe-ink);background:var(--tk-grain),var(--dupe-y);
+  -webkit-mask:conic-gradient(from -45deg at bottom,#0000,#000 1deg 89deg,#0000 90deg) 50% 100%/10px 6px repeat-x,linear-gradient(#000 0 0) 0 0/100% calc(100% - 6px) no-repeat;
+          mask:conic-gradient(from -45deg at bottom,#0000,#000 1deg 89deg,#0000 90deg) 50% 100%/10px 6px repeat-x,linear-gradient(#000 0 0) 0 0/100% calc(100% - 6px) no-repeat}
+.bf-t.pink{background:var(--tk-grain),var(--dupe-p)}
+.bf-t.white{background:var(--tk-grain),var(--dupe-w)}
+button.bf-t{display:block;width:100%;border:0;text-align:left;font:inherit;cursor:pointer}
+.bf-t:active{transform:translateY(1.5px)}
+.bf-t.is-pending{opacity:.55}
+.bf-top{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--reg);font-size:19px;line-height:1;padding-bottom:5px;border-bottom:1.5px dashed rgba(0,0,0,.45);text-transform:uppercase}
+.bf-top b{font-weight:400;font-size:22px}
+.bf-top span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-left:8px}
+.bf-n{display:block;margin-top:7px;font-weight:900;font-size:16px;line-height:1.18;overflow-wrap:anywhere}
+.bf-due{display:block;margin-top:5px;font-size:13px;font-weight:600;line-height:1.3}
+.bf-due b{font-weight:900}
+.bf-due.soon{color:var(--red)}
+.bf-due.none{opacity:.7}
+.bf-due em{display:block;font-family:var(--reg);font-size:21px;line-height:1;margin-top:2px;text-transform:uppercase}
+.bf-who{display:flex;align-items:center;gap:6px;margin-top:8px;padding-top:7px;border-top:1px solid rgba(0,0,0,.25);font-size:12.5px;font-weight:800}
+.bf-who .mini{background:none}
+
+/* The spike. */
+.bf-sp{position:relative;margin:26px calc(var(--gr) + 10px) 0 calc(var(--gl) + 10px);padding:18px 0 12px}
+.bf-sp-h{margin:0 -10px 8px;font-weight:900;font-size:14px}
+.bf-sp-h:focus-visible{outline-offset:3px}
+.bf-rod{position:absolute;left:50%;top:26px;bottom:14px;width:5px;margin-left:-2.5px;z-index:3;background:linear-gradient(90deg,#8B948E,#fff 45%,#8B948E);box-shadow:1px 0 2px rgba(0,0,0,.4);
+  clip-path:polygon(50% 0,100% 16px,100% 100%,0 100%,0 16px);pointer-events:none}
+/* With the long list's key under the base, the rod stops at the base. */
+.bf-sp:has(.bf-more:not([hidden])) .bf-rod{bottom:64px}
+.bf-base{position:relative;z-index:1;height:16px;margin:-4px auto 0;width:120px;border-radius:50%;background:radial-gradient(ellipse at 50% 30%,#fff,#aab1ac 55%,#6f7772);box-shadow:0 5px 6px -2px rgba(0,0,0,.5)}
+.bf-slip{position:relative;z-index:2;display:grid;grid-template-columns:minmax(0,1fr) 30px minmax(0,1fr);align-items:center;width:100%;min-height:46px;margin-top:-5px;padding:6px 9px;border:0;text-align:left;font:inherit;cursor:pointer;
+  background:var(--tk-grain),var(--dupe-w);color:var(--dupe-ink);box-shadow:0 1px 1px rgba(0,0,0,.3),0 5px 5px -3px rgba(0,0,0,.4);transform:rotate(var(--r,0deg))}
+.bf-slip.yel{background:var(--tk-grain),var(--dupe-y)}
+#bfDone>div:first-child .bf-slip{margin-top:14px}
+.bf-slip:active{transform:rotate(var(--r,0deg)) translateY(1.5px)}
+.bf-slip.is-pending{opacity:.55}
+.bf-slip::after{content:"";position:absolute;left:50%;top:50%;width:9px;height:7px;margin:-3px 0 0 -4.5px;border-radius:50%;background:rgba(0,0,0,.55)}
+.bf-slip s{font-weight:900;font-size:14px;line-height:1.2;text-decoration-thickness:1.5px;overflow-wrap:anywhere}
+.bf-slip .tclock{grid-column:3;justify-self:end;font-size:15px;transform:rotate(-3deg);padding:0 4px 1px}
+.bf-slip small{display:block;grid-column:1 / 4;margin-top:4px;font-size:12px;font-weight:600}
+@media (max-width:350px){ .bf-slip .tclock{grid-column:1 / 4;margin-top:4px} }
+.bf-more{display:block;margin:6px auto 0;border:0;background:none;min-height:44px;padding:0 12px;font-weight:700;font-size:13px;text-decoration:underline dotted;text-underline-offset:3px;color:var(--text)}
+@keyframes bf-drop{0%{transform:translateY(-10px) rotate(var(--r,0deg))}70%{transform:translateY(3px) rotate(var(--r,0deg))}100%{transform:rotate(var(--r,0deg))}}
+.bf-slip.is-new{animation:bf-drop .22s cubic-bezier(.3,.7,.3,1) both}
+
+/* The slip in your hand (a sheet), and the bell. */
+#bfHand{background:var(--dots), var(--ground)}
+#bfHand:focus{outline:none}
+.bf-big{margin:0 4px;transform:rotate(-.5deg)}
+.bf-big .bf-t{padding:13px 14px 20px}
+.bf-big .bf-n{font-size:23px;line-height:1.12}
+.bf-big .bf-due{font-size:14.5px}
+.bf-note{margin:9px 0 0;padding-top:8px;border-top:1px solid rgba(0,0,0,.25);font-size:14px;font-weight:500;line-height:1.4;overflow-wrap:anywhere}
+.bf-ctl{display:flex;flex-wrap:wrap;gap:8px;margin-top:11px}
+.bf-ctl p{flex:1 0 100%;margin:0;font-size:13.5px;font-weight:600;line-height:1.35}
+.bf-ctl a,.bf-ctl button{display:inline-grid;place-items:center;min-height:44px;padding:0 13px;border-radius:3px;font-weight:800;font-size:13.5px;white-space:nowrap;text-decoration:none;
+  background:linear-gradient(var(--dupe-ink),var(--dupe-ink)) center/100% 36px no-repeat;color:var(--dupe-w);border:0}
+.bf-ctl button{background:none;color:var(--dupe-ink);border:0;position:relative}
+.bf-ctl button::before{content:"";position:absolute;left:0;right:0;top:50%;height:36px;margin-top:-18px;border:1.5px solid var(--dupe-ink);border-radius:3px;pointer-events:none}
+.bf-ctl button:disabled{opacity:.5}
+.bf-wait{display:block;margin-top:4px;font-weight:600;font-size:12px}
+.bf-hand-who{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12.5px;font-weight:800}
+.bf-pass{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 132px;align-items:end;gap:6px;margin:6px 4px 0;padding:0 0 0 2px}
+.bf-pass p{margin:0;font-size:13px;font-weight:700;line-height:1.35;padding-bottom:14px}
+.bf-pass p b{display:block;font-weight:900;font-size:17px}
+.bf-defs{position:absolute;width:0;height:0}
+.bf-bell{position:relative;width:132px;height:104px;border:0;background:none;padding:0}
+.bf-bell svg{width:132px;height:104px;filter:drop-shadow(0 8px 6px rgba(0,0,0,.35))}
+.bf-bell:disabled{cursor:default}
+.bf-bell.rung::before,.bf-bell.rung::after{content:"";position:absolute;top:2px;width:26px;height:40px;border:3px solid var(--red);border-color:var(--red) transparent transparent transparent;border-radius:50%}
+.bf-bell.rung::before{left:4px;transform:rotate(-38deg)}
+.bf-bell.rung::after{right:4px;transform:rotate(38deg)}
+.bf-bell.rung svg{animation:bfring .24s}
+@keyframes bfring{30%{transform:rotate(-4deg)}60%{transform:rotate(3deg)}}
+.bf-print{position:absolute;right:12px;bottom:16px;--rot:-7deg;transform:rotate(var(--rot));font-size:27px;z-index:3;padding:1px 8px 2px;line-height:1;transition:filter 1.8s ease-out}
+.bf-print small{display:block;font-size:19px}
+.bf-print.hit{animation:hit .22s backwards}
+.bf-print.wet{filter:saturate(1.35) brightness(1.1) drop-shadow(0 0 2.5px rgba(107,42,140,.55));transition:none}
+.bf-t.is-rung .bf-note{padding-bottom:34px;opacity:.6}
+.bf-empty{margin:26px calc(var(--gr) + 0px) 0 var(--gl);font-weight:900;font-size:22px;line-height:1.15}
+.bf-empty small{display:block;font-weight:600;font-size:13.5px;margin-top:4px}
+
+/* Read from the planner, and Fetch. */
+.bf-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:14px var(--gr) 0 var(--gl);font-size:13px;font-weight:700}
+.bf-foot button{height:44px;padding:0 13px;border:0;position:relative;background:none;color:var(--print);font-weight:800;font-size:13.5px;white-space:nowrap}
+.bf-foot button::before{content:"";position:absolute;left:0;right:0;top:50%;height:34px;margin-top:-17px;border:1.5px solid var(--print);border-radius:3px;pointer-events:none}
+.bf-foot button:disabled{opacity:.6}
+/* Not read from the planner. */
+.bf-prob{margin:10px var(--gr) 0 var(--gl);padding:8px 10px 9px;background:var(--stock);border-left:3px solid var(--red);box-shadow:var(--lift);font-size:12.5px;font-weight:600;line-height:1.35;overflow-wrap:anywhere}
+.bf-prob b{display:block;font-weight:900;font-size:13px}
+.bf-prob small{font-weight:600;margin-left:6px}
+.bf-prob div{margin-top:5px}
+
+/* The pill in Money: planner lines that need a look. */
+.pl-look{margin:9px 8px 0 0;min-height:44px;padding:0 13px 0 6px;border:0;border-radius:17px;position:relative;background:none;color:var(--stock);font-weight:800;font-size:13.5px;display:inline-flex;align-items:center;gap:8px}
+.pl-look::before{content:"";position:absolute;left:0;right:0;top:50%;height:34px;margin-top:-17px;border-radius:17px;background:var(--print);z-index:0}
+.pl-look>*{position:relative;z-index:1}
+.pl-look i{min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--red);color:#fff;font-weight:900;font-size:12px;line-height:22px;text-align:center}
+
+/* The planner's sign (stage 2): a scrap of yellow dupe on a line brought in
+   from the planner (Money's receipt), in the N print colours. */
+.bf-sign{display:inline-block;font-family:var(--reg);font-size:15px;line-height:1;text-transform:uppercase;color:var(--dupe-ink);background:var(--dupe-y);padding:2px 6px 5px;transform:rotate(-1.5deg);
+  box-shadow:0 1px 1px rgba(31,26,20,.3);
+  -webkit-mask:conic-gradient(from -45deg at bottom,#0000,#000 1deg 89deg,#0000 90deg) 50% 100%/6px 3px repeat-x,linear-gradient(#000 0 0) 0 0/100% calc(100% - 3px) no-repeat;
+          mask:conic-gradient(from -45deg at bottom,#0000,#000 1deg 89deg,#0000 90deg) 50% 100%/6px 3px repeat-x,linear-gradient(#000 0 0) 0 0/100% calc(100% - 3px) no-repeat}
+.rc-row small.rc-pl{margin-top:4px}
+/* A planner line's sheet: where to change it, above the keys. */
+.ln-pl{margin:10px 0 0;font-size:13px;font-weight:600;line-height:1.35}
+
+/* The Planner row in You: the list of what could not be brought in. */
+.set-r b.red{color:var(--red)}
+.set-pp{margin:-2px 0 0;padding:9px 12px 10px;background:var(--stock);border-radius:2px;box-shadow:var(--lift);border-left:3px solid var(--red);font-size:12.5px;font-weight:600;line-height:1.35;overflow-wrap:anywhere}
+.set-pp h4{margin:0 0 4px;font-size:13px;font-weight:900}
+.set-pp div{padding:4px 0;border-top:1px solid var(--rule)}
+.set-pp div b{display:block;font-weight:800}
+
+/* While the slip is in hand the undo bar sits at the top, clear of its keys. */
+.phone.bfhand-open .ubar{top:calc(12px + env(safe-area-inset-top, 0px));bottom:auto}
+
+/* Five keys (before the trip: Days, Before, Ring up, Money, You; from the first day Tickets in Before's place): a fifth of the bar each, Ring up in the middle. Four keys leave the bar as it was. */
+.nav.five{gap:4px;padding-left:6px;padding-right:6px}
+.nav.five button{font-size:min(14px,calc((100vw - 40px) / 22))}
+.nav.five button small{font-size:9.5px}
+.nav.five .ring-w{font-size:9.5px}
+@media (max-width:350px){
+  .nav.five{gap:3px;padding-left:4px;padding-right:4px}
+  .nav.five button small,.nav.five .ring-w{font-size:9px}
+  .nav.five .cnt{right:1px}
+}
+/* Held sideways and on a computer the same keys are a rail: the five stand one under another, nothing is squeezed. */
+@media (orientation:landscape) and (max-height:520px), (min-width:1000px) and (min-height:521px){
+  .nav.five{gap:6px;padding-left:8px;padding-right:8px}
+  .nav.five button{font-size:15px}
+  .nav.five button small,.nav.five .ring-w{font-size:10.5px}
+}
+
+/* ---------- the Before pad as a sheet over the Tickets tab, and its slip there ---------- */
+#vBefore .bs-top{display:none}
+#vBefore.as-sheet{z-index:24;top:max(10%, calc(76px + var(--inset-t)));padding-top:0;padding-bottom:calc(24px + env(safe-area-inset-bottom, 0px));
+  background:var(--dots), var(--ground);border-top:1px solid rgba(31,26,20,.25);border-radius:18px 18px 0 0;box-shadow:0 -24px 40px -10px rgba(31,26,20,.5);transition:none;animation:bsUp .5s var(--sheet) both}
+#vBefore.as-sheet .bs-top{display:flex;position:sticky;top:0;z-index:2;margin:0 0 4px;padding:12px var(--gr) 6px var(--gl);background:var(--ground)}
+/* As a sheet its own top says "Before we go": the list's title stays (the
+   screen reader's name for the list, and where focus goes after a take-back)
+   but out of sight, and the count sits under the top. */
+#vBefore.as-sheet .bf-bar-d{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+#vBefore.as-sheet .bf-bar{padding-top:0}
+@keyframes bsUp{from{transform:translateY(104%)}to{transform:none}}
+@media (prefers-reduced-motion: reduce){ #vBefore.as-sheet{animation:none} }
+@media (orientation:landscape) and (max-height:520px){ #vBefore.as-sheet{top:16px} }
+/* A slip held in the hand while the pad is up dims the pad too. */
+.phone.before-open #bfHandScrim{z-index:25}
+.phone.before-open #bfHand{z-index:26}
+/* The slip on the Tickets tab: the Before items still open, on a yellow order slip (the rail's own paper). */
+.tt-bf{position:relative;display:flex;align-items:baseline;gap:8px;width:calc(100% - 2 * var(--gl) - 4px);min-height:44px;margin:10px var(--gr) 2px calc(var(--gl) + 2px);padding:8px 12px 9px;border:0;
+  background:var(--tk-grain),var(--dupe-y);color:var(--dupe-ink);text-align:left;transform:rotate(-.8deg);box-shadow:0 1px 1px rgba(0,0,0,.3),0 8px 9px -6px rgba(0,0,0,.45);transition:transform .12s ease-out}
+.tt-bf:active{transform:rotate(-1.4deg) translateY(1.5px)}
+.tt-bf b{font-size:14.5px;font-weight:900;white-space:nowrap}
+.tt-bf span{min-width:0;font-size:13.5px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tt-bf u{margin-left:auto;font-size:13.5px;font-weight:900;text-decoration:none;border-bottom:1.5px dotted var(--dupe-ink);white-space:nowrap}
+.tt-bf:focus-visible{outline-offset:3px}
+@media (prefers-reduced-motion: reduce){ .tt-bf{transition:none} }
+@media (min-width:1000px) and (min-height:521px){
+  #vBefore{right:50%}
+  #bfHand,#bfHandScrim,#beforeScrim{left:0;right:calc(50% + var(--rail) / 2)}
+  .phone:has(#vBefore.is-active) .nav button[data-tab="days"]{display:grid}
+}
+@media (prefers-reduced-motion: reduce){
+  .bf-slip.is-new,.bf-bell.rung svg,.bf-print.hit{animation:none}
+  .bf-t,.bf-slip{transition:none}
+}

@@ -163,3 +163,118 @@ test("the release checks use the check key, the old shared key only without one,
   assert.match(ship, /const KEY = checkKey\(env\)/);
   assert.match(ship, /"#k=" \+ encodeURIComponent\(KEY\)/);
 });
+
+// ---------- the permission gate (review of the planner port, 2026-11-20, C1) ----------
+// A backend that asks Google for more than the last release goes to the
+// script's head only until Mo has approved it; the live deployment and the
+// site are left alone. clasp is stubbed: every call is recorded, none is run.
+import { backendPath, headOnlySteps, manifestAsks, manifestGains, shipBackend } from "../scripts/release-lib.mjs";
+
+const OLD = JSON.stringify({ timeZone: "America/Chicago", oauthScopes: ["https://www.googleapis.com/auth/spreadsheets.currentonly", "https://www.googleapis.com/auth/script.external_request"] });
+const NEW = readFileSync(join(ROOT, "backend", "appsscript.json"), "utf8");
+const fakeClasp = (fails = {}) => {
+  const calls = [];
+  const clasp = (args) => {
+    calls.push(args.join(" "));
+    return fails[args[0]] ? { status: 1, stdout: "", stderr: "made-up clasp failure" } : { status: 0, stdout: "", stderr: "" };
+  };
+  return { calls, clasp };
+};
+
+test("C1: manifestGains names each scope and advanced service the next manifest adds, and nothing else", () => {
+  assert.deepEqual(manifestGains(OLD, NEW), ["the permission https://www.googleapis.com/auth/spreadsheets", "the advanced service sheets v4"]);
+  assert.deepEqual(manifestGains(NEW, NEW), [], "the same manifest gains nothing");
+  // Order and other fields do not matter; a scope dropped is not a gain.
+  const shuffled = JSON.stringify({ ...JSON.parse(NEW), timeZone: "UTC", oauthScopes: [...JSON.parse(NEW).oauthScopes].reverse() });
+  assert.deepEqual(manifestGains(NEW, shuffled), []);
+  // Going back to the old manifest drops a scope (not a gain) but also takes the service list out, which counts (R1-M2, below).
+  assert.deepEqual(manifestGains(NEW, OLD), ["whatever Apps Script works out without the advanced service list (it was removed from the manifest)"]);
+  assert.deepEqual(manifestGains(NEW, JSON.stringify({ ...JSON.parse(NEW), oauthScopes: JSON.parse(OLD).oauthScopes })), [], "a scope dropped, the list kept: no gain");
+  // A new version of a service is a gain; no released manifest means everything is new.
+  const v5 = JSON.stringify({ ...JSON.parse(NEW), dependencies: { enabledAdvancedServices: [{ userSymbol: "Sheets", version: "v5", serviceId: "sheets" }] } });
+  assert.deepEqual(manifestGains(NEW, v5), ["the advanced service sheets v5"]);
+  assert.equal(manifestGains(null, OLD).length, 2);
+  assert.equal(manifestGains("not json", OLD).length, 2, "an unreadable released manifest counts as asking for nothing");
+  assert.throws(() => manifestGains(OLD, "{ broken"), /can't be read/);
+  assert.equal(manifestAsks("[]"), null);
+});
+
+test("C1: a backend with new permissions goes to the head only, unless --scopes-approved", () => {
+  const gains = manifestGains(OLD, NEW);
+  assert.equal(backendPath(gains, false), "head");
+  assert.equal(backendPath(gains, true), "deploy");
+  assert.equal(backendPath([], false), "deploy", "nothing new: deployed as always");
+
+  const head = fakeClasp();
+  assert.deepEqual(shipBackend({ path: "head", check: false, clasp: head.clasp, deployId: "dep", label: "v6 abc" }), { ok: true, did: "head" });
+  assert.deepEqual(head.calls, ["push -f"], "pushed to the head; the live deployment is never touched");
+
+  const go = fakeClasp();
+  assert.deepEqual(shipBackend({ path: "deploy", check: false, clasp: go.clasp, deployId: "dep", label: "v6 abc" }), { ok: true, did: "deployed" });
+  assert.deepEqual(go.calls, ["push -f", "create-deployment -i dep -d v6 abc"]);
+
+  const bad = fakeClasp({ push: true });
+  const r = shipBackend({ path: "deploy", check: false, clasp: bad.clasp, deployId: "dep", label: "x" });
+  assert.deepEqual([r.ok, r.did, r.why], [false, "none", "clasp push failed."]);
+  assert.deepEqual(bad.calls, ["push -f"], "no deployment after a failed push");
+});
+
+test("C1: --check says which path it would take and runs nothing", () => {
+  const c = fakeClasp();
+  assert.deepEqual(shipBackend({ path: "head", check: true, clasp: c.clasp, deployId: "dep", label: "x" }), { ok: true, did: "would-head" });
+  assert.deepEqual(shipBackend({ path: "deploy", check: true, clasp: c.clasp, deployId: "dep", label: "x" }), { ok: true, did: "would-deploy" });
+  assert.deepEqual(c.calls, []);
+  const ship = readFileSync(join(ROOT, "scripts", "ship.mjs"), "utf8");
+  assert.match(ship, /out\.did === "would-head"[\s\S]{0,400}head only and stop there/);
+});
+
+test("C1: after a push to the head ship stops with an error and the owner's next steps; it reads the released manifest from origin/main", () => {
+  const steps = headOnlySteps(manifestGains(OLD, NEW), ["--migrate", "--check"]).join("\n");
+  assert.match(steps, /auth\/spreadsheets/);
+  assert.match(steps, /live deployment was not changed and the site was not published/);
+  assert.match(steps, /checkPlanner/);
+  assert.match(steps, /approve/);
+  assert.match(steps, /npm run ship -- --migrate --scopes-approved$/m, "the command to run next keeps --migrate");
+  assert.equal(headOnlySteps(["x"], ["--scopes-approved"]).join("\n").split("--scopes-approved").length - 1, 1);
+  const ship = readFileSync(join(ROOT, "scripts", "ship.mjs"), "utf8");
+  assert.match(ship, /git\(\["show", "origin\/main:backend\/appsscript\.json"\]\)/);
+  assert.match(ship, /out\.did === "head"\) \{[\s\S]{0,200}stop\(headOnlySteps/, "a head-only push ends in stop(), which exits 1");
+  // The deployment is made only through shipBackend, which a head-only path never reaches.
+  assert.equal((ship.match(/create-deployment/g) || []).length, 0);
+});
+
+// ---------- re-check 1 (R1-M1, R1-M2) ----------
+import { approvalNote } from "../scripts/release-lib.mjs";
+
+test("R1-M2: taking oauthScopes or the advanced service list out of the manifest counts as a change", () => {
+  const m = JSON.parse(NEW);
+  const noScopes = JSON.stringify({ ...m, oauthScopes: undefined });
+  assert.deepEqual(manifestGains(NEW, noScopes), ["the permissions Apps Script works out from the code (oauthScopes was removed from the manifest)"]);
+  assert.equal(backendPath(manifestGains(NEW, noScopes), false), "head");
+  const noServices = JSON.stringify({ ...m, dependencies: undefined });
+  assert.deepEqual(manifestGains(NEW, noServices), ["whatever Apps Script works out without the advanced service list (it was removed from the manifest)"]);
+  const neither = JSON.stringify({ timeZone: "America/Chicago" });
+  assert.equal(manifestGains(NEW, neither).length, 2);
+  // Never listed before and still not listed: nothing new. An empty list kept is not a removal.
+  assert.deepEqual(manifestGains(neither, neither), []);
+  assert.deepEqual(manifestGains(OLD, OLD), [], "the old manifest had no service list to take away");
+  assert.deepEqual(manifestGains(NEW, JSON.stringify({ ...m, oauthScopes: m.oauthScopes.slice(0, 2) })), [], "fewer scopes, still listed: no change");
+});
+
+test("R1-M1: --scopes-approved with nothing new says so plainly and carries on; it is this run's only", () => {
+  assert.match(approvalNote([], true), /^--scopes-approved was not needed: this backend asks Google for nothing new\. It counts for this run only/);
+  assert.equal(approvalNote([], false), null);
+  assert.equal(approvalNote(["the permission x"], true), null, "needed: no note");
+  assert.equal(backendPath([], true), "deploy", "carries on as usual");
+  // Per-run: the flag is read from this command line and nowhere else, and ship writes nothing a later run reads.
+  const ship = readFileSync(join(ROOT, "scripts", "ship.mjs"), "utf8");
+  assert.deepEqual(ship.match(/scopes-approved"\)/g), ['scopes-approved")'], "read once, from process.argv");
+  assert.match(ship, /const scopesApproved = process\.argv\.includes\("--scopes-approved"\);/);
+  assert.equal(/writeFileSync|appendFileSync|setItem|git\(\["config"/.test(ship), false, "ship stores nothing");
+  const lib = readFileSync(join(ROOT, "scripts", "release-lib.mjs"), "utf8");
+  assert.equal(/scopes-?[aA]pproved[^\n]*(writeFileSync|appendFileSync)/.test(lib), false);
+  // A later run with a new permission and no flag goes to the head again.
+  assert.equal(backendPath(manifestGains(OLD, NEW), false), "head");
+  assert.match(ship, /if \(scopesApproved\) step\(approvalNote\(\[\], true\)\)/, "said too when the backend is already live");
+  assert.match(ship, /const note = approvalNote\(gains, scopesApproved\);\s*\n\s*if \(note\) step\(note\);/);
+});

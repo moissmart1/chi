@@ -7,11 +7,18 @@
 //   npm run ship -- --backend-only   steps 1 to 3, then stops before the push
 //                                (to check something by hand against the new
 //                                backend; `npm run ship` again does the rest)
+//   npm run ship -- --scopes-approved   Mo has approved the new permission a
+//                                backend asks for (below): deploy it
 //
 // 1. This commit is main, clean, and has the gate's receipt (npm run gate).
 // 2. If the live backend is not this commit's backend: clasp push, new version
 //    on the same deployment, then wait until the live backend answers with
-//    this commit's stamp.
+//    this commit's stamp. But when backend/appsscript.json asks Google for a
+//    scope or an advanced service that origin/main's (the last release) does
+//    not, and --scopes-approved was not given: clasp push only (the script's
+//    head), say what Mo must approve, and stop with an error. The live
+//    deployment is not touched: a version needing a permission the deployer
+//    has not granted fails every request, for everyone (review, 2026-11-20).
 // 3. The live trip still loads, read with the release check's read-only key
 //    (CHI_CHECK_KEY from ~/.config/chi/env; CHI_KEY only when there is none).
 // 4. git push origin main (the push check runs again there).
@@ -32,12 +39,14 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
-import { ROOT, SITE, askUntil, call, checkKey, tripLoaded, git, gitOk, liveStamp, privateEnv, readConfig, readReceipt, withoutKeys, writtenBackendStamp } from "./release-lib.mjs";
+import { ROOT, SITE, approvalNote, askUntil, backendPath, call, checkKey, headOnlySteps, manifestGains, shipBackend, tripLoaded, git, gitOk, liveStamp, privateEnv, readConfig, readReceipt, withoutKeys, writtenBackendStamp } from "./release-lib.mjs";
 import { shellList } from "./stamp-sw.mjs";
 
 const check = process.argv.includes("--check");
 const migrate = process.argv.includes("--migrate");
 const backendOnly = process.argv.includes("--backend-only");
+// This run only: read from the command line, never written anywhere.
+const scopesApproved = process.argv.includes("--scopes-approved");
 const step = (s) => console.log("ship: " + s);
 const stop = (why, fix) => {
   console.error("\nship: STOPPED. " + why + (fix ? "\n      " + fix : ""));
@@ -67,20 +76,47 @@ const want = writtenBackendStamp();
 let live = await liveStamp(cfg.apiUrl);
 if (live === want) {
   step("backend: the live one is already this commit's (" + want + ")");
+  if (scopesApproved) step(approvalNote([], true));
 } else {
   step("backend: live is " + (live || "older than the stamp") + ", this commit is " + want + ": it must be deployed first");
-  if (check) {
-    step("--check: would run clasp push and a new version on the same deployment" + (migrate ? ", then migrate" : ""));
-  } else {
-    if (!existsSync(join(ROOT, ".clasp.json"))) stop("No .clasp.json here, so the backend cannot be deployed.", "It is git-ignored and lives only in /Users/owner/Projects/chi.");
-    const clasp = (args) => spawnSync("npx", ["clasp", ...args], { cwd: ROOT, encoding: "utf8" });
+  // What the manifest asks for beyond the last release's (origin/main, fetched above).
+  let released = null;
+  try {
+    released = git(["show", "origin/main:backend/appsscript.json"]);
+  } catch {
+    released = null;
+  }
+  let gains;
+  try {
+    gains = manifestGains(released, readFileSync(join(ROOT, "backend", "appsscript.json"), "utf8"));
+  } catch (e) {
+    stop(String(e.message || e), "Nothing was pushed or deployed.");
+  }
+  const path = backendPath(gains, scopesApproved);
+  const note = approvalNote(gains, scopesApproved);
+  if (note) step(note);
+  if (gains.length) step("backend: the manifest asks for more than the last release: " + gains.join("; ") + (scopesApproved ? " (--scopes-approved: Mo has approved it)" : ""));
+  if (!check && !existsSync(join(ROOT, ".clasp.json"))) stop("No .clasp.json here, so the backend cannot be deployed.", "It is git-ignored and lives only in /Users/owner/Projects/chi.");
+  const clasp = (args) => spawnSync("npx", ["clasp", ...args], { cwd: ROOT, encoding: "utf8" });
+  let was = null;
+  if (!check) {
     const before = clasp(["list-deployments"]);
-    const was = ((before.stdout || "").split("\n").find((l) => l.includes(cfg.deployId)) || "").match(/@(\d+)/);
+    was = ((before.stdout || "").split("\n").find((l) => l.includes(cfg.deployId)) || "").match(/@(\d+)/);
     step("backend: live deployment is at version " + (was ? was[1] : "unknown") + " (fix forward: once issueLinks has run, never roll back past the security release)");
-    const push = clasp(["push", "-f"]);
-    if (push.status !== 0) stop("clasp push failed.", (push.stderr || push.stdout || "").trim().split("\n").slice(-3).join("\n      "));
-    const dep = clasp(["create-deployment", "-i", cfg.deployId, "-d", "v" + cfg.appVersion + " " + head.slice(0, 7)]);
-    if (dep.status !== 0) stop("The new backend version was pushed but not deployed.", (dep.stderr || dep.stdout || "").trim().split("\n").slice(-3).join("\n      "));
+  }
+  const out = shipBackend({ path, check, clasp, deployId: cfg.deployId, label: "v" + cfg.appVersion + " " + head.slice(0, 7) });
+  if (out.did === "would-head") {
+    step("--check: the new permission is not approved yet (no --scopes-approved): would run clasp push to the script's head only and stop there, with no new version on the live deployment, no migrate and no site push. With --scopes-approved it would deploy as usual. Nothing was changed.");
+    process.exit(0);
+  }
+  if (out.did === "would-deploy") {
+    step("--check: would run clasp push and a new version on the same deployment" + (migrate ? ", then migrate" : ""));
+  } else if (!out.ok) {
+    stop(out.why, out.detail);
+  } else if (out.did === "head") {
+    const flags = process.argv.slice(2).filter((a) => a.startsWith("--"));
+    stop(headOnlySteps(gains, flags).join("\n      "), "Nothing else was done: no new version, no migrate, no push.");
+  } else {
     for (let i = 0; i < 30 && live !== want; i++) {
       await sleep(3000);
       live = await liveStamp(cfg.apiUrl);

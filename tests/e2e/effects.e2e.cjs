@@ -12,12 +12,12 @@ const { SEED, WITH_PLAN, NOON28, makeBackend, open, advance, until, visible } = 
 // 13:20 on Mon Dec 28 in Chicago, Day 3 of the trip.
 const DAY3 = NOON28;
 
-// The Days screen over a plan. This trip has no planner, so no Before tab.
+// The Days screen over a plan. No planner is linked here: no Before tab.
 async function daysReady(page) {
   const backend = makeBackend(WITH_PLAN, { now: DAY3 });
   await open(page, { backend, nowMs: DAY3, tab: "days" });
   await until(() => page.evaluate(() => document.querySelectorAll("#rail .tk").length > 0), "the tickets draw");
-  assert.equal(await page.locator("#beforeBtn").count(), 0, "no Before tab");
+  assert.equal(await page.locator("#beforeBtn").isHidden(), true, "no Before tab");
   return backend;
 }
 
@@ -43,7 +43,7 @@ module.exports = [
       const tk = await style(page, "#rail .tk");
       assert.equal(layers(tk.shadow), 2, "check: " + tk.shadow);
       assert.doesNotMatch(tk.bg, /url\(/, "no grain or pattern on the check");
-      assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector("#rail .tk")).backgroundColor), "rgb(238, 244, 228)");
+      assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector("#rail .tk")).backgroundColor), "rgb(251, 245, 227)");
       // The fan motion is still on the check where the browser has it.
       assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector("#rail .tk")).animationName !== undefined), true);
       // The all-days stubs.
@@ -61,10 +61,10 @@ module.exports = [
       const paper = (sel) => page.evaluate((s) => getComputedStyle(document.querySelector(s)).backgroundColor, sel);
       const slip = await style(page, ".slip");
       assert.equal(layers(slip.shadow), 2, "settling: " + slip.shadow);
-      assert.equal(await paper(".slip"), "rgb(238, 244, 228)");
+      assert.equal(await paper(".slip"), "rgb(251, 245, 227)");
       const rc = await style(page, ".rc");
       assert.ok(layers(rc.shadow) >= 1, "tab: " + rc.shadow);
-      assert.equal(await paper(".rc"), "rgb(238, 244, 228)");
+      assert.equal(await paper(".rc"), "rgb(251, 245, 227)");
       // The tab is a guest check, not a till roll: no serrated edges.
       for (const p of ["::before", "::after"]) assert.equal((await style(page, ".rc", p)).content, "none", "no serration " + p);
       // History tape.
@@ -74,7 +74,7 @@ module.exports = [
       await until(() => visible(page, "#tape"), "the tape shows");
       const tape = await style(page, "#tape");
       assert.equal(layers(tape.shadow), 2, "tape: " + tape.shadow);
-      assert.equal(await paper("#tape"), "rgb(238, 244, 228)");
+      assert.equal(await paper("#tape"), "rgb(251, 245, 227)");
     },
   },
   {
@@ -85,7 +85,7 @@ module.exports = [
       await until(() => page.evaluate(() => document.getElementById("stay").classList.contains("is-open")), "the hotel card opens");
       const s = await style(page, "#stay");
       assert.ok(layers(s.shadow) >= 2, "hotel card: " + s.shadow);
-      assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById("stay")).backgroundColor), "rgb(238, 244, 228)");
+      assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById("stay")).backgroundColor), "rgb(251, 245, 227)");
     },
   },
   {
@@ -104,7 +104,7 @@ module.exports = [
     },
   },
   {
-    name: "the current day's square is filled in ink and larger; a used day's in green; no square has a shadow",
+    name: "the current day's square is filled in ink and larger; a used day's in the pad's brown print; no square has a shadow",
     async run({ page }) {
       await daysReady(page);
       const sq = await page.evaluate(() => [...document.querySelectorAll("#pager .sq")].map((b) => { const c = getComputedStyle(b, "::before"); return [b.classList.contains("is-cur"), b.classList.contains("is-done"), c.backgroundColor, c.transform, c.boxShadow, getComputedStyle(b).boxShadow]; }));
@@ -114,9 +114,9 @@ module.exports = [
         assert.equal(own, "none");
         assert.equal(before, "none");
         if (cur) {
-          assert.equal(bg, "rgb(19, 38, 31)");
+          assert.equal(bg, "rgb(31, 26, 20)");
           assert.notEqual(transform, "none", "the current square is larger");
-        } else if (done) assert.equal(bg, "rgb(46, 122, 87)");
+        } else if (done) assert.equal(bg, "rgb(122, 85, 48)");
       }
     },
   },
@@ -199,7 +199,7 @@ module.exports = [
     },
   },
   {
-    name: "every check is ruled: a double green rule under its heading, a dashed tear line over its stub, and no half-moon notches",
+    name: "every check is ruled: a double brown rule under its heading, a dashed tear line over its stub, and no half-moon notches",
     async run({ page }) {
       await daysReady(page);
       const perfs = await page.$$eval("#rail .tk", (els) => els.map((tk) => {
@@ -208,7 +208,7 @@ module.exports = [
         return [perf.borderTopStyle, perf.borderTopColor, foot.borderTopStyle, getComputedStyle(tk.querySelector(".tk-perf"), "::before").content];
       }));
       assert.ok(perfs.length >= 3, "rules on the checks");
-      for (const p of perfs) assert.deepEqual(p, ["double", "rgb(46, 122, 87)", "dashed", "none"]);
+      for (const p of perfs) assert.deepEqual(p, ["double", "rgb(122, 85, 48)", "dashed", "none"]);
     },
   },
   {

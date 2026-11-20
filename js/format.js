@@ -90,9 +90,9 @@ export function freshText(ms) {
   return "Up to date " + clock(ms);
 }
 
-// Who a change came through, after its sentence: " (through Claude)" or "".
+// Who a change came through, after its sentence: " (through Claude)", " (from the planner)" or "".
 export function viaText(via) {
-  return via === "claude" ? " (through Claude)" : "";
+  return via === "claude" ? " (through Claude)" : via === "planner" ? " (from the planner)" : "";
 }
 
 // A history entry as one sentence: "Izzah rang up Deep dish US$42.50".
@@ -125,6 +125,20 @@ export function changeText(c) {
     if (c.action === "add") return "Added a ticket picture.";
     if (c.action === "remove") return "Removed a ticket picture.";
     return "Undone.";
+  }
+  // A "Before we go" item (js/todos.js), for when its screen is built.
+  if (c.kind === "todo") {
+    switch (c.action) {
+      case "tick": return "Ticked off " + item.item + ".";
+      case "claim": return "You’re on " + item.item + ".";
+      case "takeover": return "Took over " + item.item + ".";
+      case "unclaim": return "Handed back " + item.item + ".";
+      // An undone tick, with what it left in the planner (js/todos.js untickOutcome).
+      default:
+        if (c.planner === "pending") return "Undone. The planner couldn’t be changed back, so it may still say Booked.";
+        if (c.planner === "kept") return "Undone. The planner’s Status was changed there since, so it was left as it is.";
+        return "Undone.";
+    }
   }
   switch (c.action) {
     case "add": return "Rang up " + item.title + " " + typed(item) + ".";

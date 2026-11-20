@@ -1120,21 +1120,604 @@ test("pinned: addExpense and updateExpense answer, store and log exactly as befo
   const call = client(undefined, { clock: () => "2026-12-27T02:00:00.000Z" });
   const added = { id: "pinexp0001", day: "2026-12-27", title: "Udon", amount: 980, currency: "USD", rate: 0.72, paidBy: "Mo", split: ALL, splitMode: "equal", splitVals: [], note: "hot", kind: "food", addedBy: "Izzah", addedAt: "2026-12-27T02:00:00.000Z", deleted: false };
   const a = await call("addExpense", { expense: { id: "pinexp0001", day: "2026-12-27", title: " Udon ", amount: 980.004, currency: "USD", paidBy: "Mo", split: ALL, note: " hot ", kind: "food" } }, { actor: "Izzah" });
-  assert.deepEqual(a, { ok: true, rev: 1, data: { expense: added, logId: 1 } });
+  // Stage 2: the reply says fromPlanner; the Log (below) keeps the line exactly as before.
+  assert.deepEqual(a, { ok: true, rev: 1, data: { expense: { ...added, fromPlanner: false }, logId: 1 } });
   const again = await call("addExpense", { expense: { id: "pinexp0001", day: "2026-12-27", title: "Other", amount: 1, currency: "USD", paidBy: "Mo", split: ALL } }, { actor: "Izzah" });
   assert.deepEqual(again, a, "a repeated add answers the first");
   // A hand-typed split cell: the app's own edit writes every editable column, so it is rewritten.
   call.fake.tables.Expenses[0].split = "Mo, Izzah";
   const edited = { ...added, amount: 1200 };
   const u = await call("updateExpense", { id: "pinexp0001", patch: { amount: 1200 } });
-  assert.deepEqual(u, { ok: true, rev: 2, data: { expense: edited, logId: 2 } });
-  assert.deepEqual(await call("updateExpense", { id: "pinexp0001", patch: { amount: 1200 } }), { ok: true, rev: 2, data: { expense: edited, logId: null } });
+  assert.deepEqual(u, { ok: true, rev: 2, data: { expense: { ...edited, fromPlanner: false }, logId: 2 } });
+  assert.deepEqual(await call("updateExpense", { id: "pinexp0001", patch: { amount: 1200 } }), { ok: true, rev: 2, data: { expense: { ...edited, fromPlanner: false }, logId: null } });
   assert.deepEqual(await call("updateExpense", { id: "pinexp0001", patch: { amount: -1 } }), { ok: false, error: "bad_input", message: "The amount has to be more than zero.", rev: 2 });
-  assert.deepEqual(call.fake.tables.Expenses, [{ id: "pinexp0001", day: "2026-12-27", title: "Udon", amount: 1200, currency: "USD", rate: 0.72, paid_by: "Mo", split: "Mo,Izzah", split_mode: "equal", split_vals: "", note: "hot", kind: "food", receipt: "", added_by: "Izzah", added_at: "2026-12-27T02:00:00.000Z", deleted_at: "" }], "the Sheet's Expenses columns, without the old planner_id");
+  assert.deepEqual(call.fake.tables.Expenses, [{ id: "pinexp0001", day: "2026-12-27", title: "Udon", amount: 1200, currency: "USD", rate: 0.72, paid_by: "Mo", split: "Mo,Izzah", split_mode: "equal", split_vals: "", note: "hot", kind: "food", receipt: "", added_by: "Izzah", added_at: "2026-12-27T02:00:00.000Z", deleted_at: "", planner_id: "" }], "R40 adds the planner_id column; the app's own writes leave it empty");
   assert.deepEqual(call.fake.tables.Log, [
     { id: 1, at: "2026-12-27T02:00:00.000Z", who: "Izzah", via: "app", action: "add", kind: "expense", ref: "pinexp0001", summary: "rang up Udon US$980.00", before: "", after: JSON.stringify(added), undoes: "", undone_by: "" },
     { id: 2, at: "2026-12-27T02:00:00.000Z", who: "Mo", via: "app", action: "edit", kind: "expense", ref: "pinexp0001", summary: "changed Udon US$980.00 → US$1,200.00", before: JSON.stringify(added), after: JSON.stringify(edited), undoes: "", undone_by: "" },
   ]);
+});
+
+// ---------- payments from the planner sheet (R39, R40; ported from the Japan app) ----------
+// Every planner value here is made up: ids, vendors, refs and amounts.
+
+const PLANNER_ID = "fakePlannerSheet_0123456789abcdefXYZ";
+const PHEAD = ["payment_id", "date_paid", "payer", "description", "category", "vendor", "booking_ref", "amount", "currency", "amount_cad", "cad_is_exact", "split_between", "split_type", "status", "include_in_split", "source", "added_by", "notes"];
+const prow = (o) => PHEAD.map((h) => (o[h] === undefined ? "" : o[h]));
+const PX7 = { payment_id: "X7", date_paid: "2026-12-27", payer: "Mo", description: "Rail pass", category: "transport", vendor: "North Rail", booking_ref: "AB12", amount: 247.5, currency: "USD", amount_cad: 221.52, cad_is_exact: "yes", split_between: "Mo, Izzah", split_type: "equal", include_in_split: "yes" };
+// Q3: the amount as text with its sign, as a hand-typed cell can hold it.
+const PQ3 = { payment_id: "Q3", date_paid: "2026-12-28", payer: "izzah", description: "Noodle bar", category: "food", vendor: "Ramen Ya", amount: "US$36.00", currency: "USD", split_between: "Mo, Izzah", split_type: "equal", include_in_split: "Yes" };
+const PZ1 = { ...PX7, payment_id: "Z1", description: "Later tickets", include_in_split: "no (until charged)" };
+const PP5 = { ...PX7, payment_id: "P5", description: "Own souvenir", split_type: "personal" };
+const PU2 = { ...PX7, payment_id: "U2", payer: "Nadia" };
+const PLANNER = [PHEAD, prow(PX7), [], prow(PQ3), prow(PZ1), prow(PP5), prow(PU2)];
+const NOTE_X7 = "X7 · North Rail · ref AB12 · US$247.50 charged";
+
+function linked(over = {}, rows = PLANNER, opts = {}) {
+  return client({ ...over, planner: rows, plannerId: PLANNER_ID }, { clock: () => "2026-12-28T03:00:00.000Z", ...opts });
+}
+// The Sheet's Expenses rows tied to payment pid by their planner_id.
+const byPayment = (call, pid) => call.fake.primitives.readTable_("Expenses").filter((r) => r.planner_id === pid);
+const stored = (call, id) => call.fake.tables.Expenses.find((r) => r.id === id);
+const live = (call) => call.fake.primitives.readTable_("Expenses").filter((r) => !r.deleted_at);
+const reply = (o = {}) => ({ added: 0, changed: 0, same: 0, removed: 0, notCounted: [], problems: [], more: false, capped: false, ...o });
+const PROBLEMS = [
+  { id: "P5", message: "Only payments split equally can be brought in.", row: 6, what: "Own souvenir" },
+  { id: "U2", message: "The payer isn’t one of the people on this trip.", row: 7, what: "Rail pass" },
+];
+const HAND = { id: "handexp0001", day: "pre", title: "Rail pass", amount: 221.52, currency: "CAD", paidBy: "Mo", split: ["Izzah", "Mo"], note: NOTE_X7, kind: "" };
+
+test("a first pull adds each included payment as an expense, as addExpense would, tied by planner_id, logged as from the planner", async () => {
+  const call = linked();
+  const rev = (await call("rev")).rev;
+  const r = await call("syncPayments", {}, { actor: "Izzah" });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.deepEqual(r.data, reply({ added: 2, problems: PROBLEMS }));
+  assert.equal(r.rev, rev + 2);
+  const exps = (await call("load")).data.expenses;
+  const x7 = exps.find((e) => e.note === NOTE_X7);
+  assert.match(x7.id, /^[A-Za-z0-9]{20}$/);
+  assert.deepEqual({ ...x7, id: "" }, { id: "", day: "2026-12-27", title: "Rail pass", amount: 221.52, currency: "CAD", rate: 0.72, paidBy: "Mo", split: ALL, splitMode: "equal", splitVals: [], note: NOTE_X7, kind: "transport", addedBy: "Mo", addedAt: "2026-12-28T03:00:00.000Z", deleted: false, fromPlanner: true }); // credited to who paid; stage 2: from the planner
+  assert.equal(stored(call, x7.id).planner_id, "X7");
+  const q3 = exps.find((e) => e.note === "Q3 · Ramen Ya");
+  assert.equal(stored(call, q3.id).planner_id, "Q3");
+  assert.deepEqual([q3.title, q3.amount, q3.currency, q3.paidBy, q3.split, q3.day, q3.kind], ["Noodle bar", 36, "USD", "Izzah", ["Mo", "Izzah"], "2026-12-28", "food"]);
+  assert.equal(exps.length, 2, "nothing for the personal, the unknown payer or the not-included rows");
+  const log = call.fake.tables.Log;
+  assert.deepEqual(log.map((l) => [l.who, l.via, l.action, l.kind]), [["Mo", "planner", "add", "expense"], ["Izzah", "planner", "add", "expense"]]);
+  assert.deepEqual(log.map((l) => l.summary), ["rang up Rail pass $221.52", "rang up Noodle bar US$36.00"]);
+  const hist = await historyAll(call);
+  assert.deepEqual(hist.map((e) => e.via), ["planner", "planner"]);
+  const u = await call("undo", { logId: hist[0].id });
+  assert.equal(u.ok, true);
+  assert.equal(u.data.expense.deleted, true);
+  assert.equal(stored(call, q3.id).planner_id, "Q3", "Undo of the add keeps the tie");
+});
+
+test("R40: planner_id is never in load, History, a Log row's before/after or an undo reply", async () => {
+  const call = linked();
+  await call("syncPayments");
+  const x7 = byPayment(call, "X7")[0];
+  const e = await call("updateExpense", { id: x7.id, patch: { title: "Rail pass 7d" } });
+  const u = await call("undo", { logId: e.data.logId });
+  const seen = JSON.stringify([await call("load"), await call("history"), e, u, call.fake.tables.Log]);
+  assert.equal(/planner_?[iI]d/.test(seen), false);
+});
+
+test("a second pull straight after writes nothing and rev stays", async () => {
+  const call = linked();
+  await call("syncPayments");
+  const rows = JSON.stringify(call.fake.tables);
+  const rev = (await call("rev")).rev;
+  const r = await call("syncPayments");
+  assert.deepEqual(r.data, reply({ same: 2, problems: PROBLEMS }));
+  assert.equal(r.rev, rev);
+  assert.equal(JSON.stringify(call.fake.tables), rows);
+});
+
+test("fix 1 (the review's probe): a note edited in the app keeps the expense tied; the next pull adds nothing", async () => {
+  const call = linked();
+  await call("syncPayments");
+  const id = byPayment(call, "X7")[0].id;
+  await call("updateExpense", { id, patch: { note: "paid on Mo’s card" } });
+  assert.equal(stored(call, id).planner_id, "X7", "an app edit leaves planner_id alone");
+  const r = await call("syncPayments");
+  assert.equal(r.data.added, 0);
+  assert.equal(r.data.changed, 1, "the planner owns the note");
+  assert.equal(live(call).filter((x) => x.planner_id === "X7").length, 1);
+  const undo = await call("undo", { logId: call.fake.tables.Log.at(-1).id });
+  assert.equal(undo.ok, true);
+  assert.equal(stored(call, id).planner_id, "X7", "Undo of an edit keeps the tie");
+});
+
+test("a changed amount_cad changes that one expense: one edit, before/after differ only in amount, only that column written; Undo works", async () => {
+  const call = linked();
+  await call("syncPayments");
+  const id = byPayment(call, "X7")[0].id;
+  stored(call, id).split = "Mo, Izzah"; // typed by hand: left as it is
+  const logs = call.fake.tables.Log.length;
+  call.fake.planner.rows = [PHEAD, prow({ ...PX7, amount_cad: 230.1 }), prow(PQ3)];
+  const r = await call("syncPayments", {}, { actor: "Izzah" });
+  assert.deepEqual(r.data, reply({ changed: 1, same: 1 }));
+  assert.equal(call.fake.tables.Log.length, logs + 1);
+  const edit = call.fake.tables.Log.at(-1);
+  assert.deepEqual([edit.who, edit.via, edit.action, edit.ref, edit.summary], ["Mo", "planner", "edit", id, "changed Rail pass $221.52 → $230.10"] /* who paid, not the phone that asked */);
+  const before = JSON.parse(edit.before);
+  const after = JSON.parse(edit.after);
+  assert.deepEqual(Object.keys(after).filter((k) => JSON.stringify(after[k]) !== JSON.stringify(before[k])), ["amount"]);
+  assert.deepEqual([before.amount, after.amount], [221.52, 230.1]);
+  assert.equal(stored(call, id).amount, 230.1);
+  assert.equal(stored(call, id).split, "Mo, Izzah", "a column the pull did not change is not written");
+  const u = await call("undo", { logId: edit.id });
+  assert.equal(u.ok, true, JSON.stringify(u));
+  assert.equal(u.data.expense.amount, 221.52);
+});
+
+test("each planner-owned field that differs is changed; day and kind are the app's and stay", async () => {
+  const call = linked();
+  await call("syncPayments");
+  const id = byPayment(call, "X7")[0].id;
+  await call("updateExpense", { id, patch: { day: "2026-12-29", kind: "activity" } });
+  call.fake.planner.rows = [PHEAD, prow({ ...PX7, description: "Rail pass (7 days)", payer: "Izzah", split_between: "Izzah, Mo", vendor: "North Rail Co", date_paid: "2026-12-26", category: "food" }), prow(PQ3)];
+  const r = await call("syncPayments");
+  assert.equal(r.data.changed, 1);
+  const e = (await call("load")).data.expenses.find((x) => x.id === id);
+  assert.deepEqual([e.title, e.paidBy, e.split, e.note, e.day, e.kind], ["Rail pass (7 days)", "Izzah", ALL, "X7 · North Rail Co · ref AB12 · US$247.50 charged", "2026-12-29", "activity"]);
+  assert.deepEqual(JSON.parse(call.fake.tables.Log.at(-1).after).split, ALL, "the same people in another order is the same split");
+});
+
+test("fix 9: a line set to exact amounts or shares is put back to an equal split, with or without a change of names", async () => {
+  const call = linked();
+  await call("syncPayments");
+  const id = byPayment(call, "X7")[0].id;
+  await call("updateExpense", { id, patch: { splitMode: "exact", splitVals: [200, 21.52] } });
+  let r = await call("syncPayments");
+  assert.equal(r.data.changed, 1, JSON.stringify(r.data));
+  let e = (await call("load")).data.expenses.find((x) => x.id === id);
+  assert.deepEqual([e.splitMode, e.splitVals, e.split], ["equal", [], ALL]);
+
+  await call("updateExpense", { id, patch: { splitMode: "parts", splitVals: [1, 2] } });
+  call.fake.planner.rows = [PHEAD, prow({ ...PX7, split_between: "Mo" }), prow(PQ3)];
+  r = await call("syncPayments");
+  assert.deepEqual(r.data.problems, []);
+  e = (await call("load")).data.expenses.find((x) => x.id === id);
+  assert.deepEqual([e.splitMode, e.splitVals, e.split], ["equal", [], ["Mo"]]);
+});
+
+test("an expense deleted in the app is not brought back, nor changed, and counts as removed", async () => {
+  const call = linked();
+  await call("syncPayments");
+  const id = byPayment(call, "X7")[0].id;
+  await call("deleteExpense", { id });
+  const logs = call.fake.tables.Log.length;
+  call.fake.planner.rows = [PHEAD, prow({ ...PX7, amount_cad: 999 }), prow(PQ3)];
+  const r = await call("syncPayments");
+  assert.deepEqual(r.data, reply({ same: 1, removed: 1 }));
+  assert.equal(call.fake.tables.Log.length, logs);
+  assert.equal(byPayment(call, "X7").length, 1);
+  assert.equal(byPayment(call, "X7")[0].amount, 221.52);
+});
+
+test("a payment no longer included leaves its expense as it is and is listed in notCounted", async () => {
+  const call = linked();
+  await call("syncPayments");
+  const rows = JSON.stringify(call.fake.tables);
+  call.fake.planner.rows = [PHEAD, prow({ ...PX7, include_in_split: "no", amount_cad: 5 }), prow(PQ3), prow(PZ1)];
+  const r = await call("syncPayments");
+  assert.deepEqual(r.data, reply({ same: 1, notCounted: ["X7"] }));
+  assert.equal(JSON.stringify(call.fake.tables), rows);
+});
+
+test("R40 back-fill: a hand-rung line whose note starts with a payment id in the planner is tied once, that column only, with no Log row and no rev", async () => {
+  const call = linked({ expenses: [HAND] }, [PHEAD, prow(PX7)]);
+  const before = { ...call.fake.tables.Expenses[0] };
+  const logs = call.fake.tables.Log.length;
+  const rev = (await call("rev")).rev;
+  const r = await call("syncPayments");
+  assert.deepEqual(r.data, reply({ same: 1 }));
+  assert.deepEqual(call.fake.tables.Expenses[0], { ...before, planner_id: "X7" });
+  assert.equal(call.fake.tables.Log.length, logs);
+  assert.equal(r.rev, rev);
+  // Tied now: a note changed by hand afterwards does not untie it.
+  await call("updateExpense", { id: HAND.id, patch: { note: "card" } });
+  const again = await call("syncPayments");
+  assert.deepEqual([again.data.added, again.data.changed], [0, 1]);
+  assert.equal(live(call).length, 1);
+});
+
+test("R40 back-fill: a deleted hand-rung line is tied too (and stays deleted); a note naming an id the planner does not have is not tied", async () => {
+  const call = linked({ expenses: [{ ...HAND, deleted: true }, { ...HAND, id: "handexp0002", note: "K9 · from a friend" }] }, [PHEAD, prow(PX7)]);
+  const r = await call("syncPayments");
+  assert.deepEqual(r.data, reply({ removed: 1 }));
+  assert.equal(stored(call, "handexp0001").planner_id, "X7");
+  assert.equal(stored(call, "handexp0002").planner_id, "");
+  assert.equal(live(call).length, 1, "nothing added for X7");
+  // An id that is in the planner but not included is back-filled as well.
+  const two = linked({ expenses: [HAND] }, [PHEAD, prow({ ...PX7, include_in_split: "no" })]);
+  assert.deepEqual((await two("syncPayments")).data, reply({ notCounted: ["X7"] }));
+  assert.equal(stored(two, HAND.id).planner_id, "X7");
+});
+
+test("fix 2 (the review's probe): a payment renamed in the planner is added as new and the old line is listed as no longer in the planner", async () => {
+  const call = linked({}, [PHEAD, prow(PX7)]);
+  await call("syncPayments");
+  call.fake.planner.rows = [PHEAD, prow({ ...PX7, payment_id: "X7b2" })];
+  const r = await call("syncPayments");
+  assert.deepEqual(r.data, reply({ added: 1, problems: [{ id: "X7", message: "That payment isn’t in the planner any more.", row: null, what: "Rail pass" }] }));
+  // A deleted line no longer in the planner is not news.
+  await call("deleteExpense", { id: byPayment(call, "X7")[0].id });
+  assert.deepEqual((await call("syncPayments")).data, reply({ same: 1 }));
+});
+
+test("fix 3 (the review's probe): two live lines carrying one payment's id: a problem, and neither is changed", async () => {
+  const call = linked({ expenses: [HAND, { ...HAND, id: "handexp0002", title: "Rail pass again" }] }, [PHEAD, prow({ ...PX7, amount_cad: 300 })]);
+  const before = JSON.stringify(call.fake.tables.Log);
+  const r = await call("syncPayments");
+  assert.deepEqual(r.data, reply({ problems: [{ id: "X7", message: "Two lines carry this payment’s id.", row: 2, what: "Rail pass" }] }));
+  assert.equal(JSON.stringify(call.fake.tables.Log), before);
+  assert.deepEqual(call.fake.tables.Expenses.map((x) => x.amount), [221.52, 221.52]);
+});
+
+test("fix 4: a planner cannot be relinked from outside, and no problem repeats a planner cell's text", async () => {
+  const call = linked();
+  const other = "anotherSheetId_ABCDEFGHIJKLMNOP0123";
+  assert.deepEqual(await call.fake({ key: KEY, action: "linkPlanner", args: { id: other } }), { ok: false, error: "bad_input", message: "The app asked for something the trip sheet doesn’t know how to do.", rev: 0 });
+  assert.equal(call.fake.props.PLANNER_ID, PLANNER_ID);
+
+  call.fake.planner.rows = [PHEAD, prow({ ...PX7, payer: "Secretname" }), prow({ ...PX7, payment_id: "Q4", split_between: "Mo, Othername" }), prow({ ...PX7, payment_id: "Has Space Hidden" }), prow({ ...PX7, payment_id: "W1", split_type: "Privatetype" })];
+  const r = await call("syncPayments");
+  const text = JSON.stringify(r);
+  for (const cell of ["Secretname", "Othername", "Has Space", "Hidden", "Privatetype"]) assert.equal(text.includes(cell), false, cell);
+  assert.deepEqual(r.data.problems.map((p) => p.id), ["", "X7", "Q4", "W1"]);
+});
+
+test("fix 5: at most 10 expenses written per pull, changes first then adds; Expenses read once per pull", async () => {
+  const many = [PHEAD];
+  for (let i = 1; i <= 25; i++) many.push(prow({ ...PX7, payment_id: "R" + i, description: "Row " + i, amount_cad: i }));
+  const call = linked({}, many);
+  const reads = () => call.fake.tableReads.Expenses || 0;
+  const counts = [];
+  for (let n = 0; n < 3; n++) {
+    const was = reads();
+    const r = await call("syncPayments");
+    counts.push([r.data.added, r.data.more, reads() - was]);
+  }
+  // Read once to match, then twice per add inside addExpense_ (its own repeat check and read-back).
+  assert.deepEqual(counts, [[10, true, 21], [10, true, 21], [5, false, 11]]);
+  assert.equal(live(call).length, 25);
+  const was = reads();
+  assert.deepEqual((await call("syncPayments")).data, reply({ same: 25 }));
+  assert.equal(reads() - was, 1, "a pull with nothing to write reads Expenses once");
+
+  // Changes come before adds, in planner order.
+  const next = many.map((row, i) => (i === 0 ? row : i === 25 ? prow({ ...PX7, payment_id: "R25", description: "Row 25", amount_cad: 99 }) : row));
+  for (let i = 26; i <= 37; i++) next.push(prow({ ...PX7, payment_id: "R" + i, description: "Row " + i, amount_cad: i }));
+  call.fake.planner.rows = next;
+  const r = await call("syncPayments");
+  assert.deepEqual([r.data.changed, r.data.added, r.data.more, r.data.same], [1, 9, true, 24]);
+  assert.equal(byPayment(call, "R34").length, 1);
+  assert.deepEqual(byPayment(call, "R35"), [], "the tenth write was the last");
+});
+
+test("fix 6: a tab with a missing column, an empty tab or none is refused as planner_columns; 300 rows read says capped", async () => {
+  const call = linked();
+  call.fake.planner.rows = [PHEAD.filter((h) => h !== "amount_cad"), prow(PX7)];
+  assert.deepEqual(await call("syncPayments"), { ok: false, error: "planner_columns", message: "The planner’s Payments tab is missing the column amount_cad.", rev: 0 });
+  for (const rows of [[], null]) {
+    call.fake.planner.rows = rows;
+    assert.deepEqual(await call("syncPayments"), { ok: false, error: "planner_columns", message: "The planner has no Payments tab to read.", rev: 0 });
+  }
+  assert.equal(call.fake.tables.Expenses.length, 0);
+
+  const big = [PHEAD];
+  for (let i = 1; i <= 301; i++) big.push(prow({ ...PX7, payment_id: "C" + i, include_in_split: "no" }));
+  const capped = linked({}, big);
+  assert.deepEqual((await capped("syncPayments")).data, reply({ capped: true }));
+});
+
+test("R40 migrate: an older Sheet gets Expenses.planner_id; until then a pull is refused rather than add untied lines", async () => {
+  const call = linked({ missingColumns: ["Expenses.planner_id"] });
+  assert.deepEqual(await call("syncPayments"), { ok: false, error: "needs_migrate", message: "The trip sheet needs updating first. Ask Mo to run migrate.", rev: 0 });
+  assert.equal(call.fake.tables.Expenses.length, 0);
+  const m = await call.fake({ key: KEY, action: "migrate", args: {} });
+  assert.deepEqual(m.data, { added: ["Expenses.planner_id"] });
+  assert.equal((await call("syncPayments")).data.added, 2);
+  assert.equal(byPayment(call, "X7").length, 1);
+});
+
+test("a row the app's validation refuses is a problem, never stored, and the other rows still come in", async () => {
+  const call = linked({}, [PHEAD, prow({ ...PX7, amount_cad: 20000000 }), prow({ ...PQ3, split_between: "Mo, mo" }), prow({ ...PX7, payment_id: "F1", description: "=SUM(1)", amount_cad: 12 })]);
+  const r = await call("syncPayments");
+  assert.deepEqual(r.data, reply({ added: 1, problems: [{ id: "X7", message: "That amount is too big.", row: 2, what: "Rail pass" }, { id: "Q3", message: "Someone is in the split twice.", row: 3, what: "Noodle bar" }] }));
+  const f1 = byPayment(call, "F1")[0];
+  assert.equal(stored(call, f1.id).title, "'=SUM(1)", "a formula-looking description is stored as text");
+  assert.equal((await call("load")).data.expenses[0].title, "=SUM(1)");
+  assert.equal((await call("syncPayments")).data.same, 1, "and reads back the same");
+});
+
+test("syncPayments: not linked, unreadable, no actor, the lock busy", async () => {
+  const none = client({ planner: PLANNER });
+  assert.deepEqual(await none("syncPayments"), { ok: false, error: "no_planner", message: "No planner sheet is linked yet. Ask Mo to link it.", rev: 0 });
+
+  const call = linked();
+  call.fake.planner.fails = true;
+  const r = await call("syncPayments");
+  assert.deepEqual(r, { ok: false, error: "planner_unreadable", message: "Couldn’t read the planner sheet. Ask Mo to check its permission.", rev: 0 });
+  assert.equal(JSON.stringify(r).includes(PLANNER_ID), false);
+  assert.equal(JSON.stringify(r).includes("boom"), false, "no exception text");
+  assert.equal(call.fake.tables.Expenses.length, 0);
+  call.fake.planner.fails = false;
+
+  assert.equal((await call.fake({ key: KEY, action: "syncPayments", args: {} })).message, "Pick who you are first.");
+  assert.equal((await call.fake({ key: "nope", actor: "Mo", action: "syncPayments", args: {} })).error, "bad_key");
+
+  let busy = true;
+  const locked = client({ planner: PLANNER, plannerId: PLANNER_ID }, { lockFails: () => busy });
+  const reads = locked.fake.planner.reads;
+  assert.equal((await locked("syncPayments")).error, "busy");
+  assert.equal(locked.fake.planner.reads, reads + 1, "the planner is read before the lock is taken");
+  assert.equal(locked.fake.tables.Expenses.length, 0);
+  busy = false;
+  assert.equal((await locked("syncPayments")).data.added, 2);
+});
+
+test("Log rows from a pull say planner whoever started it; an app body cannot claim planner, nor set planner_id", async () => {
+  const call = linked();
+  await call.fake.claude("syncPayments", {});
+  assert.deepEqual(call.fake.tables.Log.map((l) => l.via), ["planner", "planner"]);
+  await call("addExpense", { expense: { ...ramen(), plannerId: "X7", planner_id: "X7" } }, { via: "planner" });
+  assert.equal(call.fake.tables.Log.at(-1).via, "app");
+  assert.equal(stored(call, "exp0000001").planner_id, "");
+  await call("updateExpense", { id: "exp0000001", patch: { planner_id: "X7" } });
+  assert.equal(stored(call, "exp0000001").planner_id, "");
+});
+
+test("linkPlanner is gone (security): no key can set PLANNER_ID; the owner sets it in Script Properties", async () => {
+  const call = client();
+  for (const key of [KEY, ownKey(call, "Mo"), call.fake.CHECK_KEY]) {
+    const r = await call.fake({ key, actor: "Mo", action: "linkPlanner", args: { id: PLANNER_ID } });
+    assert.equal(r.ok, false);
+    assert.equal(r.error, "bad_input");
+  }
+  assert.equal(call.fake.props.PLANNER_ID, undefined);
+  assert.equal((await call("load")).data.plannerLinked, false);
+  call.fake.props.PLANNER_ID = PLANNER_ID; // as the owner does in the script editor
+  const load = await call("load");
+  assert.equal(load.data.plannerLinked, true);
+  assert.equal(JSON.stringify(load).includes(PLANNER_ID), false);
+  assert.equal(call.fake.tables.Log.length, 0);
+});
+
+test("the planner id is never in a reply, a Log row or a History sentence", async () => {
+  const call = linked();
+  const replies = [await call("syncPayments"), await call("syncPayments"), await call("load"), await call("history")];
+  call.fake.planner.rows = [PHEAD, prow({ ...PX7, amount_cad: 1 })];
+  replies.push(await call("syncPayments"), await call("history"));
+  call.fake.planner.fails = true;
+  replies.push(await call("syncPayments"));
+  assert.equal(JSON.stringify(replies).includes(PLANNER_ID), false);
+  assert.equal(JSON.stringify(call.fake.tables).includes(PLANNER_ID), false);
+});
+
+
+// ---------- payments pulled on their own (Mo, 2026-11-17: "needs to be updated more often") ----------
+// A phone asks with { auto: true } when it opens and every so often. Within 10
+// minutes of the last pull the planner is not read again; the Fetch button and
+// the connector (no auto) always read it.
+
+test("auto pull: reads the planner, records when, and load says when", async () => {
+  const at = { now: "2026-12-28T03:00:00.000Z" };
+  const call = linked({}, PLANNER, { clock: () => at.now });
+  assert.equal((await call("load")).data.paymentsPulledAt, "", "never pulled");
+  const r = await call("syncPayments", { auto: true });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.deepEqual(r.data, reply({ added: 2, problems: PROBLEMS }));
+  assert.equal((await call("load")).data.paymentsPulledAt, "2026-12-28T03:00:00.000Z");
+});
+
+test("auto pull within 10 minutes of the last pull: the planner is not read, nothing is written, and the answer says skipped", async () => {
+  const at = { now: "2026-12-28T03:00:00.000Z" };
+  const call = linked({}, PLANNER, { clock: () => at.now });
+  await call("syncPayments");
+  const rev = (await call("rev")).rev;
+  const reads = call.fake.planner.reads;
+  at.now = "2026-12-28T03:09:59.000Z";
+  // A new payment in the planner is not seen yet.
+  call.fake.planner.rows.push(prow({ ...PX7, payment_id: "N9", description: "Late add" }));
+  const r = await call("syncPayments", { auto: true });
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.data, { ...reply(), skipped: true });
+  assert.equal(r.rev, rev, "nothing written");
+  assert.equal(live(call).length, 2);
+  assert.equal(call.fake.planner.reads, reads, "the planner was not read");
+  assert.equal((await call("load")).data.paymentsPulledAt, "2026-12-28T03:00:00.000Z", "the time is the last real pull");
+  // Ten minutes on, it reads again and brings the new one in.
+  at.now = "2026-12-28T03:10:00.000Z";
+  const again = await call("syncPayments", { auto: true });
+  assert.equal(again.data.added, 1);
+  assert.equal(again.data.skipped, undefined, "a real pull has no skipped field");
+  assert.equal((await call("load")).data.paymentsPulledAt, "2026-12-28T03:10:00.000Z");
+});
+
+test("Fetch (no auto) always reads the planner, even a minute after a pull", async () => {
+  const at = { now: "2026-12-28T03:00:00.000Z" };
+  const call = linked({}, PLANNER, { clock: () => at.now });
+  await call("syncPayments", { auto: true });
+  at.now = "2026-12-28T03:01:00.000Z";
+  call.fake.planner.rows.push(prow({ ...PX7, payment_id: "N9", description: "Late add" }));
+  const r = await call("syncPayments");
+  assert.equal(r.data.added, 1);
+  assert.equal((await call("load")).data.paymentsPulledAt, "2026-12-28T03:01:00.000Z");
+});
+
+test("a pull that fails does not count as a pull: the next auto pull reads again", async () => {
+  const at = { now: "2026-12-28T03:00:00.000Z" };
+  const call = linked({}, [["payment_id"]], { clock: () => at.now });
+  const bad = await call("syncPayments", { auto: true });
+  assert.equal(bad.ok, false, "the planner is missing columns");
+  assert.equal((await call("load")).data.paymentsPulledAt, "");
+  const reads = call.fake.planner.reads;
+  at.now = "2026-12-28T03:01:00.000Z";
+  await call("syncPayments", { auto: true });
+  assert.equal(call.fake.planner.reads, reads + 1, "a minute later it reads the planner again");
+});
+
+test("auto has to be true or false", async () => {
+  const call = linked();
+  const r = await call("syncPayments", { auto: "yes" });
+  assert.equal(r.ok, false);
+  assert.equal(r.error, "bad_input");
+});
+
+
+// ---------- planner payments: loose ends from the review (2026-11-17) ----------
+
+test("a planner line is credited to who paid, not to whichever phone asked", async () => {
+  const call = linked();
+  const r = await call("syncPayments", { auto: true }, { actor: "Izzah" });
+  assert.equal(r.data.added, 2);
+  const exps = (await call("load")).data.expenses;
+  assert.equal(exps.find((e) => e.title === "Rail pass").addedBy, "Mo", "X7 was paid by Mo");
+  assert.equal(exps.find((e) => e.title === "Noodle bar").addedBy, "Izzah", "Q3 was paid by Izzah");
+  assert.deepEqual(call.fake.tables.Log.map((l) => [l.who, l.via]), [["Mo", "planner"], ["Izzah", "planner"]]);
+});
+
+test("a planner change is credited to who paid", async () => {
+  const call = linked();
+  await call("syncPayments", {}, { actor: "Izzah" });
+  call.fake.planner.rows[1] = prow({ ...PX7, amount_cad: 230 });
+  const r = await call("syncPayments", {}, { actor: "Izzah" });
+  assert.equal(r.data.changed, 1);
+  const last = call.fake.tables.Log[call.fake.tables.Log.length - 1];
+  assert.deepEqual([last.who, last.via, last.action], ["Mo", "planner", "edit"]);
+});
+
+test("a pull cut short does not count as done: the next auto pull carries on at once", async () => {
+  const at = { now: "2026-12-28T03:00:00.000Z" };
+  const many = [PHEAD];
+  for (let i = 1; i <= 14; i++) many.push(prow({ ...PX7, payment_id: "M" + i, description: "Thing " + i }));
+  const call = linked({}, many, { clock: () => at.now });
+  const first = await call("syncPayments", { auto: true });
+  assert.deepEqual([first.data.added, first.data.more], [10, true]);
+  assert.equal((await call("load")).data.paymentsPulledAt, "", "not recorded while more remain");
+  at.now = "2026-12-28T03:00:20.000Z";
+  const second = await call("syncPayments", { auto: true });
+  assert.deepEqual([second.data.added, second.data.more, second.data.skipped], [4, false, undefined]);
+  assert.equal((await call("load")).data.paymentsPulledAt, "2026-12-28T03:00:20.000Z");
+});
+
+test("a pull whose read is older than one that already landed writes nothing", async () => {
+  // Pull A read the planner at 03:00:04; before A got the lock, pull B (read at 03:00:05) landed.
+  const at = { now: "2026-12-28T03:00:00.000Z" };
+  const call = linked({}, PLANNER, { clock: () => at.now });
+  await call("syncPayments");
+  const logged = call.fake.tables.Log.length;
+  call.fake.planner.rows[1] = prow({ ...PX7, amount_cad: 199 }); // what A read: the old value
+  call.fake.props.PAYMENTS_READ_AT = "2026-12-28T03:00:05.000Z"; // B has landed
+  at.now = "2026-12-28T03:00:04.000Z";
+  const a = await call("syncPayments", {}, { actor: "Izzah" });
+  assert.equal(a.ok, true);
+  assert.equal(a.data.skipped, true, "A's older read is dropped");
+  assert.equal(call.fake.tables.Log.length, logged, "nothing written");
+  assert.equal(call.fake.props.PAYMENTS_READ_AT, "2026-12-28T03:00:05.000Z");
+  // A read made after B's goes through.
+  at.now = "2026-12-28T03:00:06.000Z";
+  const c = await call("syncPayments", {}, { actor: "Izzah" });
+  assert.equal(c.data.changed, 1);
+  assert.equal(call.fake.props.PAYMENTS_READ_AT, "2026-12-28T03:00:06.000Z");
+});
+
+
+// ---------- which payment needs a look (Task 22) ----------
+// The last pull's problems are kept in PAYMENT_PROBLEMS so every phone gets
+// them from load. Rows and descriptions here are made up.
+
+const NOPROB = { at: "", list: [], more: 0 };
+const badRows = (n) => {
+  const rows = [PHEAD];
+  for (let i = 1; i <= n; i++) rows.push(prow({ ...PX7, payment_id: "B" + i, description: "Bad " + i, payer: "Nadia" }));
+  return rows;
+};
+
+test("a pull with one bad row stores it, and load hands it to any phone", async () => {
+  const call = linked({}, [PHEAD, prow(PX7), prow({ ...PX7, payment_id: "U9", description: "Hotel   deposit", payer: "Nadia" })]);
+  assert.deepEqual((await call("load")).data.paymentProblems, NOPROB, "never pulled");
+  await call("syncPayments", {}, { actor: "Izzah" });
+  const want = { at: "2026-12-28T03:00:00.000Z", list: [{ id: "U9", message: "The payer isn’t one of the people on this trip.", row: 3, what: "Hotel deposit" }], more: 0 };
+  assert.deepEqual((await call("load", {}, { actor: "Izzah" })).data.paymentProblems, want);
+  assert.deepEqual(JSON.parse(call.fake.props.PAYMENT_PROBLEMS), want);
+});
+
+test("a later clean pull stores an empty list, which clears the old one", async () => {
+  let t = "2026-12-28T03:00:00.000Z";
+  const call = linked({}, badRows(1), { clock: () => t });
+  await call("syncPayments");
+  assert.equal((await call("load")).data.paymentProblems.list.length, 1);
+  call.fake.planner.rows = [PHEAD, prow(PX7)];
+  t = "2026-12-28T04:00:00.000Z";
+  await call("syncPayments");
+  assert.deepEqual((await call("load")).data.paymentProblems, { at: t, list: [], more: 0 });
+});
+
+test("23 bad rows store the first 20 and more: 3; a message is cut to 160", async () => {
+  const call = linked({}, badRows(23));
+  await call("syncPayments");
+  const got = (await call("load")).data.paymentProblems;
+  assert.equal(got.list.length, 20);
+  assert.equal(got.more, 3);
+  assert.deepEqual(got.list.map((p) => p.id), Array.from({ length: 20 }, (_, i) => "B" + (i + 1)));
+  assert.equal(got.list[19].row, 21);
+  const raw = JSON.parse(call.fake.props.PAYMENT_PROBLEMS);
+  assert.ok(raw.list.every((p) => p.message.length <= 160));
+});
+
+test("a skipped auto pull leaves the stored list alone", async () => {
+  const call = linked({}, badRows(2));
+  await call("syncPayments", { auto: true });
+  const kept = call.fake.props.PAYMENT_PROBLEMS;
+  assert.equal(JSON.parse(kept).list.length, 2);
+  call.fake.planner.rows = [PHEAD, prow(PX7)];
+  const r = await call("syncPayments", { auto: true });
+  assert.equal(r.data.skipped, true);
+  assert.equal(call.fake.props.PAYMENT_PROBLEMS, kept);
+});
+
+test("a pull cut short by the ten-write limit still stores what it found", async () => {
+  const many = [PHEAD, prow({ ...PX7, payment_id: "U1", payer: "Nadia" })];
+  for (let i = 1; i <= 12; i++) many.push(prow({ ...PX7, payment_id: "R" + i, description: "Row " + i, amount_cad: i }));
+  const call = linked({}, many);
+  const r = await call("syncPayments");
+  assert.equal(r.data.more, true);
+  assert.deepEqual((await call("load")).data.paymentProblems.list.map((p) => p.id), ["U1"]);
+});
+
+test("garbage in PAYMENT_PROBLEMS loads as the empty shape and never throws", async () => {
+  const call = linked();
+  for (const bad of ["{{not json", "null", "[]", '{"list":"x"}', '{"at":1,"list":[]}', '"text"', ""]) {
+    call.fake.props.PAYMENT_PROBLEMS = bad;
+    const r = await call("load");
+    assert.equal(r.ok, true, bad);
+    assert.deepEqual(r.data.paymentProblems, NOPROB, bad);
+  }
+});
+
+test("a seeded paymentProblems comes back from load", async () => {
+  const seeded = { at: "2026-12-28T01:00:00.000Z", list: [{ id: "Q1", message: "Why.", row: 9, what: "Thing" }], more: 2 };
+  const call = linked({ paymentProblems: seeded });
+  assert.deepEqual((await call("load")).data.paymentProblems, seeded);
+});
+
+test("an add writes no row onto the expense, and the problem list is not in the expense", async () => {
+  const call = linked();
+  await call("syncPayments");
+  const x7 = stored(call, byPayment(call, "X7")[0].id);
+  assert.equal("row" in x7, false);
+  assert.equal(JSON.stringify(call.fake.tables.Expenses).includes('"row"'), false);
+  assert.equal("row" in (await call("load")).data.expenses.find((e) => e.id === x7.id), false);
+  const edit = call.fake.planner.rows;
+  call.fake.planner.rows = edit.map((r) => (r[0] === "X7" ? r.map((c, i) => (PHEAD[i] === "amount_cad" ? 230.1 : c)) : r));
+  await call("syncPayments");
+  assert.equal(JSON.stringify(call.fake.tables.Log).includes('"row"'), false);
 });
 
 // ---------- Task 16: a picture in each person's seal ----------
@@ -1246,4 +1829,55 @@ test("an older picture change cannot be undone over a newer one, and only its ow
   const theirs = await call("undo", { logId: last.id }, { actor: "Izzah" });
   assert.deepEqual([theirs.ok, theirs.message], [false, "You can only change your own picture."]);
   assert.equal((await call("load")).data.people.find((p) => p.name === "Mo").photo, JPEG2);
+});
+
+// ---------- stage 2 of the Before screens: fromPlanner on an expense ----------
+
+test("stage 2: load says fromPlanner per expense: true for a pulled line and a hand line tied by its note, false for the app's own", async () => {
+  const call = linked({ expenses: [{ ...HAND }, { ...ramen({ id: "handexp0002", title: "Coffee", note: "" }) }] });
+  await call("syncPayments");
+  const exps = (await call("load")).data.expenses;
+  const of = (f) => exps.filter(f).map((e) => e.fromPlanner);
+  assert.deepEqual(of((e) => e.id === "handexp0001"), [true], "tied by its note on the first pull");
+  assert.deepEqual(of((e) => e.id === "handexp0002"), [false]);
+  assert.deepEqual(of((e) => e.note === "Q3 · Ramen Ya"), [true], "added by the pull");
+  assert.ok(exps.every((e) => typeof e.fromPlanner === "boolean"));
+  assert.equal(/planner_?[iI]d/.test(JSON.stringify(exps)), false, "the tie itself never leaves");
+});
+
+test("stage 2: fromPlanner is never written to the Sheet (no column, not in a Log row) and never taken from a request", async () => {
+  const call = linked();
+  await call("syncPayments");
+  const x7 = byPayment(call, "X7")[0].id;
+  // A phone (or the connector) claiming fromPlanner changes nothing.
+  const add = await call("addExpense", { expense: { ...ramen(), fromPlanner: true } });
+  assert.equal(add.ok, true, JSON.stringify(add));
+  assert.equal(add.data.expense.fromPlanner, false);
+  assert.equal(stored(call, "exp0000001").planner_id, "");
+  const bad = await call("updateExpense", { id: "exp0000001", patch: { fromPlanner: true } });
+  assert.equal(bad.ok, false);
+  assert.equal(bad.error, "bad_input");
+  const off = await call("updateExpense", { id: x7, patch: { fromPlanner: false } });
+  assert.equal(off.ok, false);
+  assert.equal(stored(call, x7).planner_id, "X7");
+  await call.fake.claude("addExpense", { expense: ramen({ id: "exp0000002", title: "Coffee", fromPlanner: true }) });
+  assert.equal(stored(call, "exp0000002").planner_id, "");
+  // Edits, deletes and undos of a planner line keep the tie and write no such column.
+  const e = await call("updateExpense", { id: x7, patch: { kind: "food" } });
+  assert.equal(e.data.expense.fromPlanner, true);
+  const d = await call("deleteExpense", { id: x7 });
+  assert.equal(d.data.expense.fromPlanner, true);
+  const u = await call("undo", { logId: d.data.logId });
+  assert.equal(u.data.expense.fromPlanner, true);
+  assert.equal(stored(call, x7).planner_id, "X7");
+  for (const r of call.fake.tables.Expenses) assert.equal(Object.keys(r).some((k) => /from_?planner/i.test(k)), false);
+  assert.equal(/fromPlanner|from_planner/.test(JSON.stringify(call.fake.tables.Log)), false, "not in a Log row's before or after");
+  assert.equal(/fromPlanner/.test(JSON.stringify((await call("history")).data)), false, "nor in History");
+});
+
+test("stage 2: the fake seeds a line from the planner with plannerId", async () => {
+  const call = client({ expenses: [ramen({ plannerId: "X7" }), ramen({ id: "exp0000002" })] });
+  const exps = (await call("load")).data.expenses;
+  assert.deepEqual(exps.map((e) => [e.id, e.fromPlanner]), [["exp0000001", true], ["exp0000002", false]]);
+  assert.equal(stored(call, "exp0000001").planner_id, "X7");
 });

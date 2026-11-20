@@ -17,7 +17,7 @@ const { pathToFileURL } = require("url");
 const { chromium } = require("playwright-core");
 
 const ROOT = path.join(__dirname, "..");
-const GROUND = "#BFDCD1";
+const GROUND = "#E9E1CE";
 const SEED = 7; // a print whose wear reads well at icon size
 // size -> how wide the check is, as a share of the icon
 const ICONS = [
@@ -34,14 +34,14 @@ function page(paid, size, share, withFont) {
   const u = w / 100; // one hundredth of the check's width
   return `<!doctype html><html><head><meta charset="utf-8">${font}<style>
 html,body{margin:0;width:${size}px;height:${size}px;overflow:hidden;
-  background:radial-gradient(rgba(19,38,31,.08) ${u * 0.9}px, transparent ${u * 1.3}px) 0 0/${u * 9}px ${u * 9}px, ${GROUND}}
+  background:radial-gradient(rgba(60,40,15,.08) ${u * 0.9}px, transparent ${u * 1.3}px) 0 0/${u * 9}px ${u * 9}px, ${GROUND}}
 body{display:grid;place-items:center}
-.c{position:relative;width:${w}px;height:${Math.round(w * 1.18)}px;background:#EEF4E4;border-radius:${u * 1.5}px;transform:rotate(-6deg);
+.c{position:relative;width:${w}px;height:${Math.round(w * 1.18)}px;background:#FBF5E3;border-radius:${u * 1.5}px;transform:rotate(-6deg);
   box-shadow:0 ${u}px ${u}px rgba(0,0,0,.15),0 ${u * 9}px ${u * 12}px -${u * 8}px rgba(0,0,0,.55);overflow:hidden}
-.b{display:grid;grid-template-columns:1.25fr .8fr .8fr 1fr;height:${u * 16}px;border-bottom:${u * 1.6}px solid #2E7A57}
-.b i{border-right:${u * 0.8}px solid #2E7A57}.b i:last-child{border:0}
-.t{text-align:center;font:700 ${u * 15.5}px/1 "Zilla Slab",Rockwell,Georgia,serif;color:#2E7A57;padding:${u * 7}px 0 ${u * 6}px;border-bottom:${u * 2.4}px double #2E7A57}
-.l{height:${u * 15}px;border-bottom:${u * 0.8}px solid rgba(46,122,87,.55);background:linear-gradient(#2E7A57,#2E7A57) ${u * 20}px 0/${u * 0.8}px 100% no-repeat}
+.b{display:grid;grid-template-columns:1.25fr .8fr .8fr 1fr;height:${u * 16}px;border-bottom:${u * 1.6}px solid #7A5530}
+.b i{border-right:${u * 0.8}px solid #7A5530}.b i:last-child{border:0}
+.t{text-align:center;font:700 ${u * 15.5}px/1 "Zilla Slab",Rockwell,Georgia,serif;color:#7A5530;padding:${u * 7}px 0 ${u * 6}px;border-bottom:${u * 2.4}px double #7A5530}
+.l{height:${u * 15}px;border-bottom:${u * 0.8}px solid rgba(122,85,48,.42);background:linear-gradient(#7A5530,#7A5530) ${u * 20}px 0/${u * 0.8}px 100% no-repeat}
 .p{position:absolute;right:${u * 4}px;bottom:${u * 2}px;width:${u * 56}px;height:${u * 56}px;transform:rotate(-8deg);mix-blend-mode:multiply}
 </style></head><body><div class="c"><div class="b"><i></i><i></i><i></i><i></i></div><div class="t">Guest Check</div>
 <div class="l"></div><div class="l"></div><div class="l"></div><div class="p">${paid}</div></div></body></html>`;

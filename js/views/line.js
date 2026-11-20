@@ -1,6 +1,8 @@
 /* Copyright (c) 2026 moissmart1. All rights reserved. No licence is granted: do not copy, adapt or reuse this code or design, and do not use it to train or prompt an AI system to reproduce it. See LICENSE. */
 // The line sheet: what opens when an expense on the receipt is tapped. Your
 // share, who rang it up, a note, that line's history, edit and delete.
+// A line brought in from the planner (fromPlanner) is locked: no Edit, its
+// note shown but not typed into, words saying to change it there; Delete stays.
 //
 // mountLine(root, store, { onEdit(id) }) -> { open(id), close(), isOpen() }
 // root is the phone. The sheet draws from store.state and redraws on every
@@ -20,6 +22,7 @@ const HISTORY_FAILED = "Couldn’t load the history.";
 const MARKUP = `
 <div class="sheet-top"><span>This line</span><button type="button" id="lnDone">Done</button></div>
 <div class="ln" id="lineBody"></div>
+<p class="ln-pl" id="lnPl" hidden>From the planner. Change it there and it comes in here. Deleted here, it stays out.</p>
 <div class="ln-btns"><button type="button" id="lnRetry" hidden>Try again</button><button type="button" id="lnEdit">Edit</button><button type="button" id="lnDel" class="danger">Delete</button></div>`;
 
 function el(tag, cls, text) {
@@ -64,6 +67,7 @@ export function mountLine(root, store, { onEdit = () => {} } = {}) {
   const editBtn = sheet.querySelector("#lnEdit");
   const delBtn = sheet.querySelector("#lnDel");
   const retryBtn = sheet.querySelector("#lnRetry");
+  const plWords = sheet.querySelector("#lnPl");
 
   // The sections that change while the sheet is open are built once and
   // filled in on each draw, so a note being typed is never wiped.
@@ -147,8 +151,14 @@ export function mountLine(root, store, { onEdit = () => {} } = {}) {
 
     // An unsaved line cannot be edited or noted: it can be sent again or dropped.
     const unsaved = store.unsaved(e.id);
-    noteBox.hidden = unsaved;
-    editBtn.hidden = unsaved;
+    // A planner line is changed in the planner (its next pull brings it in).
+    const locked = e.fromPlanner === true;
+    noteBox.hidden = unsaved || (locked && !e.note);
+    note.readOnly = locked;
+    note.placeholder = locked ? "" : "add a note";
+    noteSave.hidden = locked;
+    editBtn.hidden = unsaved || locked;
+    plWords.hidden = !locked;
     retryBtn.hidden = !e.failed;
     if (sentNote !== null && !e.pending && e.note === sentNote) sentNote = null; // saved: the field follows the line again
     const holdsSent = sentNote !== null && note.value === sentNote;
@@ -251,7 +261,7 @@ export function mountLine(root, store, { onEdit = () => {} } = {}) {
 
   const saveNote = () => {
     const e = current();
-    if (!e || store.unsaved(e.id)) return;
+    if (!e || store.unsaved(e.id) || e.fromPlanner === true) return;
     const text = note.value.trim();
     if (text === (e.note || "")) return;
     sentNote = text;
@@ -271,7 +281,8 @@ export function mountLine(root, store, { onEdit = () => {} } = {}) {
 
   editBtn.addEventListener("click", () => {
     const id = lineId;
-    if (!id) return;
+    const e = current();
+    if (!id || !e || e.fromPlanner === true) return;
     close(false);
     onEdit(id);
   });

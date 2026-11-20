@@ -1,8 +1,10 @@
 /* Copyright (c) 2026 moissmart1. All rights reserved. No licence is granted: do not copy, adapt or reuse this code or design, and do not use it to train or prompt an AI system to reproduce it. See LICENSE. */
 // The Money screen: where you stand, the settlement slip (js/views/slip.js)
 // and the till receipt.
-// mountMoney(root, store, { onRing(day), onLine(id), onHistory() }) draws into
-// root and redraws on every store change. Every figure comes from money.js and
+// mountMoney(root, store, { onRing(day), onLine(id), onHistory(), onPlanner() }) draws into
+// root and redraws on every store change. The pill under the sentence ("2
+// planner lines need a look") shows while the planner's payments could not be
+// brought in; a tap calls onPlanner() (the app opens You on the Planner row). Every figure comes from money.js and
 // format.js; text from people or the Sheet goes in with textContent only.
 
 import { standing, tripCents, cadCents, shares } from "../money.js";
@@ -11,6 +13,7 @@ import { mountSlip, viewerOwed } from "./slip.js";
 import { tripMoney, dollars, typed, dayHead, pt, freshText, sentence, tripSpan } from "../format.js";
 import { checkDate } from "../plan.js";
 import { fillSeal } from "../picture.js";
+import { lookWords } from "../before.js";
 
 const UNREACHABLE = "Couldn’t reach the trip sheet.";
 const STAND_IN_RATE = "US dollars are being converted at a stand-in rate of 0.72.";
@@ -74,6 +77,12 @@ function drawLine(e, ctx) {
   const payer = ctx.people.find((p) => p.name === e.paidBy);
   const t = el("span", "rc-t", e.title);
   if (e.note) t.append(el("small", "rc-note", e.note));
+  // Brought in from the planner (load's fromPlanner): its sign, after the note.
+  if (e.fromPlanner === true) {
+    const pl = el("small", "rc-pl");
+    pl.append(el("span", "bf-sign", "From the planner"));
+    t.append(pl);
+  }
   const only = !ctx.names.every((n) => e.split.includes(n));
   const uneven = !!e.splitMode && e.splitMode !== "equal";
   if (only || uneven) {
@@ -160,7 +169,7 @@ function drawReceipt(rc, s, live, ctx) {
   rc.replaceChildren(boxes, spike, head, el("div", "rule"), ...days, tot, inDollars, each, foot);
 }
 
-export function mountMoney(root, store, { onRing = () => {}, onLine = () => {}, onHistory = () => {}, now = () => Date.now() } = {}) {
+export function mountMoney(root, store, { onRing = () => {}, onLine = () => {}, onHistory = () => {}, onPlanner = () => {}, now = () => Date.now() } = {}) {
   const say = el("h1");
   say.id = "say";
   const sayP = el("p");
@@ -182,7 +191,14 @@ export function mountMoney(root, store, { onRing = () => {}, onLine = () => {}, 
   asideNote.id = "asideNote";
   asideNote.setAttribute("role", "status");
   asideNote.hidden = true;
-  top.append(say, sayP, rateNote, asideNote, histBtn);
+  const look = el("button", "pl-look");
+  look.type = "button";
+  look.id = "plLook";
+  look.hidden = true;
+  const lookN = el("i");
+  const lookT = el("span");
+  look.append(lookN, lookT);
+  top.append(say, sayP, look, rateNote, asideNote, histBtn);
   const slip = el("div", "slip");
   slip.id = "slip";
   const rc = el("div", "rc");
@@ -194,6 +210,7 @@ export function mountMoney(root, store, { onRing = () => {}, onLine = () => {}, 
   mountSlip(slip, store);
 
   histBtn.addEventListener("click", () => onHistory());
+  look.addEventListener("click", () => onPlanner());
   const act = (target) => {
     if (target.closest("#fresh")) return store.refresh();
     const add = target.closest("[data-addday]");
@@ -217,6 +234,7 @@ export function mountMoney(root, store, { onRing = () => {}, onLine = () => {}, 
       sayP.textContent = s.status === "error" ? UNREACHABLE : "";
       rateNote.hidden = true;
       asideNote.hidden = true;
+      look.hidden = true;
       histBtn.hidden = true;
       slip.hidden = true;
       rc.replaceChildren();
@@ -232,6 +250,16 @@ export function mountMoney(root, store, { onRing = () => {}, onLine = () => {}, 
       ", across ", el("b", "", String(live.length)), live.length === 1 ? " receipt." : " receipts.");
     rateNote.hidden = s.rateSource !== "fallback";
     rateNote.textContent = rateNote.hidden ? "" : STAND_IN_RATE;
+    // Planner payments that could not be brought in (the list is on You).
+    const pp = s.paymentProblems && typeof s.paymentProblems === "object" ? s.paymentProblems : {};
+    const lookCount = s.plannerLinked === true ? (Array.isArray(pp.list) ? pp.list.length : 0) + (Number.isFinite(pp.more) && pp.more > 0 ? pp.more : 0) : 0;
+    look.hidden = lookCount < 1;
+    if (lookCount > 0) {
+      const words = lookWords(lookCount);
+      lookN.textContent = String(lookCount);
+      lookT.textContent = words.slice(String(lookCount).length + 1);
+      look.setAttribute("aria-label", words);
+    }
     const aside = setAsideText(s.setAside);
     asideNote.hidden = !aside;
     asideNote.textContent = aside;

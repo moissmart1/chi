@@ -6,7 +6,7 @@
 .scrim{position:absolute;inset:0;z-index:23;background:rgba(19,38,31,.4)}
 
 /* The line on check paper: its name, its figure, then the check's ruled lines. */
-.ln{background:var(--stock);color:var(--print);padding:15px 14px 8px;border-radius:2px;box-shadow:var(--lift);border-top:3px double var(--grn)}
+.ln{background:var(--stock);color:var(--print);padding:15px 14px 8px;border-radius:2px;box-shadow:var(--lift);border-top:3px double var(--print2)}
 .ln-t{font-weight:900;font-size:20px;line-height:1.2;overflow-wrap:anywhere}
 .ln-a{font-weight:900;font-size:35px;line-height:1.15;letter-spacing:-.01em;margin-top:2px;font-variant-numeric:tabular-nums}
 .ln-a i{font-size:14px;font-weight:500;letter-spacing:0;margin-left:8px}
@@ -24,7 +24,7 @@
 .ln-share.is-none{justify-content:flex-start}
 .ln-by{min-height:40px;display:flex;align-items:center;font-size:14px;font-weight:500;opacity:.8}
 .ln-note{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin-top:4px}
-.ln-note input{width:100%;height:46px;padding:0 12px;border:1.5px solid var(--grn);border-radius:4px;background:var(--mat);color:var(--print);
+.ln-note input{width:100%;height:46px;padding:0 12px;border:1.5px solid var(--print2);border-radius:4px;background:var(--mat);color:var(--print);
   font-size:16px;font-weight:700;outline:none}
 .ln-note input::placeholder{color:rgba(19,38,31,.5);font-weight:500}
 .ln-note input:focus{border-color:var(--print)}
@@ -51,7 +51,7 @@
 
 /* ---------- Settings (#you): cream keys on the mint counter ---------- */
 .set{display:grid;gap:6px}
-.set-h{color:var(--grn);font-family:var(--slab);font-size:14px;font-weight:600}
+.set-h{color:var(--print2);font-family:var(--slab);font-size:14px;font-weight:600}
 /* As .who-pick: a third of the row each, two centred. */
 .set-who{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-bottom:4px}
 .set-who>button{flex:0 0 calc((100% - 12px) / 3);min-width:0}
@@ -69,7 +69,7 @@ button.set-r,a.set-r{box-shadow:var(--key-edge)}
 .set-r>span,.set-col>label{min-width:0}
 button.set-r:active,a.set-r:active{background:var(--key-hi);transform:translateY(1.5px);box-shadow:var(--key-down)}
 .set-r small{display:block;color:var(--key-ink);font-size:12.5px;font-weight:500}
-.set-r b{font-weight:900;color:var(--grn);white-space:nowrap;font-size:14.5px;font-variant-numeric:tabular-nums}
+.set-r b{font-weight:900;color:var(--print2);white-space:nowrap;font-size:14.5px;font-variant-numeric:tabular-nums}
 /* A word that answers a tap (Copy, Copied ✓, Not copied...) keeps the room
    of the widest it can say (data-w), so the row never changes height under
    the finger. */
@@ -94,7 +94,7 @@ button.set-r:active,a.set-r:active{background:var(--key-hi);transform:translateY
 .set-pic-b #setPicDel{color:var(--dim)}
 .set-pic-b button:disabled{opacity:.35;transform:none}
 .set-mail{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
-.set-mail input{width:100%;height:46px;padding:0 12px;border:1.5px solid var(--grn);border-radius:4px;background:var(--mat);color:var(--text);font-size:16px;font-weight:700;outline:none}
+.set-mail input{width:100%;height:46px;padding:0 12px;border:1.5px solid var(--print2);border-radius:4px;background:var(--mat);color:var(--text);font-size:16px;font-weight:700;outline:none}
 .set-mail input::placeholder{color:var(--dim);font-weight:500}
 .set-mail input:focus{border-color:var(--text)}
 .set-mail input:disabled{opacity:.4}
@@ -121,17 +121,17 @@ button.set-r:active,a.set-r:active{background:var(--key-hi);transform:translateY
    A form on check paper: each field is a blank on the check, ruled in
    green, filled in ink. It sits on top of the phone's keyboard (--kb, set
    by js/views/stopsheet.js while the keyboard is up). */
-.sheet.stop{background:var(--stock);color:var(--print);border-top:3px double var(--grn);padding-top:14px;
+.sheet.stop{background:var(--stock);color:var(--print);border-top:3px double var(--print2);padding-top:14px;
   bottom:var(--kb, 0px);max-height:calc(min(90%, 100% - 76px - var(--inset-t)) - var(--kb, 0px))}
 .stop .sheet-top button{height:44px}
 .st{display:grid;gap:10px;padding-bottom:4px}
-.st-day{display:flex;align-items:baseline;gap:8px;padding-bottom:9px;border-bottom:2px solid var(--grn);font-size:15px}
+.st-day{display:flex;align-items:baseline;gap:8px;padding-bottom:9px;border-bottom:2px solid var(--print2);font-size:15px}
 .st-day b{font-weight:900}
 .st-day i{font-size:13px;font-weight:500}
 .st-f{display:grid;gap:4px;font-size:12.5px;font-weight:700}
 /* Each blank's label in the check's slab, green, as the boxes' labels. */
-.st-f>span{color:var(--grn);font-family:var(--slab);font-weight:600;font-size:13px}
-.st-f input,.st-f textarea{width:100%;min-height:46px;padding:10px 12px;border:1.5px solid var(--grn);border-radius:4px;background:var(--mat);
+.st-f>span{color:var(--print2);font-family:var(--slab);font-weight:600;font-size:13px}
+.st-f input,.st-f textarea{width:100%;min-height:46px;padding:10px 12px;border:1.5px solid var(--print2);border-radius:4px;background:var(--mat);
   color:var(--print);font:inherit;font-size:16px;font-weight:700;line-height:1.3;outline:none;-webkit-appearance:none;appearance:none}
 .st-f textarea{resize:none;display:block}
 .st-f input:focus,.st-f textarea:focus{border-color:var(--print);box-shadow:0 0 0 1px var(--print)}
@@ -140,11 +140,11 @@ button.set-r:active,a.set-r:active{background:var(--key-hi);transform:translateY
 .st-time input{font-variant-numeric:tabular-nums}
 /* The time can't slip: a switch, its word boxed in green as on the check. */
 .st-sw{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:48px;font-size:15px;font-weight:900}
-.st-sw i{border:1.5px solid var(--grn);color:var(--grn);border-radius:2px;padding:0 4px 1px;margin-left:8px;font-size:12.5px;font-weight:900}
+.st-sw i{border:1.5px solid var(--print2);color:var(--print2);border-radius:2px;padding:0 4px 1px;margin-left:8px;font-size:12.5px;font-weight:900}
 .st-sw input{flex:none;position:relative;width:50px;height:30px;margin:0;border:1.5px solid var(--print);border-radius:15px;background:var(--mat);
   -webkit-appearance:none;appearance:none;cursor:pointer;transition:background .15s}
 .st-sw input::after{content:"";position:absolute;top:3px;left:3px;width:21px;height:21px;border-radius:50%;background:var(--print);transition:transform .15s ease-out}
-.st-sw input:checked{background:var(--grn);border-color:var(--grn)}
+.st-sw input:checked{background:var(--print2);border-color:var(--print2)}
 .st-sw input:checked::after{background:var(--stock);transform:translateX(20px)}
 .st-msg{margin:0;font-size:14.5px;font-weight:900}
 .st-msg:empty{display:none}

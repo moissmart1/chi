@@ -14,12 +14,12 @@
 /* One day's check, with what is stapled to it (the stubs hang a little past its right edge). */
 .ck{position:relative;margin:0 calc(var(--gr) + 6px) 0 calc(var(--gl) - 4px);background:var(--stock);color:var(--print);box-shadow:var(--lift);border-radius:2px}
 .ck+.ck{margin-top:12px}
-.ck-h{display:grid;grid-template-columns:auto minmax(0,1fr) auto;border-bottom:2px solid var(--grn)}
-.ck-h>div{padding:4px 7px 3px;border-right:1px solid var(--grn);min-width:56px}
-.ck-h>div:last-child{border-right:0;border-left:1px solid var(--grn)}
-.ck-h small{display:block;font-family:var(--slab);font-weight:600;font-size:10.5px;color:var(--grn);line-height:1.1}
+.ck-h{display:grid;grid-template-columns:auto minmax(0,1fr) auto;border-bottom:2px solid var(--print2)}
+.ck-h>div{padding:4px 7px 3px;border-right:1px solid var(--print2);min-width:56px}
+.ck-h>div:last-child{border-right:0;border-left:1px solid var(--print2)}
+.ck-h small{display:block;font-family:var(--slab);font-weight:600;font-size:10.5px;color:var(--print2);line-height:1.1}
 .ck-h b{display:block;font-size:14px;font-weight:900;white-space:nowrap;font-variant-numeric:tabular-nums}
-.ck-h .mid{border-right:0;font-family:var(--slab);font-weight:700;font-size:16px;color:var(--grn);align-self:center;text-align:center;overflow-wrap:anywhere}
+.ck-h .mid{border-right:0;font-family:var(--slab);font-weight:700;font-size:16px;color:var(--print2);align-self:center;text-align:center;overflow-wrap:anywhere}
 .ck-h .mid i{font-family:var(--f);font-weight:800;font-size:12.5px;color:var(--print);margin-left:5px}
 .cr{display:grid;grid-template-columns:54px minmax(0,1fr);border-bottom:1px solid var(--rule);position:relative}
 .cr:last-child{border-bottom:0}

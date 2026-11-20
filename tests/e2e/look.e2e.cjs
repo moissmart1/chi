@@ -47,7 +47,7 @@ for (const size of SIZES) {
       const t = '#rail .pg[data-date="2026-12-28"] .tk';
       await until(async () => (await text(page, t + " .gc-t")) !== null, "today's check");
       assert.match(await text(page, t + " .gc-t"), /^Guest Check/);
-      // The check's paper, its green rules and the slab face of its printed words.
+      // The check's paper, its brown rules and the slab face of its printed words.
       const look = await page.evaluate((sel) => {
         const tk = document.querySelector(sel);
         const cs = (el) => getComputedStyle(el);
@@ -55,15 +55,15 @@ for (const size of SIZES) {
           paper: cs(tk).backgroundColor,
           rule: cs(tk.querySelector(".gc-box")).borderBottomColor,
           slab: cs(tk.querySelector(".gc-t")).fontFamily,
-          // The mint counter: on the phone, or held sideways on the page around it.
+          // The linen counter: on the phone, or held sideways on the page around it.
           ground: [document.getElementById("phone"), document.documentElement].map((n) => cs(n).backgroundColor).find((c) => c !== "rgba(0, 0, 0, 0)"),
           body: cs(document.body).fontFamily,
         };
       }, t);
-      assert.equal(look.paper, "rgb(238, 244, 228)");
-      assert.equal(look.rule, "rgb(46, 122, 87)");
+      assert.equal(look.paper, "rgb(251, 245, 227)");
+      assert.equal(look.rule, "rgb(122, 85, 48)");
       assert.match(look.slab, /Zilla Slab/);
-      assert.equal(look.ground, "rgb(191, 220, 209)");
+      assert.equal(look.ground, "rgb(233, 225, 206)");
       assert.match(look.body, /^"Libre Franklin"/);
       assert.deepEqual(await noSideways(page), []);
       assert.deepEqual(await cutText(page, t + " .gc-box b"), [], "no box's value is cut");
@@ -91,7 +91,7 @@ for (const size of SIZES) {
         return { joined: Math.abs(slip.top - rc.bottom) < 1, paper: getComputedStyle(document.getElementById("slip")).backgroundColor };
       });
       assert.equal(order.joined, true, "the slip continues the tab");
-      assert.equal(order.paper, "rgb(238, 244, 228)");
+      assert.equal(order.paper, "rgb(251, 245, 227)");
       assert.equal(await text(page, "#slip .ghost"), "PAID");
       assert.deepEqual(await noSideways(page), []);
       assert.deepEqual(await cutText(page, "#rc .gc-box b, #rc .rc-amt, #slip .s-amt"), [], "no figure is cut");
