@@ -387,6 +387,10 @@ export function mountBefore(root, store, { clock, now = () => Date.now(), onStat
   });
   // iPhone Safari draws a pressed look (:active) on touch only when something listens.
   section.addEventListener("touchstart", () => {}, { passive: true });
+  // A key held down repeats Enter and Space: one press is one tap (a slip opens once, not again and again).
+  section.addEventListener("keydown", (ev) => {
+    if (ev.repeat && (ev.key === "Enter" || ev.key === " ")) ev.preventDefault();
+  });
 
   // ---- fetching ----
 

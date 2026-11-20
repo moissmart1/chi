@@ -99,6 +99,19 @@ module.exports = [
     },
   },
   {
+    name: "Enter held down on a slip opens it once",
+    async run({ page }) {
+      await openBefore(page, await makeBook());
+      await slip(page, "3").focus();
+      for (let i = 0; i < 5; i++) await page.keyboard.down("Enter");
+      await page.keyboard.up("Enter");
+      await until(() => isOpen(page), "the sheet opens");
+      await new Promise((r) => setTimeout(r, 300));
+      assert.equal(await isOpen(page), true, "the repeats did not close it again");
+      assert.equal(await text(page, "#bfHandNo"), "#3");
+    },
+  },
+  {
     name: "a redraw between finger down and finger up still opens the slip",
     async run({ page }) {
       const backend = await makeBook();

@@ -70,6 +70,7 @@ button.bf-t{display:block;width:100%;border:0;text-align:left;font:inherit;curso
 
 /* The slip in your hand (a sheet), and the bell. */
 #bfHand{background:var(--dots), var(--ground)}
+#bfHand:focus{outline:none}
 .bf-big{margin:0 4px;transform:rotate(-.5deg)}
 .bf-big .bf-t{padding:13px 14px 20px}
 .bf-big .bf-n{font-size:23px;line-height:1.12}

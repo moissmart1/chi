@@ -54,7 +54,7 @@ module.exports = [
       assert.match(await page.locator("#bfBell").getAttribute("class"), /\brung\b/);
       assert.equal(await page.locator("#bfHand .bf-link, #bfHand [data-act='claim']").count(), 0, "the link and the claim key are gone");
       assert.equal(await page.locator("#bfSay").getAttribute("aria-live"), "polite");
-      assert.equal(await focusedIs(page, "#bfBack"), true, "focus is on the one key left");
+      assert.equal(await focusedIs(page, "#bfHand"), true, "focus rests on the sheet"); // a held Enter does nothing there
       // The list behind it already shows the slip on the spike, and the count.
       assert.deepEqual(await railIds(page), ["2", "3", "4", "5", "6"]);
       assert.equal((await spikeIds(page))[0], "1");
@@ -87,6 +87,24 @@ module.exports = [
       await until(async () => !(await isOpen(page)), "closed");
       assert.equal(ticks(backend).length, 1, "never two tickTodo calls");
       assert.equal(ticks(backend)[0].args.id, "2");
+    },
+  },
+  {
+    name: "Enter held down on the bell is one tick, and the repeats do not close the sheet or ring again",
+    async run({ page }) {
+      const backend = await makeBook();
+      await openBefore(page, backend);
+      await slip(page, "2").click();
+      await until(() => isOpen(page), "open");
+      await page.locator("#bfBell").focus();
+      for (let i = 0; i < 6; i++) await page.keyboard.down("Enter");
+      await page.keyboard.up("Enter");
+      await until(() => ticks(backend).length >= 1, "a tick was sent");
+      assert.equal(await isOpen(page), true, "the repeats did not close the sheet");
+      assert.equal(ticks(backend).length, 1, "one tick");
+      await advance(page, backend, 2000);
+      await until(async () => !(await isOpen(page)), "it closes by itself");
+      assert.equal(ticks(backend).length, 1);
     },
   },
   {

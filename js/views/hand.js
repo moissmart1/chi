@@ -63,6 +63,12 @@ export function mountHand(root, store, { now = () => Date.now(), onHistory = () 
   root.append(scrim, sheet);
   // iPhone Safari draws a pressed look (:active) on touch only when something listens.
   sheet.addEventListener("touchstart", () => {}, { passive: true });
+  // A key held down repeats Enter and Space: one press is one action (the bell
+  // is rung once, and a repeat never lands on the key focus moves to).
+  sheet.addEventListener("keydown", (ev) => {
+    if (ev.repeat && (ev.key === "Enter" || ev.key === " ")) ev.preventDefault();
+  });
+  sheet.tabIndex = -1; // focus can rest on the sheet itself after a ring
 
   const no = sheet.querySelector("#bfHandNo");
   const back = sheet.querySelector("#bfBack");
@@ -338,7 +344,7 @@ export function mountHand(root, store, { now = () => Date.now(), onHistory = () 
     tokens.set(id, token);
     bell();
     render();
-    back.focus({ preventScroll: true }); // the bell is spent: the one key left is Put it back
+    sheet.focus({ preventScroll: true }); // the bell is spent; focus rests on the sheet (a held Enter does nothing there)
     clearTimeout(timer);
     timer = setTimeout(() => {
       if (rungId !== id || openId !== id) return;
