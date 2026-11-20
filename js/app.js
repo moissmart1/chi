@@ -473,6 +473,9 @@ function start() {
   };
   const line = mountLine(phone, store, {
     onEdit: (id) => {
+      // A line from the planner is never edited here, by any way in.
+      const e = store.state.expenses.find((x) => x.id === id);
+      if (!e || e.fromPlanner === true) return;
       line.close(false);
       register.edit(id);
     },

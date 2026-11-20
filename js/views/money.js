@@ -77,6 +77,12 @@ function drawLine(e, ctx) {
   const payer = ctx.people.find((p) => p.name === e.paidBy);
   const t = el("span", "rc-t", e.title);
   if (e.note) t.append(el("small", "rc-note", e.note));
+  // Brought in from the planner (load's fromPlanner): its sign, after the note.
+  if (e.fromPlanner === true) {
+    const pl = el("small", "rc-pl");
+    pl.append(el("span", "bf-sign", "From the planner"));
+    t.append(pl);
+  }
   const only = !ctx.names.every((n) => e.split.includes(n));
   const uneven = !!e.splitMode && e.splitMode !== "equal";
   if (only || uneven) {

@@ -122,6 +122,16 @@ button.bf-t{display:block;width:100%;border:0;text-align:left;font:inherit;curso
 .pl-look>*{position:relative;z-index:1}
 .pl-look i{min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--red);color:#fff;font-weight:900;font-size:12px;line-height:22px;text-align:center}
 
+/* The planner's sign (stage 2): a scrap of yellow dupe on a line brought in
+   from the planner (Money's receipt), in the N print colours. */
+.bf-sign{display:inline-block;font-family:var(--reg);font-size:15px;line-height:1;text-transform:uppercase;color:var(--dupe-ink);background:var(--dupe-y);padding:2px 6px 5px;transform:rotate(-1.5deg);
+  box-shadow:0 1px 1px rgba(31,26,20,.3);
+  -webkit-mask:conic-gradient(from -45deg at bottom,#0000,#000 1deg 89deg,#0000 90deg) 50% 100%/6px 3px repeat-x,linear-gradient(#000 0 0) 0 0/100% calc(100% - 3px) no-repeat;
+          mask:conic-gradient(from -45deg at bottom,#0000,#000 1deg 89deg,#0000 90deg) 50% 100%/6px 3px repeat-x,linear-gradient(#000 0 0) 0 0/100% calc(100% - 3px) no-repeat}
+.rc-row small.rc-pl{margin-top:4px}
+/* A planner line's sheet: where to change it, above the keys. */
+.ln-pl{margin:10px 0 0;font-size:13px;font-weight:600;line-height:1.35}
+
 /* The Planner row in You: the list of what could not be brought in. */
 .set-r b.red{color:var(--red)}
 .set-pp{margin:-2px 0 0;padding:9px 12px 10px;background:var(--stock);border-radius:2px;box-shadow:var(--lift);border-left:3px solid var(--red);font-size:12.5px;font-weight:600;line-height:1.35;overflow-wrap:anywhere}
