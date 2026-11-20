@@ -117,7 +117,7 @@ button.bf-t{display:block;width:100%;border:0;text-align:left;font:inherit;curso
 .bf-prob div{margin-top:5px}
 
 /* The pill in Money: planner lines that need a look. */
-.pl-look{margin-top:9px;min-height:44px;padding:0 13px 0 6px;border:0;border-radius:17px;position:relative;background:none;color:var(--stock);font-weight:800;font-size:13.5px;display:inline-flex;align-items:center;gap:8px}
+.pl-look{margin:9px 8px 0 0;min-height:44px;padding:0 13px 0 6px;border:0;border-radius:17px;position:relative;background:none;color:var(--stock);font-weight:800;font-size:13.5px;display:inline-flex;align-items:center;gap:8px}
 .pl-look::before{content:"";position:absolute;left:0;right:0;top:50%;height:34px;margin-top:-17px;border-radius:17px;background:var(--print);z-index:0}
 .pl-look>*{position:relative;z-index:1}
 .pl-look i{min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--red);color:#fff;font-weight:900;font-size:12px;line-height:22px;text-align:center}

@@ -88,6 +88,7 @@ module.exports = [
       assert.match(await text(page, "#setPlannerP"), /^Not brought in from the planner/);
       assert.match(await text(page, "#setPlannerP"), /row 3 · Made-up bad one/);
       assert.match(await text(page, "#setPlannerP"), /isn’t usable/);
+      await page.locator("#setPlannerP").scrollIntoViewIfNeeded();
       await shot(page, "14-planner-row-with-problems");
     },
   },
