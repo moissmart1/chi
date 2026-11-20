@@ -15,6 +15,13 @@
 //   js/views/stubs.js tixInfo draws it, the picture keep, and a hook for a
 //   picture arriving), or null; onTicket(stopId, button): the big stub on an
 //   open stop (Show ticket) was tapped.
+// - storage: the phone's storage, for the board's close (js/views/board.js).
+// - where: the phone's position (js/where.js), or null. Read inside a redraw
+//   and dropped: it is never kept here, put in a redraw key or sent. While its
+//   choice is unset, today's check asks once (.tk-ask), only when it has a
+//   next stop and at least one of its stops is on the map: Use it asks the
+//   phone (its own prompt comes with it), Not now turns it off; either way
+//   the line goes for good and focus goes to the day counter.
 // - The trip taken off this phone (status "nokey": a refused key, Forget
 //   this phone): every check is taken out of the page, tickets and all.
 // - held(): true while a sheet over Days is in use (the stop sheet): coming
@@ -44,15 +51,18 @@
 // ground under it), it goes back to the top. Never
 // on a minute tick, a sync or a redraw.
 
-import { openDayIndex, dayState, daysToGo, nowIn, stopsFor, nextStopId, header, dayTotalTrip, stayShownFor } from "../plan.js";
+import { openDayIndex, dayState, daysToGo, nowIn, stopsFor, nextStopId, header, dayTotalTrip, stayShownFor, hereLine, nearStops } from "../plan.js";
 import { dayShort, dayHead } from "../format.js";
 import { cadCents } from "../money.js";
 import { APP_NAME } from "../config.js";
 import { TRIP_TZ } from "../trip.js";
 import { ticketEl } from "./ticket.js";
+import { mountBoard } from "./board.js";
+import { boardFor } from "../board.js";
 import { summary as bookSummary, countText } from "../stampbook.js";
 import { isPhone } from "../shape.js";
 import { tapOnRelease } from "./tap.js";
+import { point } from "../geo.js";
 
 const TICK_MS = 15000;
 // While a demo runs, a trip minute passes every half second.
@@ -83,15 +93,18 @@ const calm = () => typeof matchMedia === "function" && matchMedia("(prefers-redu
 // whether a redrawn row is the same as the one on screen.
 const drawn = new WeakMap();
 
-// A row's markup without the text of its leave-by line.
-const LEAD = /(<b class="r-lv">)[^<]*(<\/b>)/;
-const withoutLead = (html) => html.replace(LEAD, "$1$2");
+// A row's markup without the text (and the late colour) of its leave-by
+// line, and without the inside of its sign line (it moves as the phone does).
+const LEAD = /(<b class="r-lv)(?: is-late)?(">)[^<]*(<\/b>)/;
+const HERE = /(<div class="r-here">).*?(<\/div>)/s;
+const withoutLead = (html) => html.replace(LEAD, "$1$2$3").replace(HERE, "$1$2");
 
 // Puts the fresh rows into `rows` in order, keeping each old row that is
 // drawn the same. A row that differs only in its leave-by line's words (the
-// next stop, every minute) keeps its node, and only those words change, so
-// focus, its photo, a height change under way and a screen reader are left
-// alone. Only rows that changed otherwise, or moved, are touched.
+// next stop, every minute) or its sign line (the phone moving) keeps its
+// node, and only those change, so focus, its photo, a height change under
+// way, a ticket stub and a screen reader are left alone. Only rows that
+// changed otherwise, or moved, are touched.
 function patchRows(rows, fresh) {
   const old = new Map();
   for (const r of rows.children) if (r.dataset.id) old.set(r.dataset.id, r);
@@ -103,8 +116,14 @@ function patchRows(rows, fresh) {
     if (was === now) return keep;
     const lead = keep.querySelector(".r-lv");
     const next = r.querySelector(".r-lv");
-    if (lead && next && withoutLead(was) === withoutLead(now)) {
-      lead.textContent = next.textContent;
+    const sign = keep.querySelector(".r-here");
+    const fresh = r.querySelector(".r-here");
+    if (!!lead === !!next && !!sign === !!fresh && withoutLead(was) === withoutLead(now)) {
+      if (lead) {
+        if (lead.textContent !== next.textContent) lead.textContent = next.textContent;
+        if (lead.className !== next.className) lead.className = next.className;
+      }
+      if (sign && sign.outerHTML !== fresh.outerHTML) sign.replaceWith(fresh);
       drawn.set(keep, now);
       return keep;
     }
@@ -139,7 +158,7 @@ function patchTicket(old, fresh) {
   return old;
 }
 
-export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = () => {}, onStop = () => {}, onAddStop = () => {}, onStampBook = () => {}, held = () => false, tickets = null, onTicket = () => {} } = {}) {
+export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = () => {}, onStop = () => {}, onAddStop = () => {}, onStampBook = () => {}, held = () => false, tickets = null, onTicket = () => {}, storage = null, where = null } = {}) {
   const count = el("button", "bar-t");
   count.type = "button";
   count.id = "dayCount";
@@ -175,7 +194,9 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
   demo.append(demoText, demoStop);
   demo.hidden = true;
   demoStop.addEventListener("click", () => clock.stop());
-  root.replaceChildren(demo, bar, rail);
+  // The board (js/views/board.js): between the top line and the rail.
+  const board = mountBoard({ storage });
+  root.replaceChildren(demo, board.el, bar, rail);
 
   let dates = []; // the dates of the drawn tickets, in order
   let states = []; // each one's dayState
@@ -187,6 +208,7 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
   let autoId = null; // today's next stop: open unless a person chose
   let chosen = false; // a person has opened or closed a stop by hand
   let openId = null; // the stop they left open, or null
+  let whyId = null; // the stop whose Directions line was shown first this visit
 
   const step = () => {
     const pg = rail.firstElementChild;
@@ -269,8 +291,11 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
 
   function applyOpen() {
     const id = chosen ? openId : autoId;
+    if (id && !whyId) whyId = id;
     for (const r of rail.querySelectorAll(".r[data-id]")) {
       const on = r.dataset.id === id;
+      const why = r.querySelector(".r-why");
+      if (why && why.hidden !== (r.dataset.id !== whyId)) why.hidden = r.dataset.id !== whyId;
       if (r.classList.contains("is-open") !== on) r.classList.toggle("is-open", on);
       const b = r.querySelector(".r-b");
       if (b) b.setAttribute("aria-expanded", String(on));
@@ -394,8 +419,45 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
       if (k) onTicket(id, k);
     },
   });
+  // The ask's two keys, and a stop's name and Edit: a position arriving (or a
+  // sync) can draw the check's heading or a row again under the finger; the
+  // tap is then done on finger up on what is now in its place.
+  const rescue = tapOnRelease(rail, {
+    pick: (t) => {
+      if (where && t.closest(".tk-ask .yes")) return { k: "yes" };
+      if (where && t.closest(".tk-ask .no")) return { k: "no" };
+      const r = t.closest(".r[data-id]");
+      if (!r) return null;
+      if (t.closest(".r-edit")) return { k: "edit", id: r.dataset.id };
+      if (t.closest(".r-b")) return { k: "open", id: r.dataset.id };
+      return null;
+    },
+    act: ({ k, id }) => {
+      if (k === "yes" || k === "no") return answer(k);
+      const r = rail.querySelector('.r[data-id="' + CSS.escape(id) + '"]');
+      if (!r) return;
+      if (k === "edit") onStop(id);
+      else toggle(r);
+    },
+  });
+  // Use it, or Not now: the line goes on the redraw this causes, and focus goes to the day counter.
+  function answer(k) {
+    if (!where) return;
+    if (k === "yes") where.ask();
+    else where.turnOff();
+    if (!count.hidden) count.focus({ preventScroll: true });
+  }
   rail.addEventListener("click", (ev) => {
-    if (tap.skip(ev)) return;
+    const tapped = tap.skip(ev);
+    if (rescue.skip(ev) || tapped) return;
+    if (where && ev.target.closest(".tk-ask .yes")) {
+      answer("yes");
+      return;
+    }
+    if (where && ev.target.closest(".tk-ask .no")) {
+      answer("no");
+      return;
+    }
     if (ev.target.closest(".tk-stampline")) {
       onStampBook();
       return;
@@ -497,7 +559,9 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
     seen = null;
     autoId = null;
     openId = null;
+    whyId = null;
     chosen = false;
+    board.clear();
     rail.replaceChildren();
     pager.replaceChildren();
     count.replaceChildren();
@@ -514,6 +578,7 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
     const stampToday = showStamps(s);
     const ready = s.status === "ready" && s.trip && s.trip.start && list(s.days).length;
     if (!ready) {
+      board.update(null);
       if (!dates.length) {
         count.hidden = true;
         rail.replaceChildren();
@@ -532,6 +597,8 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
     const stops = list(s.stops).filter((x) => x && typeof x.id === "string" && x.id && typeof x.date === "string");
     const stays = list(s.stays).filter((x) => x && typeof x === "object");
     const expenses = list(s.expenses).filter((x) => x && typeof x === "object");
+    // Where the phone is, when usable: read here and dropped (memory only).
+    const here = where ? where.current() : null;
     const inView = cur >= 0 ? dates[cur] : null;
     const left = rail.scrollLeft;
     const spot = focusSpot();
@@ -579,6 +646,18 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
         // Today's stamp is open and not yet pressed: the ticket says so.
         stampOpen: stampToday === day.date,
       };
+      // Leave by, from where you are: only with a usable position within a mile of the next stop.
+      if (nextId && here) {
+        const hl = hereLine(dayStops.find((x) => x.id === nextId), now.minutes, here);
+        if (hl) model.hereNext = hl;
+      }
+      // A loose day: each stop's distance and the nearest, the order kept.
+      if (state === "today" && here) {
+        const near = nearStops(dayStops, here);
+        if (Object.keys(near).length) model.near = near;
+      }
+      // Asked once, on today's check, only when something on it could show a distance.
+      if (nextId && where && where.supported() && where.state() === "unset" && dayStops.some((x) => point(x))) model.ask = true;
       // The stops with a ticket, stapled to their lines. None, no key at all.
       if (tickets) {
         const tix = {};
@@ -600,6 +679,7 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
     });
     applyOpen();
     restoreFocus(spot);
+    board.update(boardFor(s, nowMs, here), tz);
 
     if (!opened) {
       opened = true;
@@ -672,6 +752,8 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
 
   render(store.state);
   store.subscribe(render);
+  // A new position, or the choice changing: the lines that use it are drawn again.
+  if (where) where.subscribe(() => render(store.state));
   // A picture reaching this phone makes its stub solid.
   if (tickets && tickets.subscribe) tickets.subscribe(() => render(store.state));
   // Starting or stopping a demo is a deliberate jump: the rail goes to the

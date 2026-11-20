@@ -40,11 +40,21 @@
 //   when the stop is open, the big stub (.r-tk) above the links: Show ticket.
 //   Absent, a stop reads exactly as it did. ticketEl's second argument,
 //   { keep }, is where the big stub's small picture of the code comes from.
+// - ask: today's check asks, once, whether to use where the phone is: the
+//   last thing in its heading, .tk-ask, with Use it (.yes) and Not now (.no)
+//   (the Days view sees to the taps). No sign is drawn with it.
+// - hereNext: leave by from where you are (js/plan.js hereLine) for today's
+//   next stop: its sign line (.r-here: the sign, the miles and the walk) and
+//   its leave line (late: .r-lv.is-late). Absent, today's line stands.
+// - near: { [stopId]: nearStops(...) } for today's stops with no time: each
+//   gets the same sign line; the nearest of two or more gets the NEAREST
+//   sign above its name. Absent, the stop reads as it did.
 
-import { minutesOf, issueLine, isPast, nextLine, originFor, mapsUrl, safeHref, gateDate, checkDate } from "../plan.js";
+import { minutesOf, issueLine, isPast, nextLine, mapsUrl, safeHref, gateDate, checkDate } from "../plan.js";
 import { dayHead, tripMoney, dollars } from "../format.js";
 import { rng, gateStampSVG } from "../stamp.js";
 import { onCheckEl, bigStubEl, kindWord, bandDay, thumbEl, statusWords } from "./stubs.js";
+import { plainBlade, bladeEl, nearestEl } from "./sign.js";
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
@@ -71,7 +81,7 @@ const failedPhotos = new Set();
 
 // What shows when the stop is open: the photo, how to get there, the note,
 // and the buttons (directions, and the stop's own link).
-function more(stop, origin, tix, keep) {
+function more(stop, tix, keep) {
   const wrap = el("div", "r-more");
   wrap.inert = true;
   const inner = el("div");
@@ -103,8 +113,8 @@ function more(stop, origin, tix, keep) {
     a.rel = "noopener";
     return a;
   };
-  const map = mapsUrl(stop, origin);
-  if (map) btns.append(link("r-map", "Directions ↗", map));
+  const map = mapsUrl(stop);
+  if (map) btns.append(link("r-map", "Directions from here ↗", map));
   const own = safeHref(stop.link);
   if (own) btns.append(link("r-map alt", "Ticket or booking ↗", own));
   // Opens the stop sheet on this stop (js/views/stopsheet.js).
@@ -112,6 +122,12 @@ function more(stop, origin, tix, keep) {
   edit.type = "button";
   btns.append(edit);
   inner.append(btns);
+  // Said once per visit (the Days view shows it on one stop only).
+  if (map) {
+    const why = el("p", "r-why", "Opens Maps from where your phone is, by train and bus.");
+    why.hidden = true;
+    inner.append(why);
+  }
   wrap.append(inner);
   return wrap;
 }
@@ -146,7 +162,7 @@ function showKey(stop, tix, keep) {
 }
 
 function row(stop, i, model, keep) {
-  const { state, minutes, nextId, stops, stays, day } = model;
+  const { state, minutes, nextId } = model;
   const next = state === "today" && stop.id === nextId;
   const r = el("div", "r");
   r.dataset.id = stop.id;
@@ -159,8 +175,11 @@ function row(stop, i, model, keep) {
   body.tabIndex = 0;
   body.setAttribute("aria-expanded", "false");
   const title = str(stop.title);
-  if (title || next) {
+  const near = model.near && model.near[stop.id] ? model.near[stop.id] : null;
+  const nearest = !!(near && near.near);
+  if (title || next || nearest) {
     const n = el("div", "r-n");
+    if (nearest) n.append(nearestEl());
     if (next) n.append(el("span", "tag", "Next"));
     if (title) n.append(title);
     body.append(n);
@@ -171,12 +190,21 @@ function row(stop, i, model, keep) {
     fx.append(el("span", "", "Fixed time"));
     body.append(fx);
   }
-  const lead = next ? nextLine(stop, minutes) : "";
+  // From where you are: the sign, the miles and the walk.
+  const hereNext = next && model.hereNext ? model.hereNext : null;
+  const signed = hereNext || near;
+  if (signed) {
+    const h = el("div", "r-here");
+    h.append(bladeEl(signed.from), el("span", "dist", signed.dist));
+    body.append(h);
+    r.classList.add("has-here");
+  }
+  const lead = hereNext ? hereNext.lead : next ? nextLine(stop, minutes) : "";
   const tix = model.tix && model.tix[stop.id] ? model.tix[stop.id] : null;
   const detail = str(stop.detail);
   if (lead || detail) {
     const s = el("div", "r-s");
-    if (lead) s.append(el("b", "r-lv", lead));
+    if (lead) s.append(el("b", hereNext && hereNext.late ? "r-lv is-late" : "r-lv", lead));
     if (lead && detail) s.append(" ");
     if (detail) s.append(detail);
     body.append(s);
@@ -191,7 +219,7 @@ function row(stop, i, model, keep) {
   // was paid is rung up on Money), so it holds the check's blank dot.
   const price = el("div", "r-j", "·");
   price.setAttribute("aria-hidden", "true");
-  r.append(el("div", "r-t", minutesOf(stop.time) === null ? "—" : stop.time), body, price, more(stop, originFor(stops, i, stays, day.date), tix, keep));
+  r.append(el("div", "r-t", minutesOf(stop.time) === null ? "—" : stop.time), body, price, more(stop, tix, keep));
   return r;
 }
 
@@ -229,6 +257,27 @@ function stampLine() {
   b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle class="d" cx="12" cy="12" r="9.5"/><circle cx="12" cy="12" r="4.2"/></svg>';
   b.append(el("span", "", "Today’s stamp is open"), el("i", "", "›"));
   return b;
+}
+
+// The one-time ask, under the heading of today's check.
+function askLine() {
+  const q = "Leave-by times from where you are?";
+  const d = el("div", "tk-ask");
+  d.setAttribute("role", "group");
+  d.setAttribute("aria-label", q);
+  const m = el("div", "ask-m");
+  m.append(plainBlade("FROM HERE"));
+  const keys = el("div", "ask-k");
+  const key = (cls, text) => {
+    const k = document.createElement("button");
+    k.type = "button";
+    k.className = cls;
+    k.textContent = text;
+    return k;
+  };
+  keys.append(key("yes", "Use it"), key("no", "Not now"));
+  d.append(m, el("b", "ask-q", q), el("span", "ask-s", "Your location stays on this phone."), keys);
+  return d;
 }
 
 // Tonight and the stay's name: a button that opens the hotel card.
@@ -270,6 +319,7 @@ export function ticketEl(model, { keep = null } = {}) {
   const w = where(h, tripName);
   if (w) head.append(w);
   if (model.stampOpen) head.append(stampLine());
+  if (model.ask) head.append(askLine());
 
   const rows = el("div", "rows");
   if (stops.length) rows.append(...stops.map((stop, i) => row(stop, i, model, keep)));

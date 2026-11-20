@@ -4,7 +4,7 @@
 // Every place here is made up.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { metres, walkMinutes, usable, distanceText, pointFromLink, linkProblem, DIRECTIONS_LINK, point, FRESH_MS, ROUGH_M } from "../js/geo.js";
+import { metres, walkMinutes, usable, gridMetres, gridParts, blocksOf, compass, milesText, gridSpot, GRID_ORIGIN, MILE_M, BLOCK_M, WALK_M_PER_MIN, pointFromLink, linkProblem, DIRECTIONS_LINK, point, FRESH_MS, ROUGH_M } from "../js/geo.js";
 
 const LOOP = { lat: 41.8954, lng: -87.6589 };
 const NOW = Date.parse("2026-12-28T13:20:00-06:00");
@@ -21,12 +21,55 @@ test("metres: the haversine distance", () => {
   for (const bad of [null, {}, { lat: "", lng: "" }, { lat: 91, lng: 0 }, { lat: 0, lng: 181 }, { lat: "x", lng: 1 }]) assert.ok(Number.isNaN(metres(bad, LOOP)), JSON.stringify(bad));
 });
 
-test("walkMinutes: 1.3 times the straight line, at 80 m a minute, rounded up", () => {
-  assert.equal(walkMinutes(0), 0);
-  assert.equal(walkMinutes(1000), 17); // 1300 / 80 = 16.25
-  assert.equal(walkMinutes(984.6), 16); // 1280 / 80 = 16, exactly
-  assert.equal(walkMinutes(1), 1);
-  assert.equal(walkMinutes(3000), 49);
+// A made-up spot, and a point `north` metres north and `east` metres east of a base.
+const P = { lat: 41.9, lng: -87.7 };
+const DEG = (6371008.8 * Math.PI) / 180;
+const off = (base, north, east) => ({
+  lat: +(base.lat + north / DEG).toFixed(6),
+  lng: +(base.lng + east / (DEG * Math.cos((base.lat * Math.PI) / 180))).toFixed(6),
+});
+
+test("walkMinutes: 70 m a minute along the grid, rounded up, never under 1", () => {
+  assert.equal(WALK_M_PER_MIN, 70);
+  const table = [[0, 1], [1, 1], [70, 1], [71, 2], [140, 2], [805, 12], [1609, 23], [3000, 43]];
+  for (const [m, want] of table) assert.equal(walkMinutes(m), want, String(m));
+});
+
+test("blocksOf: eight blocks to a mile", () => {
+  assert.equal(MILE_M, 1609.344);
+  assert.equal(BLOCK_M, MILE_M / 8);
+  const table = [[0, 0], [100, 0], [101, 1], [805, 4], [1609.344, 8], [3300, 16], [3400, 17]];
+  for (const [m, want] of table) assert.equal(blocksOf(m), want, String(m));
+});
+
+test("milesText", () => {
+  const table = [[0, "under 0.1 mi"], [79, "under 0.1 mi"], [81, "0.1 mi"], [241, "0.1 mi"], [805, "0.5 mi"], [2250, "1.4 mi"], [15300, "9.5 mi"], [16020, "10 mi"], [NaN, ""], [-1, ""]];
+  for (const [m, want] of table) assert.equal(milesText(m), want, String(m));
+});
+
+test("gridMetres is north-south plus east-west; metres stays the straight line", () => {
+  const q = off(P, -400, 300);
+  assert.ok(Math.abs(gridMetres(P, q) - 700) < 1, String(gridMetres(P, q)));
+  assert.ok(Math.abs(metres(P, q) - 500) < 1, String(metres(P, q)));
+  assert.ok(Number.isNaN(gridMetres(P, { lat: "", lng: "" })));
+  assert.equal(gridParts(null, P), null);
+});
+
+test("compass: the longer way decides", () => {
+  assert.equal(compass(P, off(P, -805, 0)), "S");
+  assert.equal(compass(P, off(P, 0, 320)), "E");
+  assert.equal(compass(P, off(P, 600, -200)), "N");
+  assert.equal(compass(P, off(P, -100, -300)), "W");
+  assert.equal(compass(P, P), "");
+  assert.equal(compass(P, null), "");
+});
+
+test("gridSpot: the city's own grid", () => {
+  assert.equal(gridSpot(off(GRID_ORIGIN, -201, 201)), "100 S · 100 E");
+  assert.equal(gridSpot(off(GRID_ORIGIN, 1609, -805)), "800 N · 400 W");
+  assert.equal(gridSpot(GRID_ORIGIN), "0 N · 0 E");
+  assert.equal(gridSpot(off(GRID_ORIGIN, 40000, 0)), "");
+  assert.equal(gridSpot({ lat: "", lng: "" }), "");
 });
 
 test("usable: at most 3 minutes old and 300 m or better", () => {
@@ -41,19 +84,6 @@ test("usable: at most 3 minutes old and 300 m or better", () => {
   assert.equal(usable({ ...pos, at: NOW + 2 * 60000 }, NOW), false, "from the future");
   assert.equal(usable({ ...pos, at: NOW + 30000 }, NOW), true, "a clock a little ahead");
   for (const bad of [null, undefined, {}, { lat: 41, lng: -87 }, { ...pos, lat: 99 }]) assert.equal(usable(bad, NOW), false, JSON.stringify(bad));
-});
-
-test("distanceText", () => {
-  assert.equal(distanceText(4), "10 m");
-  assert.equal(distanceText(283), "280 m");
-  assert.equal(distanceText(650), "650 m");
-  assert.equal(distanceText(994), "990 m");
-  assert.equal(distanceText(996), "1.0 km");
-  assert.equal(distanceText(1204), "1.2 km");
-  assert.equal(distanceText(2449), "2.4 km");
-  assert.equal(distanceText(24400), "24 km");
-  assert.equal(distanceText(NaN), "");
-  assert.equal(distanceText(-1), "");
 });
 
 test("pointFromLink: the pin, else the map's centre, else nothing", () => {

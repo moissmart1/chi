@@ -31,9 +31,59 @@ export function metres(a, b) {
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
-// Minutes on foot for a straight line: streets are about 1.3 times longer, at 80 m a minute.
+export const MILE_M = 1609.344;
+export const BLOCK_M = MILE_M / 8; // 201.168: eight blocks to a mile
+export const WALK_M_PER_MIN = 70; // a winter pace
+
+// How far north and east b is of a, in metres (negative: south, west). null when either is not a point.
+export function gridParts(a, b) {
+  const p = point(a);
+  const q = point(b);
+  if (!p || !q) return null;
+  return { north: rad(q.lat - p.lat) * R, east: rad(q.lng - p.lng) * R * Math.cos(rad((p.lat + q.lat) / 2)) };
+}
+
+// Metres along the grid: north-south plus east-west. NaN when either is not a point.
+export function gridMetres(a, b) {
+  const g = gridParts(a, b);
+  return g ? Math.abs(g.north) + Math.abs(g.east) : NaN;
+}
+
+// Minutes on foot for a grid distance, rounded up, never under 1.
 export function walkMinutes(m) {
-  return Math.ceil((m * 1.3) / 80);
+  return Math.max(1, Math.ceil(m / WALK_M_PER_MIN));
+}
+
+// Whole blocks for a grid distance.
+export function blocksOf(m) {
+  return Math.round(m / BLOCK_M);
+}
+
+// "N", "S", "E" or "W": the longer of the two parts decides; equal parts say N or S. "" when both are under half a metre.
+export function compass(a, b) {
+  const g = gridParts(a, b);
+  if (!g || (Math.abs(g.north) < 0.5 && Math.abs(g.east) < 0.5)) return "";
+  return Math.abs(g.north) >= Math.abs(g.east) ? (g.north >= 0 ? "N" : "S") : g.east >= 0 ? "E" : "W";
+}
+
+// "under 0.1 mi", "0.5 mi", "1.4 mi", "10 mi". "" for NaN or a negative.
+export function milesText(m) {
+  if (!Number.isFinite(m) || m < 0) return "";
+  const mi = m / MILE_M;
+  return mi < 0.05 ? "under 0.1 mi" : mi < 9.95 ? mi.toFixed(1) + " mi" : Math.round(mi) + " mi";
+}
+
+// The city's own grid: State and Madison are zero, 800 to a mile.
+export const GRID_ORIGIN = { lat: 41.88195, lng: -87.62784 };
+
+// "100 S · 100 E" for a place, to the nearest block; "" when it is not a point or is over 160 blocks (20 miles) out either way.
+export function gridSpot(p) {
+  const g = gridParts(GRID_ORIGIN, p);
+  if (!g) return "";
+  const ns = Math.round(g.north / BLOCK_M);
+  const ew = Math.round(g.east / BLOCK_M);
+  if (Math.abs(ns) > 160 || Math.abs(ew) > 160) return "";
+  return Math.abs(ns) * 100 + (ns >= 0 ? " N" : " S") + " · " + Math.abs(ew) * 100 + (ew >= 0 ? " E" : " W");
 }
 
 // A position is used only when it is at most 3 minutes old and 300 m or better.
@@ -44,14 +94,6 @@ export function usable(pos, now) {
   if (!Number.isFinite(at) || !Number.isFinite(acc) || acc < 0 || acc > ROUGH_M) return false;
   // A phone's clock a little ahead is allowed; a minute ahead is not believed.
   return now - at <= FRESH_MS && at - now <= 60 * 1000;
-}
-
-// "280 m", "1.2 km", "24 km".
-export function distanceText(m) {
-  if (!Number.isFinite(m) || m < 0) return "";
-  if (m < 995) return Math.max(10, Math.round(m / 10) * 10) + " m";
-  if (m < 9950) return (m / 1000).toFixed(1) + " km";
-  return Math.round(m / 1000) + " km";
 }
 
 // What a pasted directions link would give away: its start is often where

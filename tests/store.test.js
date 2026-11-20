@@ -3125,7 +3125,7 @@ test("a position never leaves the phone: not in any request, not in storage, eve
   const here = w.current();
   assert.ok(here);
   await p.store.boot();
-  p.store.pressStamp("d1", { here: inPlace({ lat: "41.9270", lng: "-87.6377" }, here) });
+  p.store.pressStamp("d1", { here: inPlace({ lat: "41.9150", lng: "-87.6377" }, [], here) });
   await p.store.idle();
   assert.equal(p.fake.tables.Stamps[0].here, "yes");
   const everything = JSON.stringify(p.net.sent) + JSON.stringify([...p.storage.map.entries()]) + JSON.stringify(p.fake.tables);

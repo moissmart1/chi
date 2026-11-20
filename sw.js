@@ -19,7 +19,7 @@
 //   script.googleusercontent.com), and anything else not listed here.
 // - Only OK answers are ever kept.
 
-const SW_VERSION = "429f02896c";
+const SW_VERSION = "d0844cdb02";
 // Cache Storage is shared by every app on this origin (another trip's app
 // can sit beside this one), so every name this worker makes or deletes
 // starts with this app's own prefix.
@@ -46,8 +46,10 @@ const SHELL = [
   "css/stampbook.css",
   "css/tickets.css",
   "css/tickettab.css",
+  "css/where.css",
   "js/api.js",
   "js/app.js",
+  "js/board.js",
   "js/bulk.js",
   "js/clip.js",
   "js/clock.js",
@@ -72,6 +74,7 @@ const SHELL = [
   "js/update.js",
   "js/where.js",
   "js/views/alldays.js",
+  "js/views/board.js",
   "js/views/bulkadd.js",
   "js/views/days.js",
   "js/views/first.js",
@@ -80,6 +83,7 @@ const SHELL = [
   "js/views/money.js",
   "js/views/net.js",
   "js/views/register.js",
+  "js/views/sign.js",
   "js/views/slip.js",
   "js/views/stampbook.js",
   "js/views/staycard.js",

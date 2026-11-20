@@ -1,0 +1,94 @@
+/* Copyright (c) 2026 moissmart1. All rights reserved. No licence is granted: do not copy, adapt or reuse this code or design, and do not use it to train or prompt an AI system to reproduce it. See LICENSE. */
+/* The location screens: the small green street sign ("blade") printed wherever the app used the phone's position, and the board. */
+:root{
+  --steel:linear-gradient(180deg,#FAFBFA 0%,#C9CFCB 40%,#8B948E 58%,#DADFDB 100%);
+  --prism:repeating-linear-gradient(60deg,rgba(255,255,255,.075) 0 1.5px,transparent 1.5px 4px),repeating-linear-gradient(-60deg,rgba(255,255,255,.075) 0 1.5px,transparent 1.5px 4px);
+  --sgn:#07704B; --sgn2:#04583B; --hon:#6A4322; --hon2:#4F3016;
+}
+/* the sign */
+.g-bl{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 5px 0 8px;border-radius:3.5px;color:#fff;font-weight:900;font-size:11.5px;letter-spacing:.07em;line-height:1;white-space:nowrap;flex:none;
+  background:var(--prism),linear-gradient(var(--sgn),var(--sgn2));box-shadow:inset 0 1.5px 0 rgba(255,255,255,.45),inset 0 -1.5px 0 rgba(0,0,0,.4),0 1px 1.5px rgba(0,0,0,.5)}
+.g-bl b{font-size:15px;letter-spacing:0}
+.g-bl i{display:grid;place-items:center;min-width:18px;height:16px;padding:0 3px;border:1.4px solid #fff;border-radius:2px;font-size:11px;letter-spacing:0}
+.g-bl.pl{padding-right:8px}
+.g-bl.off{background:none;color:var(--dim);box-shadow:inset 0 0 0 1.4px rgba(19,38,31,.45);border:0}
+.g-ow{display:block;margin:0 0 4px;width:96px;height:24px;flex:none;filter:drop-shadow(0 1px 1px rgba(0,0,0,.4))}
+.g-bl.far{padding:0 5px}
+.g-cap{height:19px;font-size:10px;padding:0 6px;transform:rotate(-2deg)}
+.r-why{margin:7px 0 0;font-size:13px;font-weight:600;line-height:1.35}
+
+/* the board */
+.g-brd{padding:2px 0 0 31px}
+.g-pole{position:absolute;left:8px;top:-12px;bottom:-9px;width:14px;border-radius:2px;background:var(--tk-grain),linear-gradient(90deg,#6F7873,#EEF1EF 34%,#B4BCB7 58%,#646D68);box-shadow:1px 0 2px rgba(0,0,0,.4)}
+.g-pole::before{content:"";position:absolute;left:-1px;right:-1px;top:0;height:5px;border-radius:2px 2px 0 0;background:linear-gradient(#8a938e,#565e59)}
+/* a sticker somebody left on the pole */
+.g-pole::after{content:"";position:absolute;left:1.5px;bottom:20px;width:11px;height:15px;background:linear-gradient(135deg,#F3E183 0 62%,#d9c65e 62%);transform:rotate(-7deg);box-shadow:0 0 0 .6px rgba(0,0,0,.35);opacity:.9}
+.g-blade{position:relative;display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:58px;padding:7px 9px 7px 16px;border-radius:5px;color:#fff;
+  background:var(--prism),linear-gradient(var(--sgn),var(--sgn2));
+  box-shadow:inset 0 2.5px 0 rgba(255,255,255,.4),inset 0 -2.5px 0 rgba(0,0,0,.4),inset 0 0 0 1px rgba(0,0,0,.25),0 2px 2px rgba(0,0,0,.35),0 12px 12px -9px rgba(0,0,0,.6)}
+.g-blade+.g-blade{margin-top:6px}
+/* the steel band that holds a blade to the pole, and its two bolts */
+.g-blade::before{content:"";position:absolute;left:-27px;top:50%;width:33px;height:13px;margin-top:-6.5px;border-radius:2px;background:var(--steel);box-shadow:0 0 0 .7px rgba(0,0,0,.5),0 2px 2px rgba(0,0,0,.4)}
+.g-blade::after{content:"";position:absolute;left:4px;top:7px;bottom:7px;width:7px;background:radial-gradient(circle at 50% 3.5px,#F4F6F4 0 1.4px,#7b847f 1.5px 3.2px,transparent 3.4px),radial-gradient(circle at 50% calc(100% - 3.5px),#F4F6F4 0 1.4px,#7b847f 1.5px 3.2px,transparent 3.4px)}
+.g-nm{min-width:0}
+.g-blade small{display:block;font-weight:800;font-size:10.5px;letter-spacing:.14em;line-height:1.1;opacity:.95}
+.g-nm b{display:block;font-weight:900;font-size:20px;line-height:1.05;letter-spacing:.015em;text-transform:uppercase;margin-top:2px;overflow-wrap:anywhere}
+.g-no{flex:none;text-align:center;padding:3px 7px 4px;border:1.8px solid #fff;border-radius:4px}
+.g-no b{display:block;font-weight:900;font-size:23px;line-height:1;font-variant-numeric:tabular-nums}
+.g-lv{min-height:54px}
+.g-lv b{display:block;font-weight:900;font-size:25px;line-height:1.02;font-variant-numeric:tabular-nums;white-space:nowrap}
+.g-lv>div:last-child{text-align:right}
+.g-lv.hon{background:var(--prism),linear-gradient(var(--hon),var(--hon2))}
+.g-lv.tow{background:var(--tk-grain),linear-gradient(#FDFCF6,#F1EFE4);color:var(--red);box-shadow:inset 0 0 0 2.5px var(--red),inset 0 0 0 4px #FDFCF6,0 2px 2px rgba(0,0,0,.35),0 12px 12px -9px rgba(0,0,0,.6)}
+.g-lv.red{background:var(--prism),linear-gradient(#CC3A2E,#A5261C);box-shadow:inset 0 0 0 2px #A5261C,inset 0 0 0 3.6px #fff,0 2px 2px rgba(0,0,0,.35),0 12px 12px -9px rgba(0,0,0,.6)}
+.g-ft{display:flex;justify-content:space-between;align-items:center;gap:8px;min-height:34px;margin-top:6px}
+.g-pl{position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;padding:4px 10px 4px 5px;background:var(--tk-grain),#FBFAF4;border-radius:3px;color:#151515;font-weight:900;font-size:14.5px;line-height:1.15;font-variant-numeric:tabular-nums;
+  box-shadow:inset 0 0 0 1.5px #151515,0 2px 2px rgba(0,0,0,.3),0 8px 8px -6px rgba(0,0,0,.5)}
+.g-pl::before{content:"";position:absolute;left:-27px;top:50%;width:30px;height:9px;margin-top:-4.5px;border-radius:2px;background:var(--steel);box-shadow:0 0 0 .7px rgba(0,0,0,.5),0 2px 2px rgba(0,0,0,.4)}
+@media (max-width:350px){ .g-lv b{font-size:21px} .g-nm b{font-size:18px} .g-no b{font-size:21px} }
+.brd-wrap{display:grid;grid-template-rows:1fr;transition:grid-template-rows .2s ease-out}
+.brd-wrap>div{overflow:hidden;min-height:0}
+.brd-wrap.is-shut{grid-template-rows:0fr}
+.brd{position:relative;margin:14px 22px 11px}                         /* the check's own edges (the rail's 22px); room above and below for the pole's ends and the blades' shadows */
+.g-blade{text-transform:uppercase}
+.g-nm b{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}   /* a long name: two lines, then cut */
+.g-lv>div[hidden],.g-no[hidden],.g-lv[hidden],.g-pl[hidden]{display:none}
+.brd-x{position:static;flex:none;margin-left:auto;width:44px;height:44px;border:0;padding:0 0 2px;border-radius:50%;color:var(--stock);font-weight:800;font-size:17px;line-height:1;
+  background:radial-gradient(circle, rgba(19,38,31,.82) 0 13px, transparent 13.5px)}   /* 44px to the finger, 26px drawn */
+@media (prefers-reduced-motion: reduce){ .brd-wrap{transition:none !important} }
+
+/* the Edit sheet's "Where it is" row */
+.st-at-h{display:flex;flex-wrap:wrap;align-items:center;gap:5px 9px}
+.st-at-h b{font-size:16px;font-weight:900}
+.st-at i{font-size:12.5px;font-weight:600;line-height:1.35;overflow-wrap:anywhere}
+
+/* the one-time ask on today's check */
+.tk-ask{position:relative;padding:10px 9px 11px;border-top:1px solid var(--rule);text-align:left;margin:6px -8px -4px}
+.ask-q{display:block;font-weight:900;font-size:16px;line-height:1.25}
+.ask-s{display:block;font-weight:600;font-size:13px;margin-top:2px}
+.ask-m{display:flex;align-items:center;min-height:24px;margin-bottom:5px}
+.ask-k{display:grid;grid-template-columns:1.25fr 1fr;gap:8px;margin-top:9px}
+.ask-k button{border:0;font:inherit;color:inherit;padding:0;display:grid;place-items:center;height:46px;border-radius:6px;font-weight:900;font-size:15.5px}
+.ask-k .yes{background:var(--print);color:var(--stock);box-shadow:var(--paper-edge)}
+.ask-k .no{background:none;box-shadow:inset 0 0 0 1.5px var(--print)}
+
+/* the sign line on a stop: the sign, the miles and the walk */
+.r-here{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin:5px -86px 2px 0;font-weight:900;font-size:14.5px;line-height:1.2;font-variant-numeric:tabular-nums}
+.r-here .dist{white-space:nowrap}
+.r.has-here>.r-j{align-self:start;height:38px}          /* the price column's rule: a short tick, so it never crosses the line */
+.r-lv.is-late{color:var(--red)}
+@media (max-width:350px){ .r-here{margin-right:-30px} }
+
+/* the Location row in You */
+.set-where-l{display:flex;align-items:center;gap:8px;white-space:nowrap}
+.set-where>b.no{color:var(--red)}
+.set-where>b.off{color:var(--dim)}
+
+/* the hotel card: how far */
+.sy-dist{display:flex;flex-wrap:wrap;align-items:center;gap:5px 9px;margin-top:11px;padding-top:11px;border-top:1px solid var(--rule);font-size:21px;font-weight:900;line-height:1.15;font-variant-numeric:tabular-nums}
+
+/* the stamp pressed in the place */
+.g-cap{text-transform:uppercase}
+.bk-in .g-bl{text-transform:uppercase}
+.bk-cap.is-here{margin-top:3px}
+.bk-lt i.bk-in{display:flex;flex-wrap:wrap;align-items:center;gap:4px 7px;margin-top:6px;font-weight:900}

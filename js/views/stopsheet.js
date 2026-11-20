@@ -29,6 +29,7 @@
 import { dayHead } from "../format.js";
 import { newId } from "../time.js";
 import { mountTicketPart } from "./ticketpart.js";
+import { pointFromLink, linkProblem, DIRECTIONS_LINK, gridSpot } from "../geo.js";
 
 const NO_SIGNAL = "No signal. Stops need a connection.";
 const GONE = "Someone removed this stop, so it can’t be saved.";
@@ -52,6 +53,7 @@ const MARKUP = `
   <label class="st-f st-time"><span>Minutes to get there</span><input id="stMin" inputmode="numeric" maxlength="3" autocomplete="off" enterkeyhint="next"></label>
   <label class="st-sw"><span>The time can’t slip</span><input id="stFixed" type="checkbox" role="switch"></label>
   <label class="st-f"><span>Place name or pasted Maps link</span><input id="stPlace" maxlength="200" autocomplete="off" enterkeyhint="next"></label>
+  <label class="st-f st-at"><span>Where it is</span><span class="st-at-h"><b id="stAtW">Not on the map</b><span class="g-bl pl off" id="stAtM" aria-hidden="true">NO CORNER YET</span></span><i id="stAtS"></i><input id="stPin" type="url" inputmode="url" maxlength="2000" autocomplete="off" enterkeyhint="next" placeholder="Paste a Google Maps link"></label>
   <label class="st-f"><span>Link to a ticket or confirmation</span><input id="stLink" type="url" inputmode="url" maxlength="500" autocomplete="off" enterkeyhint="done"></label>
   <div id="stTix" hidden></div>
   <p class="st-msg" id="stMsg" role="status"></p>
@@ -110,10 +112,14 @@ export function mountStopSheet(root, store, { keep = null } = {}) {
   const msg = $("stMsg");
   const save = $("stSave");
   const del = $("stDel");
+  const pin = $("stPin");
   const f = {
     title: $("stWhat"), time: $("stTime"), detail: $("stDetail"), gettingThere: $("stGo"), travelMin: $("stMin"),
-    fixed: $("stFixed"), place: $("stPlace"), link: $("stLink"),
+    fixed: $("stFixed"), place: $("stPlace"), link: $("stLink"), pin,
   };
+  const atWord = $("stAtW");
+  const atSign = $("stAtM");
+  const atSay = $("stAtS");
   const tixBox = $("stTix");
   const part = keep ? mountTicketPart(tixBox, store, keep) : null;
   let withTix = false; // the Ticket part is shown (migrate has run): its facts are part of the stop
@@ -121,6 +127,7 @@ export function mountStopSheet(root, store, { keep = null } = {}) {
   let mode = null; // "add" or "edit" while open
   let date = null; // the day the stop is on
   let stopId = null; // the stop being changed
+  let at = { lat: "", lng: "" }; // the stop's position as the sheet opened
   let was = null; // the fields as they were filled, to send only what changed
   let refused = ""; // why the last Save was refused, until a field changes
   let phase = null; // "saving" while Save waits for the backend; "checking" when no answer came
@@ -134,8 +141,44 @@ export function mountStopSheet(root, store, { keep = null } = {}) {
   const current = () => (store.state.stops || []).find((s) => s && s.id === stopId && !s.deleted) || null;
   const online = () => store.state.online !== false;
 
+  // The position the stop will have: from a pasted link that has one, else
+  // as it was, except that a new place takes it off (the old one was for the
+  // old place). Both or neither.
+  function where(place, usePin = true) {
+    const p = usePin ? pointFromLink(pin.value) : null;
+    if (p) return { lat: String(p.lat), lng: String(p.lng) };
+    if (was && place !== was.place) return { lat: "", lng: "" };
+    return at;
+  }
+
+  // The "Where it is" row: a place's position, never the phone's. A directions
+  // link, or a link with no position, changes nothing that is saved: the row
+  // stays as it was, with a word on why.
+  function showAt() {
+    const place = f.place.value.trim();
+    const p = pointFromLink(pin.value);
+    const bad = linkProblem(pin.value);
+    if (bad || (pin.value.trim() !== "" && !p)) {
+      paint(where(place, false));
+      atSay.textContent = bad ? DIRECTIONS_LINK : "No position in that link. Copy the long link from Google Maps’ address bar.";
+      return;
+    }
+    const w = where(place);
+    paint(w);
+    atSay.textContent = p ? "From the pasted link." : w.lat !== "" ? "Wrong spot? Paste the place’s Google Maps link to move it." : "No distance or leave-by from where you are until it is. Paste the place’s Google Maps link.";
+  }
+  function paint(w) {
+    const on = w.lat !== "";
+    const spot = on ? gridSpot(w) : "";
+    atWord.textContent = on ? "On the map" : "Not on the map";
+    atSign.textContent = on ? (spot ? "ABOUT " + spot : "ON THE MAP") : "NO CORNER YET";
+    atSign.classList.toggle("off", !on);
+  }
+
   // The fields as the backend takes them.
   function read() {
+    const place = f.place.value.trim();
+    const w = where(place);
     return {
       title: f.title.value.trim(),
       time: cleanTime(f.time.value),
@@ -143,8 +186,10 @@ export function mountStopSheet(root, store, { keep = null } = {}) {
       gettingThere: f.gettingThere.value.trim(),
       travelMin: cleanMin(f.travelMin.value),
       fixed: f.fixed.checked,
-      place: f.place.value.trim(),
+      place,
       link: f.link.value.trim(),
+      lat: w.lat,
+      lng: w.lng,
       ...(withTix ? part.read() : {}),
     };
   }
@@ -161,6 +206,8 @@ export function mountStopSheet(root, store, { keep = null } = {}) {
       fixed: stop.fixed === true,
       place: str(stop.place).trim(),
       link: str(stop.link).trim(),
+      lat: str(stop.lat),
+      lng: str(stop.lng),
       ...(withTix ? part.fieldsOf(stop) : {}),
     };
   }
@@ -175,13 +222,16 @@ export function mountStopSheet(root, store, { keep = null } = {}) {
     f.fixed.checked = stop.fixed === true;
     f.place.value = str(stop.place);
     f.link.value = str(stop.link);
+    pin.value = "";
     withTix = !!part && store.state.ticketsReady === true;
     tixBox.hidden = !withTix;
     // The keyboard's key says what Enter does: on to the ticket's facts, or done.
     f.link.enterKeyHint = withTix ? "next" : "done";
     if (part) part.fill(withTix ? stop : {});
+    at = str(stop.lat) !== "" && str(stop.lng) !== "" ? { lat: str(stop.lat), lng: str(stop.lng) } : { lat: "", lng: "" };
     was = null;
     was = read();
+    showAt();
   }
 
   const diff = (from, to) => {
@@ -339,6 +389,11 @@ export function mountStopSheet(root, store, { keep = null } = {}) {
       token = store.addStop({ date, ...now }, { id: addId, quiet: true, onUnsure });
     } else if (mode === "edit") {
       const patch = diff(was, now);
+      // Both or neither: a patch with one of the two is refused by the backend.
+      if ("lat" in patch || "lng" in patch) {
+        patch.lat = now.lat;
+        patch.lng = now.lng;
+      }
       if (Object.keys(patch).length) token = store.updateStop(stopId, patch, { quiet: true, onUnsure });
       else if (current()) {
         if (withTix && part.pending()) {
@@ -441,6 +496,11 @@ export function mountStopSheet(root, store, { keep = null } = {}) {
   }
 
   f.title.addEventListener("input", update);
+  pin.addEventListener("input", () => {
+    showAt();
+    update();
+  });
+  f.place.addEventListener("input", showAt);
   // A picture picked or taken off (the Ticket part says so with an input event).
   tixBox.addEventListener("input", update);
   // Correcting any field takes the reason away.
@@ -469,7 +529,7 @@ export function mountStopSheet(root, store, { keep = null } = {}) {
   // The keyboard's Next, in a one-line field, goes to the next field (the
   // directions box among them); on the last one it puts the keyboard away.
   // Enter in the directions box is its own (a new line).
-  const order = [f.title, f.time, f.detail, f.gettingThere, f.travelMin, f.place, f.link, ...(part ? part.inputs() : [])];
+  const order = [f.title, f.time, f.detail, f.gettingThere, f.travelMin, f.place, pin, f.link, ...(part ? part.inputs() : [])];
   sheet.addEventListener("keydown", (ev) => {
     // Only the fields that show (the ticket's facts are hidden before migrate).
     const shown = order.filter((x) => !x.closest("[hidden]"));
