@@ -3,7 +3,7 @@
 
 const assert = require("node:assert/strict");
 const { until, visible, text } = require("./helpers.cjs");
-const { ROWS, makeBook, openBefore, slip, spiked, railIds, spikeIds } = require("./before-fixture.cjs");
+const { ROWS, makeBook, openBefore, shot, whoText, slip, spiked, railIds, spikeIds } = require("./before-fixture.cjs");
 
 const cls = (page, sel) => page.locator(sel).first().getAttribute("class");
 const noSideways = (page) => page.evaluate(() => ({ doc: document.documentElement.scrollWidth <= innerWidth, view: [...document.querySelectorAll(".view.is-active")].every((v) => v.scrollWidth <= v.clientWidth + 1) }));
@@ -30,6 +30,7 @@ module.exports = [
       assert.equal(await text(page, "#bfOpen .bf-hang[data-id='6'] .bf-due"), "No date");
       assert.equal(await text(page, "#bfOpen .bf-hang[data-id='1'] .bf-n"), "Made-up rooftop table");
       assert.equal(await text(page, "#bfOpen .bf-hang[data-id='1'] .bf-top"), "#1To book");
+      await shot(page, "01-list-mixed-390x844");
     },
   },
   {
@@ -45,8 +46,8 @@ module.exports = [
       assert.match(await cls(page, "#bfOpen [data-id='1'] .bf-due"), /\bsoon\b/);
       assert.doesNotMatch(await cls(page, "#bfOpen [data-id='2'] .bf-due"), /\bsoon\b/);
       assert.equal(await text(page, "#bfOpen [data-id='1'] .bf-due"), "by Thu Dec 3in 2 days");
-      assert.equal(await text(page, "#bfOpen [data-id='4'] .bf-who"), "Izzah’s on it");
-      assert.equal(await text(page, "#bfOpen [data-id='5'] .bf-who"), "You’re on it");
+      assert.equal(await whoText(page, "#bfOpen [data-id='4'] .bf-who"), "Izzah’s on it");
+      assert.equal(await whoText(page, "#bfOpen [data-id='5'] .bf-who"), "You’re on it");
       assert.equal(await page.locator("#bfOpen [data-id='1'] .bf-who").count(), 0, "nobody on it: no line");
       assert.equal(await page.locator("#bfOpen [data-id='1'] .bf-t").getAttribute("aria-label"), "1. Made-up rooftop table. To book. by Thu Dec 3 · in 2 days.");
       assert.equal(await page.locator("#bfOpen [data-id='5'] .bf-t").getAttribute("aria-label"), "5. Made-up museum timed entry. To book. by Mon Dec 14 · in 13 days. You’re on it.");
@@ -110,6 +111,7 @@ module.exports = [
       assert.equal(await page.locator("#bfOpen .bf-rail").count(), 1);
       assert.equal(await page.locator("#bfOpen .bf-row").count(), 0);
       assert.equal(await text(page, "#bfCount"), "25 days to go");
+      await shot(page, "05-nothing-left");
     },
   },
   {
@@ -147,6 +149,7 @@ module.exports = [
       assert.equal(await inside(page), true);
       const w = await page.locator("#bfOpen [data-id='2'] .bf-t").evaluate((n) => n.getBoundingClientRect().width);
       assert.ok(w > 120 && w < 160, "a slip is about 137 px wide: " + w);
+      await shot(page, "09-list-320x568");
     },
   },
   {
@@ -162,6 +165,7 @@ module.exports = [
     viewport: { width: 844, height: 390 },
     async run({ page }) {
       await openBefore(page, await makeBook());
+      await shot(page, "10-list-844x390");
       assert.deepEqual(await noSideways(page), { doc: true, view: true });
       assert.equal(await inside(page), true);
     },
@@ -179,6 +183,7 @@ module.exports = [
         return { beforeRight: b.right, moneyLeft: m.left, moneyShown: document.querySelector("#vMoney").classList.contains("is-active") };
       });
       assert.ok(box.beforeRight <= box.moneyLeft + 1, "the panes do not overlap");
+      await shot(page, "11-list-1440x900");
       assert.equal(box.moneyShown, true);
       assert.equal(await inside(page), true);
     },

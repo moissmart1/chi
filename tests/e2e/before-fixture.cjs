@@ -25,16 +25,17 @@ const ROWS = [
 ];
 
 // The seed: SEED with the planner linked and its Book Now and Change Log tabs.
-function bookSeed(rows = ROWS) {
-  return { ...JSON.parse(JSON.stringify(SEED)), plannerId: PLANNER_ID, plannerTabs: { "Book Now": [BHEAD, ...rows.map(brow)], "Change Log": [CHEAD] } };
+function bookSeed(rows = ROWS, base = SEED) {
+  return { ...JSON.parse(JSON.stringify(base)), plannerId: PLANNER_ID, plannerTabs: { "Book Now": [BHEAD, ...rows.map(brow)], "Change Log": [CHEAD] } };
 }
 
 const asApp = (backend, actor, action, args) => backend.handle({ key: "test-key", actor, via: "app", action, args });
 
 // A backend with the list already pulled, Mo's tick of #7 made on Nov 28, #4 claimed
 // by Izzah and #5 by Mo. `claims` false leaves the claims out.
-async function makeBook({ rows = ROWS, ticked = true, claims = true, nowMs = NOW } = {}) {
-  const backend = makeBackend(bookSeed(rows), { now: NOV28 });
+// base: a seed other than SEED to lay the planner over.
+async function makeBook({ rows = ROWS, ticked = true, claims = true, nowMs = NOW, base = SEED } = {}) {
+  const backend = makeBackend(bookSeed(rows, base), { now: NOV28 });
   await asApp(backend, "Mo", "syncTodos", { force: true });
   if (ticked) await asApp(backend, "Mo", "tickTodo", { id: "7" });
   if (claims) {
@@ -46,11 +47,24 @@ async function makeBook({ rows = ROWS, ticked = true, claims = true, nowMs = NOW
   return backend;
 }
 
+// What a "who is on it" line says, without the seal's letters.
+const whoText = (page, sel) => page.evaluate((s) => { const n = document.querySelector(s); return n ? n.lastChild.textContent : null; }, sel);
 const slip = (page, id) => page.locator('#bfOpen .bf-hang[data-id="' + id + '"] .bf-t');
 const spiked = (page, id) => page.locator('#bfDone [data-id="' + id + '"] .bf-slip');
 // The ids on the rail, left to right and down.
 const railIds = (page) => page.evaluate(() => [...document.querySelectorAll("#bfOpen .bf-hang")].map((n) => n.dataset.id));
 const spikeIds = (page) => page.evaluate(() => [...document.querySelectorAll("#bfDone > div")].map((n) => n.dataset.id));
+
+// Pictures of each state, only when asked: CHI_BEFORE_SHOTS=<folder> (never in the repo).
+const fs = require("node:fs");
+const SHOTS = process.env.CHI_BEFORE_SHOTS || "";
+async function shot(page, name) {
+  if (!SHOTS) return;
+  fs.mkdirSync(SHOTS, { recursive: true });
+  // The page's clock is paused: let a sheet and the views' fade finish (the wait is Node's own).
+  await new Promise((r) => setTimeout(r, 700));
+  await page.screenshot({ path: SHOTS + "/" + name + ".png" });
+}
 
 // Opens the app on `page` against a book backend and shows the Before screen.
 async function openBefore(page, backend, opts = {}) {
@@ -61,4 +75,4 @@ async function openBefore(page, backend, opts = {}) {
   await until(() => visible(page, "#before"), "the Before screen shows");
 }
 
-module.exports = { openBefore, PLANNER_ID, NOW, NOV28, ROWS, BHEAD, brow, bookSeed, makeBook, asApp, slip, spiked, railIds, spikeIds };
+module.exports = { whoText, shot, openBefore, PLANNER_ID, NOW, NOV28, ROWS, BHEAD, brow, bookSeed, makeBook, asApp, slip, spiked, railIds, spikeIds };

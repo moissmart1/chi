@@ -1,8 +1,8 @@
 // The planner link (ported from the Japan app, workings only): with a planner
 // linked, its payments come in on their own while the app is open, at most
 // once every 10 minutes, and nothing of the planner shows but the lines it
-// brings: the Before list and the Planner payments row have no screen yet
-// (their look is still to be picked). Every planner value here is made up.
+// brings, and the Planner row in You (planner-you.e2e.cjs); with no Book Now
+// rows the Before key stays out of the bar. Every planner value here is made up.
 
 const assert = require("node:assert/strict");
 const { SEED, NOON28, open, advance, until } = require("./helpers.cjs");
@@ -19,13 +19,17 @@ const pulls = (backend) => backend.requests.filter((r) => r.action === "syncPaym
 
 module.exports = [
   {
-    name: "a linked planner: opening the app brings its payment onto the receipt with nobody asking, and there is no Before key, screen or Planner row",
+    name: "a linked planner: opening the app brings its payment onto the receipt with nobody asking, and the Planner row is in You but, with no Book Now rows, there is no Before key",
     async run({ page }) {
       const backend = await open(page, { seed: linkedSeed(), nowMs: NOON28 });
       await until(() => onReceipt(page, "Made-up rail pass"), "the planner's payment is on the receipt");
       assert.deepEqual(pulls(backend).map((r) => r.args), [{ auto: true }], "one quiet pull when the app opened");
       assert.equal(backend.fake.tables.Expenses.filter((e) => e.planner_id === "X7").length, 1, "tied to its payment");
-      assert.equal(await page.locator("#beforeBtn, #vBefore, #setPlanner, #setPlannerP").count(), 0, "no planner screen or row");
+      assert.equal(await page.locator("#beforeBtn").isHidden(), true, "no Before key without Book Now rows");
+      assert.equal(await page.locator("#before").isHidden(), true, "and its screen is not shown");
+      await page.locator("#youBtn").click();
+      await until(() => page.locator("#setPlanner").isVisible(), "the Planner row is in You");
+      assert.equal(await page.locator("#setPlannerP").isHidden(), true, "no list of problems");
       assert.equal(JSON.stringify(await page.evaluate(() => ({ ...localStorage }))).includes(PLANNER_ID), false, "the planner's id never reaches the phone");
     },
   },

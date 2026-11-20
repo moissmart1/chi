@@ -90,3 +90,30 @@ test("daysToGo: whole days to the trip's first day; null once it is 0 or less or
   assert.equal(daysToGo({}, "2026-12-01"), null);
   assert.equal(daysToGo(null, "2026-12-01"), null);
 });
+
+// The small words the screens print under and beside a slip (js/views/before.js, no DOM needed).
+import { onWords, slipSmall, shortDay, PENDING, COMPUTES, WAITING } from "../js/views/before.js";
+
+test("onWords: who is on it", () => {
+  assert.equal(onWords({ claimedBy: "" }, "Mo"), "");
+  assert.equal(onWords({ claimedBy: "Mo" }, "Mo"), "You’re on it");
+  assert.equal(onWords({ claimedBy: "Izzah" }, "Mo"), "Izzah’s on it");
+});
+
+test("slipSmall: waiting for signal, the planner computing it, the planner not updated yet; else nothing", () => {
+  const up = { online: true };
+  const down = { online: false };
+  assert.equal(slipSmall({ pending: true, tickedBy: "Mo" }, down), WAITING);
+  assert.equal(slipSmall({ pending: true, tickedBy: "Mo" }, up), "", "in flight with signal: nothing to say yet");
+  assert.equal(slipSmall({ tickedBy: "Mo", plannerComputes: true, status: "To book" }, up), COMPUTES);
+  assert.equal(slipSmall({ tickedBy: "Mo", status: "To book" }, up), PENDING);
+  assert.equal(slipSmall({ tickedBy: "Mo", status: "Booked" }, up), "", "the planner has it");
+  assert.equal(slipSmall({ tickedBy: "", status: "Booked" }, up), "", "booked in the planner by hand");
+  assert.equal(PENDING, "The planner hasn’t been updated yet.");
+  assert.equal(COMPUTES, "The planner works this one out itself, so the app left it as it was.");
+});
+
+test("shortDay: Nov 28 on the phone's own calendar, empty for no time", () => {
+  assert.equal(shortDay(Date.parse("2026-11-28T12:00:00")), "Nov 28");
+  assert.equal(shortDay(NaN), "");
+});
