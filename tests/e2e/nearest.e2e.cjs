@@ -10,7 +10,7 @@ const assert = require("node:assert/strict");
 const fs = require("fs");
 const { open, advance, until } = require("./helpers.cjs");
 const { geoStub, leaks, HERE } = require("./geostub.cjs");
-const { whereBackend, clock, D28, ID, P, off } = require("./where-fixture.cjs");
+const { whereBackend, clock, D28, ID, P, off, SEED_WHERE } = require("./where-fixture.cjs");
 
 const SHOTS = "/private/tmp/claude-501/chi-shots/where";
 const shot = async (page, name) => {
@@ -111,15 +111,52 @@ module.exports = [
       await page.click(row(ID.L3) + " .r-b");
       await until(() => page.evaluate((sel) => document.querySelector(sel).classList.contains("is-open"), row(ID.L3)), "Loose three is open");
       const node = await page.evaluateHandle((sel) => document.querySelector(sel), row(ID.L3));
+      const moving = await page.evaluateHandle((sels) => sels.map(s => document.querySelector(s)), [row(ID.L1), row(ID.L2)]);
+      await page.focus(row(ID.L2) + " .r-b");
       // 300 m east: Loose one is now the nearest.
       await page.evaluate((p) => window.__geoSet({ lat: p.lat, lng: p.lng + 300 / (111195 * Math.cos((p.lat * Math.PI) / 180)) }), HERE);
       await advance(page, backend, 2 * MIN);
       await until(async () => (await rows(page)).find((r) => r.nearest)?.id === ID.L1, "NEAREST moves to Loose one");
       const got = await rows(page);
       assert.deepEqual(got.map((r) => r.id), ORDER);
+      assert.equal(await moving.evaluate(nodes => nodes.every(n => n.isConnected)), true, "both rows keep their nodes");
+      assert.equal(await page.locator(row(ID.L2) + " .r-b").evaluate(n => n === document.activeElement), true, "focus stays on the old nearest stop");
       const l3 = got.find((r) => r.id === ID.L3).here;
       assert.match(l3, /0\.7 mi · 16 min walk/, l3);
       assert.equal(await page.evaluate(([n, sel]) => n === document.querySelector(sel) && n.classList.contains("is-open"), [node, row(ID.L3)]), true, "the same node, still open");
+      await clean(page, backend);
+    },
+  },
+  {
+    name: "NEAREST moves onto a stop with no title and off it again: same nodes, focus kept, the name line comes and goes",
+    async run({ page }) {
+      // The test's own day: Loose two (the nearest) and a loose stop with no title.
+      const seed = { ...SEED_WHERE, stops: SEED_WHERE.stops.map((s) => (s.id === ID.L1 ? { ...s, title: "" } : s)) };
+      await geoStub(page);
+      const nowMs = clock("13:52");
+      const backend = whereBackend({ nowMs, seed });
+      await open(page, { backend, nowMs, tab: "days", storage: { "chi.where": "on" } });
+      await until(() => page.evaluate(() => document.querySelectorAll("#rail .pg .tk").length > 0), "the checks draw");
+      await signs(page);
+      const names = () => page.evaluate(([a, b]) => [a, b].map((sel) => { const n = document.querySelector(sel + " .r-n"); return n ? n.textContent : null; }), [row(ID.L1), row(ID.L2)]);
+      assert.deepEqual(await names(), [null, "NEARESTLoose two"], "the untitled stop has no name line; the nearest has NEAREST");
+      const nodes = await page.evaluateHandle((sels) => sels.map((s) => document.querySelector(s)), [row(ID.L1), row(ID.L2)]);
+      const same = () => nodes.evaluate((ns, sels) => ns.every((n, i) => n.isConnected && n === document.querySelector(sels[i])), [row(ID.L1), row(ID.L2)]);
+      // 300 m east: the untitled stop is now the nearest.
+      await page.focus(row(ID.L1) + " .r-b");
+      await page.evaluate((p) => window.__geoSet({ lat: p.lat, lng: p.lng + 300 / (111195 * Math.cos((p.lat * Math.PI) / 180)) }), HERE);
+      await advance(page, backend, 2 * MIN);
+      await until(async () => (await rows(page)).find((r) => r.nearest)?.id === ID.L1, "NEAREST moves onto the untitled stop");
+      assert.deepEqual(await names(), ["NEAREST", "Loose two"]);
+      assert.equal(await same(), true, "same nodes");
+      assert.equal(await page.evaluate((sel) => document.activeElement === document.querySelector(sel), row(ID.L1) + " .r-b"), true, "focus stays");
+      // Back: the nearest is Loose two again.
+      await page.evaluate((p) => window.__geoSet({ lat: p.lat, lng: p.lng }), HERE);
+      await advance(page, backend, 2 * MIN);
+      await until(async () => (await rows(page)).find((r) => r.nearest)?.id === ID.L2, "NEAREST moves off the untitled stop");
+      assert.deepEqual(await names(), [null, "NEARESTLoose two"], "the untitled stop's name line is gone again");
+      assert.equal(await same(), true, "same nodes");
+      assert.equal(await page.evaluate((sel) => document.activeElement === document.querySelector(sel), row(ID.L1) + " .r-b"), true, "focus stays");
       await clean(page, backend);
     },
   },

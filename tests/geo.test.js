@@ -67,6 +67,10 @@ test("compass: the longer way decides", () => {
 test("gridSpot: the city's own grid", () => {
   assert.equal(gridSpot(off(GRID_ORIGIN, -201, 201)), "100 S · 100 E");
   assert.equal(gridSpot(off(GRID_ORIGIN, 1609, -805)), "800 N · 400 W");
+  for (const [miles, address] of [[0.5, 600], [1, 1200], [1.5, 1700], [2, 2200], [3, 3100], [4, 3900], [20, 16700]]) {
+    assert.equal(gridSpot(off(GRID_ORIGIN, -miles * MILE_M, 0)), address + " S · 0 E");
+  }
+  assert.equal(gridSpot(off(GRID_ORIGIN, -21 * MILE_M, 0)), "");
   assert.equal(gridSpot(GRID_ORIGIN), "0 N · 0 E");
   assert.equal(gridSpot(off(GRID_ORIGIN, 40000, 0)), "");
   assert.equal(gridSpot({ lat: "", lng: "" }), "");

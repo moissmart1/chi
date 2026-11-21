@@ -73,7 +73,7 @@ export function milesText(m) {
   return mi < 0.05 ? "under 0.1 mi" : mi < 9.95 ? mi.toFixed(1) + " mi" : Math.round(mi) + " mi";
 }
 
-// The city's own grid: State and Madison are zero, 800 to a mile.
+// The city's own grid: State and Madison are zero. Most miles count as 800 address numbers.
 export const GRID_ORIGIN = { lat: 41.88195, lng: -87.62784 };
 
 // "100 S · 100 E" for a place, to the nearest block; "" when it is not a point or is over 160 blocks (20 miles) out either way.
@@ -83,7 +83,16 @@ export function gridSpot(p) {
   const ns = Math.round(g.north / BLOCK_M);
   const ew = Math.round(g.east / BLOCK_M);
   if (Math.abs(ns) > 160 || Math.abs(ew) > 160) return "";
-  return Math.abs(ns) * 100 + (ns >= 0 ? " N" : " S") + " · " + Math.abs(ew) * 100 + (ew >= 0 ? " E" : " W");
+  // A straight-line estimate "to the nearest block". South of Madison the
+  // numbers run at different rates per mile: 1200 per mile from Madison to
+  // Roosevelt (1200 S), 1000 to Cermak (2200 S), 900 to 31st (3100 S), then
+  // 800 per mile.
+  const south = Math.max(0, -g.north / MILE_M);
+  const southBlocks = Math.round(12 * Math.min(south, 1)
+    + 10 * Math.min(Math.max(south - 1, 0), 1)
+    + 9 * Math.min(Math.max(south - 2, 0), 1)
+    + 8 * Math.max(south - 3, 0));
+  return (southBlocks ? southBlocks * 100 + " S" : Math.abs(ns) * 100 + " N") + " · " + Math.abs(ew) * 100 + (ew >= 0 ? " E" : " W");
 }
 
 // A position is used only when it is at most 3 minutes old and 300 m or better.

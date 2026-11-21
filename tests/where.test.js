@@ -294,3 +294,27 @@ test("the Japan app's choice is not this app's", () => {
   assert.equal(w.state(), "unset");
   assert.equal(g.calls.length, 0);
 });
+
+test("removing a trip discards pending permission and position answers, even after opting in again", async () => {
+  const g = phone();
+  const s = mem({ "chi.where": "on" });
+  let resolvePermission;
+  const permissions = { query: () => new Promise(resolve => { resolvePermission = resolve; }) };
+  const w = createWhere({ ...T, storage: s, geolocation: g, permissions, now: () => NOW, doc: doc() });
+  w.start();
+  s.m.clear();
+  w.reset();
+  assert.equal(w.state(), "unset");
+  assert.equal(s.getItem("chi.where"), null);
+  w.ask();
+  assert.equal(g.calls.length, 2);
+  g.give(0, 41.9, -87.6);
+  g.refuse(0);
+  resolvePermission({ state: "denied" });
+  await Promise.resolve();
+  assert.equal(w.current(), null);
+  assert.equal(w.why(), null);
+  assert.equal(w.state(), "on");
+  g.give(1, 41.8, -87.5);
+  assert.equal(w.current().lat, 41.8);
+});
