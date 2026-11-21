@@ -97,7 +97,8 @@ const drawn = new WeakMap();
 // line, and without the inside of its sign line (it moves as the phone does).
 const LEAD = /(<b class="r-lv)(?: is-late)?(">)[^<]*(<\/b>)/;
 const HERE = /(<div class="r-here">).*?(<\/div>)/s;
-const withoutLead = (html) => html.replace(LEAD, "$1$2$3").replace(HERE, "$1$2");
+const NEAREST = /<svg class="g-ow"[^>]*>.*?<\/svg>/s;
+const withoutLead = (html) => html.replace(NEAREST, "").replace('<div class="r-n"></div>', "").replace(LEAD, "$1$2$3").replace(HERE, "$1$2");
 
 // Puts the fresh rows into `rows` in order, keeping each old row that is
 // drawn the same. A row that differs only in its leave-by line's words (the
@@ -119,6 +120,15 @@ function patchRows(rows, fresh) {
     const sign = keep.querySelector(".r-here");
     const fresh = r.querySelector(".r-here");
     if (!!lead === !!next && !!sign === !!fresh && withoutLead(was) === withoutLead(now)) {
+      const name = keep.querySelector(".r-n");
+      const nextName = r.querySelector(".r-n");
+      if (name && nextName) {
+        const badge = name.querySelector(".g-ow");
+        const nextBadge = nextName.querySelector(".g-ow");
+        if (badge && !nextBadge) badge.remove();
+        if (!badge && nextBadge) name.prepend(nextBadge);
+      } else if (name) name.remove();
+      else if (nextName) keep.querySelector(".r-b").prepend(nextName);
       if (lead) {
         if (lead.textContent !== next.textContent) lead.textContent = next.textContent;
         if (lead.className !== next.className) lead.className = next.className;

@@ -48,6 +48,7 @@ export function createWhere({ storage, geolocation, permissions, now = () => Dat
   let pos = null; // { lat, lng, at, accuracy }: memory only
   let lastAsk = -Infinity;
   let asking = false;
+  let session = 0; // ignore callbacks from a trip that was removed
   let askNo = 0; // which request `asking` is about
   let timer = null;
   let reason = null; // { code, message } of the last refusal: memory only
@@ -85,6 +86,7 @@ export function createWhere({ storage, geolocation, permissions, now = () => Dat
     if (!force && now() - lastAsk < ASK_GAP_MS) return;
     lastAsk = now();
     asking = true;
+    const trip = session;
     const mine = ++askNo;
     const done = () => {
       if (askNo === mine) asking = false;
@@ -95,7 +97,7 @@ export function createWhere({ storage, geolocation, permissions, now = () => Dat
         (p) => {
           done();
           const c = p && p.coords;
-          if (!c || choice !== "on") return;
+          if (trip !== session || !c || choice !== "on") return;
           const t = Number(p.timestamp);
           pos = { lat: Number(c.latitude), lng: Number(c.longitude), at: Number.isFinite(t) ? t : now(), accuracy: Number(c.accuracy) };
           reason = null;
@@ -103,7 +105,7 @@ export function createWhere({ storage, geolocation, permissions, now = () => Dat
         },
         (e) => {
           done();
-          if (e && e.code === DENIED) {
+          if (trip === session && choice === "on" && e && e.code === DENIED) {
             pos = null;
             reason = { code: DENIED, message: typeof e.message === "string" ? e.message.slice(0, 80) : "" };
             write("refused");
@@ -131,7 +133,9 @@ export function createWhere({ storage, geolocation, permissions, now = () => Dat
   function checkPermission() {
     if (!geo || !permissions || typeof permissions.query !== "function") return;
     try {
+      const trip = session;
       Promise.resolve(permissions.query({ name: "geolocation" })).then((st) => {
+        if (trip !== session) return;
         const s = st && st.state;
         if (s === "denied" && choice === "on") {
           pos = null;
@@ -173,6 +177,16 @@ export function createWhere({ storage, geolocation, permissions, now = () => Dat
       tell();
       request(true);
       tick();
+    },
+    reset() {
+      session++;
+      asking = false;
+      choice = "unset";
+      pos = null;
+      reason = null;
+      lastAsk = -Infinity;
+      tick();
+      tell();
     },
     turnOff() {
       write("off");

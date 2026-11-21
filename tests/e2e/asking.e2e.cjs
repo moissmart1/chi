@@ -249,6 +249,12 @@ const cases = [
       assert.equal(await calls(page), 1, "not asked again");
       const keys = await page.evaluate(() => Object.keys(localStorage).filter((k) => k === "chi.where" || k === "chi.board"));
       assert.deepEqual(keys, []);
+      backend.failWith = null;
+      await page.fill("#keyPaste", "test-key");
+      await page.click("#keyGo");
+      await until(() => askShown(page), "a fresh link offers Location again without a reload");
+      assert.equal(await calls(page), 1, "a new link waits for opt-in");
+      assert.equal(await choice(page), null);
       await clean(page, backend);
     },
   },

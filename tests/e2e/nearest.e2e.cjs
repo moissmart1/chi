@@ -111,12 +111,16 @@ module.exports = [
       await page.click(row(ID.L3) + " .r-b");
       await until(() => page.evaluate((sel) => document.querySelector(sel).classList.contains("is-open"), row(ID.L3)), "Loose three is open");
       const node = await page.evaluateHandle((sel) => document.querySelector(sel), row(ID.L3));
+      const moving = await page.evaluateHandle((sels) => sels.map(s => document.querySelector(s)), [row(ID.L1), row(ID.L2)]);
+      await page.focus(row(ID.L2) + " .r-b");
       // 300 m east: Loose one is now the nearest.
       await page.evaluate((p) => window.__geoSet({ lat: p.lat, lng: p.lng + 300 / (111195 * Math.cos((p.lat * Math.PI) / 180)) }), HERE);
       await advance(page, backend, 2 * MIN);
       await until(async () => (await rows(page)).find((r) => r.nearest)?.id === ID.L1, "NEAREST moves to Loose one");
       const got = await rows(page);
       assert.deepEqual(got.map((r) => r.id), ORDER);
+      assert.equal(await moving.evaluate(nodes => nodes.every(n => n.isConnected)), true, "both rows keep their nodes");
+      assert.equal(await page.locator(row(ID.L2) + " .r-b").evaluate(n => n === document.activeElement), true, "focus stays on the old nearest stop");
       const l3 = got.find((r) => r.id === ID.L3).here;
       assert.match(l3, /0\.7 mi · 16 min walk/, l3);
       assert.equal(await page.evaluate(([n, sel]) => n === document.querySelector(sel) && n.classList.contains("is-open"), [node, row(ID.L3)]), true, "the same node, still open");

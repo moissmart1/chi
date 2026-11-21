@@ -283,20 +283,12 @@ function start() {
   // phone (a refused link, Forget this phone) stops it asking and keeps no
   // choice: nothing of it is written again until a new link is in.
   let whereGone = false;
-  const whereKeep = {
-    getItem: (k) => raw.getItem(k),
-    setItem: (k, v) => {
-      if (!whereGone) raw.setItem(k, v);
-    },
-  };
-  const where = createWhere({ storage: whereKeep, geolocation: navigator.geolocation, permissions: navigator.permissions });
+  const where = createWhere({ storage: raw, geolocation: navigator.geolocation, permissions: navigator.permissions });
   where.start();
   store.subscribe((s) => {
     if (s.status !== "nokey" || whereGone) return;
-    const st = where.state();
-    if (st !== "on" && st !== "refused") return;
     whereGone = true;
-    where.turnOff();
+    where.reset();
   });
 
   // A picture just kept may unblock the next one once saving ends: look again then.
