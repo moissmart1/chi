@@ -282,13 +282,31 @@ function start() {
   // sent or stored; chi.where holds the choice alone. The trip taken off this
   // phone (a refused link, Forget this phone) stops it asking and keeps no
   // choice: nothing of it is written again until a new link is in.
-  let whereGone = false;
-  const where = createWhere({ storage: raw, geolocation: navigator.geolocation, permissions: navigator.permissions });
-  where.start();
+  let whereResetSinceKey = false;
+  const whereKeep = {
+    getItem: (k) => raw.getItem(k),
+    setItem: (k, v) => {
+      if (!whereResetSinceKey) raw.setItem(k, v);
+    },
+  };
+  const whereCore = createWhere({ storage: whereKeep, geolocation: navigator.geolocation, permissions: navigator.permissions });
+  whereCore.start();
+  // While no key is held nothing can be chosen: a tap on a screen left open
+  // behind the no-key screen (Enter on the Location row) neither saves a choice
+  // nor asks the phone for a position.
+  const where = {
+    ...whereCore,
+    ask: () => {
+      if (!whereResetSinceKey) whereCore.ask();
+    },
+    turnOff: () => {
+      if (!whereResetSinceKey) whereCore.turnOff();
+    },
+  };
   store.subscribe((s) => {
-    if (s.status !== "nokey" || whereGone) return;
-    whereGone = true;
-    where.reset();
+    if (s.status !== "nokey" || whereResetSinceKey) return;
+    whereResetSinceKey = true;
+    whereCore.reset();
   });
 
   // A picture just kept may unblock the next one once saving ends: look again then.
@@ -705,7 +723,7 @@ function start() {
       // Forget this phone still running: it would take this key off too.
       if (forgetting) await forgetting;
       keyHere = key;
-      whereGone = false;
+      whereResetSinceKey = false;
       try {
         raw.setItem(STORAGE_PREFIX + "key", key);
       } catch {

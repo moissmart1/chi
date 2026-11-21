@@ -259,6 +259,31 @@ const cases = [
     },
   },
   {
+    name: "a refused link with You still open: Enter on the Location row saves nothing and asks nothing, and the next link still asks first",
+    async run({ page }) {
+      await geoStub(page);
+      const backend = await ready(page);
+      await openYou(page);
+      await page.focus("#setWhere");
+      backend.failWith = "bad_key";
+      await page.evaluate(() => window.__matTest.store.refresh());
+      await until(() => page.evaluate(() => document.querySelectorAll("#rail .pg").length === 0), "the checks are taken out");
+      // The row behind the no-key screen is activated, as Enter on it would.
+      await page.evaluate(() => document.getElementById("setWhere").click());
+      await page.evaluate(() => document.getElementById("setWhere").click());
+      await advance(page, backend, 5 * MIN);
+      assert.equal(await calls(page), 0, "the phone is not asked with no key");
+      assert.equal(await choice(page), null, "no choice is saved with no key");
+      backend.failWith = null;
+      await page.fill("#keyPaste", "test-key");
+      await page.click("#keyGo");
+      await until(() => askShown(page), "the new link offers Location first");
+      assert.equal(await calls(page), 0, "a new link waits for opt-in");
+      assert.equal(await choice(page), null);
+      await clean(page, backend);
+    },
+  },
+  {
     name: "exactly today's: with no usable position the check and the board are byte for byte as with no geolocation at all",
     async run({ page, newPhone }) {
       const snap = (pg) =>

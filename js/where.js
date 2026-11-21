@@ -2,8 +2,7 @@
 // Where the phone is, for leave-by times, distances and the stamp in the
 // place. Ported from the Japan app (its js/where.js, with its fixes: a request
 // the phone never answers stops blocking after 15 s; back on screen after a
-// refusal, the permission is looked at again). No screen uses it yet: nothing
-// calls ask(), so the state stays "unset" and the phone is never asked.
+// refusal, the permission is looked at again).
 //
 // A position never leaves the phone: it is kept in this module's memory only,
 // never in the store, localStorage, a request or a log line. What is kept in
@@ -11,7 +10,7 @@
 // (nothing yet: "unset").
 //
 // createWhere({ storage, geolocation, permissions, now, doc, every, stopEvery, later }) ->
-//   { state(), supported(), ask(), turnOff(), current(), subscribe(fn), start() }
+//   { state(), supported(), ask(), turnOff(), reset(), current(), subscribe(fn), start() }
 // - state(): "unset", "on", "off" or "refused". A phone with no geolocation
 //   is always "off" (supported() false).
 // - ask(): only from a tap (on a screen still to be built): the phone's own prompt
@@ -26,6 +25,9 @@
 //   watchPosition): coarse, a position up to 2 minutes old is fine, 8 seconds.
 //   A request the phone never answers (a suspended page) is given up after
 //   STUCK_MS, so it cannot block asking for the rest of the visit.
+// - reset(): the trip was taken off this phone: the choice goes back to
+//   "unset" in memory (nothing is written), answers still on their way are
+//   ignored, and the phone is not asked until ask() is called again.
 // - subscribe(fn): fn() when the choice or the position changes.
 // - why(): the phone's own answer to the last refused request, { code,
 //   message } (message cut to 80 characters), or null. Memory only, like a

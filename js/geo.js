@@ -83,7 +83,10 @@ export function gridSpot(p) {
   const ns = Math.round(g.north / BLOCK_M);
   const ew = Math.round(g.east / BLOCK_M);
   if (Math.abs(ns) > 160 || Math.abs(ew) > 160) return "";
-  // South of Madison, Roosevelt, Cermak and 31st mark 1200, 2200 and 3100 S.
+  // A straight-line estimate "to the nearest block". South of Madison the
+  // numbers run at different rates per mile: 1200 per mile from Madison to
+  // Roosevelt (1200 S), 1000 to Cermak (2200 S), 900 to 31st (3100 S), then
+  // 800 per mile.
   const south = Math.max(0, -g.north / MILE_M);
   const southBlocks = Math.round(12 * Math.min(south, 1)
     + 10 * Math.min(Math.max(south - 1, 0), 1)
