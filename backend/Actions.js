@@ -184,8 +184,8 @@ function reportError_(where, e, extra) {
 
 // What the check key and the connector may ask for; a person's key and the
 // shared key may ask for anything. The check key reads only what a phone's
-// start needs, and runs migrate.
-var CHECK_ACTIONS_ = ["load", "rev", "history", "migrate"];
+// start needs, runs migrate, and runs the plan's dry run (planDiff).
+var CHECK_ACTIONS_ = ["load", "rev", "history", "migrate", "planDiff"];
 // The connector reads and writes through its tools only.
 var CLAUDE_ACTIONS_ = ["load", "history", "syncPayments", "addExpense", "addStop", "updateStop", "deleteStop", "saveStay", "deleteStay", "setDay", "undo",
   // Listed only so they answer their own "do this one in the app" sentence.
@@ -230,6 +230,13 @@ function dispatch_(body, holder) {
     return token ? ok_({ token: token }, rev_()) : err_("not_found", MSG_.noClaude);
   }
   // (There is no linkPlanner: the owner sets PLANNER_ID in Script Properties.)
+  // The plan's dry run: what a pull would do, read only. The check key (from
+  // a terminal) and the trip's first person on their own link.
+  if (action === "planDiff") {
+    var diffOwner = peopleNames_()[0];
+    if (holder.kind !== "check" && !(holder.kind === "person" && holder.name === diffOwner)) return err_("bad_input", MSG_.planDiffOwnerOnly.replace("{owner}", diffOwner || "the trip’s organiser"));
+    return planDiff_();
+  }
 
   var write;
   switch (action) {
@@ -2354,6 +2361,46 @@ function pullPlan_(read, tix, dayDates, ctx) {
     appendLog_(who, "delete", "stop", job.id, summarize("delete", "stop", before, after), before, after);
   });
   return ok_(out, writes ? bumpRev_() : rev_());
+}
+
+// The dry run (planDiff): what a pull would do now, whether or not the app
+// follows the planner. No lock, no write, no property, no History. It
+// names the stops whose ticket details would change and never a value.
+// -> { adds, edits: [{ id, row, title, action, changes: { field: [from, to] } }],
+// removals, onlyInApp, same, problems, held, tickets: [{ id, title }] }.
+function planDiff_() {
+  if (!plannerId_()) return err_("no_planner", MSG_.noPlanner);
+  var got = planRead_();
+  if (got.error) return got.error;
+  var tix = { linked: false, byStop: {}, problems: [] };
+  var dayDates = tripDates_();
+  var read = planFromRows(got.rows, dayDates);
+  if (read.missing) return err_("planner_columns", read.missing);
+  var current = planCurrent_();
+  var byId = {};
+  current.forEach(function (c) { byId[c.stop.id] = c.stop; });
+  var jobs = planJobs(read, tix, current, dayDates, PLAN_APP_STOPS_);
+  return ok_({
+    adds: jobs.adds.map(function (j) {
+      return { id: j.id, row: j.row, date: j.value.date, time: j.value.time, title: j.value.title, booked: j.value.booked, fixed: j.value.fixed };
+    }),
+    edits: jobs.edits.map(function (j) {
+      var was = byId[j.id];
+      var changes = {};
+      PLAN_LED_.forEach(function (k) { if (Object.prototype.hasOwnProperty.call(j.cols, k)) changes[k] = [was[k], j.next[k]]; });
+      if (j.action === "restore") changes.deleted = [true, false];
+      return { id: j.id, row: j.row, title: j.next.title, action: j.action, changes: changes };
+    }),
+    removals: jobs.removals.map(function (j) {
+      var was = byId[j.id];
+      return { id: j.id, date: was.date, time: was.time, title: was.title };
+    }),
+    onlyInApp: jobs.onlyInApp,
+    same: jobs.same,
+    problems: jobs.problems,
+    held: jobs.held,
+    tickets: [],
+  }, rev_());
 }
 
 // What load gives as planProblems: the last pull's list, and in front of it

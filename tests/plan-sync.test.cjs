@@ -671,3 +671,69 @@ test("load's planProblems: the pull's own list after the moved lines, at most 20
   assert.deepEqual(p.list[0], { id: "", message: "That row has no id, so it wasn’t brought in.", row: 5, what: "Row 1" });
   clean(call);
 });
+
+// ---------- planDiff, the dry run ----------
+
+test("planDiff: for the check key and the first person on their own link only; it writes nothing; it works with the switch off; its lists are what the next pull does", async () => {
+  const call = linked({ follow: false, stops: [FULL, APP_PIER, APP_SHOW, { id: "teststop0004", date: "2026-12-28", title: "Our own extra" }, { id: "teststop0005", date: "2026-12-31", title: "Gone stop", deleted: true }] });
+  // The planner: the museum moved, the pier unchanged, the show gone, a new stop, the deleted one back, a bad row.
+  setPlan(call, { ...MUSEUM, date: "2026-12-29", time: "11:00" }, PIER, { stop_id: "teststop0009", date: "Dec 27", time: "9:00 am", what: "Breakfast counter", fixed: "yes" }, { stop_id: "teststop0005", date: "2026-12-31", what: "Gone stop" }, { stop_id: "teststop0010", date: "2027-03-01", what: "Off the trip" });
+  // Make the pier and the show the planner's already, so the show's going counts.
+  call.fake.tables.Stops.filter((r) => r.id === "teststop0002" || r.id === "teststop0003").forEach((r) => { r.planner = "yes"; });
+  const mo = call.fake.personKey("Mo");
+  const izzah = call.fake.personKey("Izzah");
+  const tables = JSON.stringify(call.fake.tables);
+  const props = JSON.stringify(call.fake.props);
+  const asCheck = await call.fake({ key: CHECK_KEY, action: "planDiff", args: {} });
+  const asMo = await call.fake({ key: mo, action: "planDiff", args: {} });
+  assert.equal(asCheck.ok, true, JSON.stringify(asCheck));
+  assert.deepEqual(asMo.data, asCheck.data);
+  const refused = "Only Mo can run the plan check.";
+  for (const key of [izzah, KEY]) {
+    const r = await call.fake({ key, actor: "Mo", action: "planDiff", args: {} });
+    assert.deepEqual([r.ok, r.error, r.message], [false, "bad_input", refused]);
+  }
+  const viaClaude = await call.fake.claude("planDiff", {});
+  assert.deepEqual([viaClaude.ok, viaClaude.error], [false, "bad_input"]);
+  assert.equal(JSON.stringify(call.fake.tables), tables, "no table changed");
+  assert.equal(JSON.stringify(call.fake.props), props, "no property changed");
+  const d = asCheck.data;
+  assert.deepEqual(d.adds, [{ id: "teststop0009", row: 4, date: "2026-12-27", time: "09:00", title: "Breakfast counter", booked: false, fixed: true }]);
+  assert.deepEqual(d.edits, [
+    { id: "teststop0001", row: 2, title: "Corner museum", action: "edit", changes: { date: ["2026-12-28", "2026-12-29"], time: ["10:00", "11:00"] } },
+    { id: "teststop0005", row: 5, title: "Gone stop", action: "restore", changes: { deleted: [true, false] } },
+  ]);
+  assert.deepEqual(d.removals, [{ id: "teststop0003", date: "2026-12-30", time: "19:30", title: "Late show" }]);
+  assert.deepEqual(d.onlyInApp, [{ id: "teststop0004", date: "2026-12-28", time: "", title: "Our own extra" }]);
+  assert.deepEqual([d.same, d.held, d.tickets], [1, 0, []], "the pier is the planner's and the same");
+  assert.deepEqual(d.problems, [{ id: "teststop0010", message: "Pick a day of the trip.", row: 6, what: "Off the trip" }]);
+  // The museum: adopted with its change (it was the app's); the pier is the same.
+  // Then follow, and the pull does exactly that.
+  call.fake.props.PLAN_FOLLOW = "on";
+  const r = await call("syncPlan", {});
+  assert.deepEqual(counts(r.data), [1, 1, 1, 1, 0, 1]);
+  assert.deepEqual(r.data.problems, d.problems);
+  later(call, 20);
+  const after = (await call.fake({ key: CHECK_KEY, action: "planDiff", args: {} })).data;
+  assert.deepEqual([after.adds, after.edits, after.removals, after.same], [[], [], [], 4], "nothing left to do");
+  clean(call);
+});
+
+test("planDiff: no planner, an unreadable planner and a missing tab say so, never with the planner's id", async () => {
+  const none = linked({ over: { plannerId: undefined } });
+  assert.equal((await none.fake({ key: CHECK_KEY, action: "planDiff", args: {} })).error, "no_planner");
+  const call = linked();
+  call.fake.planner.fails = true;
+  const r = await call.fake({ key: CHECK_KEY, action: "planDiff", args: {} });
+  assert.deepEqual([r.ok, r.error], [false, "planner_unreadable"]);
+  assert.equal(JSON.stringify(r).includes(PLANNER_ID), false);
+  call.fake.planner.fails = false;
+  delete call.fake.planner.tabs.Plan;
+  assert.equal((await call.fake({ key: CHECK_KEY, action: "planDiff", args: {} })).error, "planner_columns");
+  // An old Sheet without the planner column: nobody led yet.
+  const old = linked({ over: { missingColumns: ["Stops.planner", "Stops.tk_planner", "Stops.moved_from"] } });
+  const o = (await old.fake({ key: CHECK_KEY, action: "planDiff", args: {} })).data;
+  assert.deepEqual(o.edits.map((e) => e.action), ["adopt", "adopt", "adopt"]);
+  clean(call);
+  clean(old);
+});
