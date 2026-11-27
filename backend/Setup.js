@@ -708,7 +708,7 @@ function checkPlannerPlan_() {
   }
   try {
     var list = plannerTab_("Tickets") || [];
-    var h = headerAt_(list, ["stop_id", "status"]);
+    var h = headerAt_(list, PLAN_TICKET_NEEDS_);
     if (h === -1) {
       Logger.log("Tickets: no stop_id column yet (tickets are not followed)");
     } else {
@@ -717,6 +717,11 @@ function checkPlannerPlan_() {
         return Array.isArray(row) && plannerText_(row[head.indexOf("stop_id")]) !== "" && plannerText_(row[head.indexOf("status")]).toLowerCase() === "active";
       }).length;
       Logger.log("Tickets: stop_id column found, " + active + " active rows name a stop");
+      // The four detail columns: all four, or no detail is followed.
+      var details = ["confirmation", "holder", "traveler", "seat"];
+      var found = details.filter(function (c) { return head.indexOf(c) !== -1; });
+      var lacking = details.filter(function (c) { return head.indexOf(c) === -1; });
+      Logger.log("Tickets: detail columns found: " + (found.join(", ") || "none") + (lacking.length ? "; missing: " + lacking.join(", ") + " (ticket details are not followed)" : ""));
     }
   } catch (e2) {
     Logger.log("Tickets: couldn’t read it.");

@@ -311,7 +311,8 @@ function clean(call) {
   assert.equal(call.fake.planner.calls.some((c) => c.appLock), false, "never read under the app's lock (R49)");
 }
 // The columns of a Stops row a pull may never change.
-const PULL_COLS = ["date", "time", "title", "booked", "fixed", "deleted_at", "planner", "tk_planner", "moved_from", "tk_ref", "tk_name", "tk_people", "tk_seat"];
+// With no Tickets tab linked, the four ticket details are the app's too and must not change.
+const PULL_COLS = ["date", "time", "title", "booked", "fixed", "deleted_at", "planner", "tk_planner", "moved_from"];
 const others = (row) => Object.fromEntries(Object.entries(row).filter(([k]) => !PULL_COLS.includes(k)));
 
 test("off is off: with PLAN_FOLLOW unset syncPlan answers off and reads nothing; load says not following and no stop is the planner's", async () => {
@@ -418,24 +419,35 @@ test("each kind of change lands once, logged via the planner in the first person
   clean(call);
 });
 
-test("unreadable: a Plan read that throws changes nothing and never says the planner's id; no tab or no header says which", async () => {
+test("unreadable: a Plan read that throws changes nothing and never says the planner's id; no tab or no header says which; a broken planner is read at most once a minute", async () => {
   const call = linked();
   call.fake.planner.fails = true;
-  const props = JSON.stringify(call.fake.props);
   const stops = JSON.stringify(call.fake.tables.Stops);
-  for (const args of [{}, { auto: true }]) {
-    const r = await call("syncPlan", args);
-    assert.deepEqual([r.ok, r.error, r.message], [false, "planner_unreadable", "Couldn’t read the planner sheet. Ask Mo to check its permission."]);
-    assert.equal(JSON.stringify(r).includes(PLANNER_ID), false);
-  }
-  assert.equal(JSON.stringify(call.fake.props), props, "no property changed");
+  const r = await call("syncPlan", { auto: true });
+  assert.deepEqual([r.ok, r.error, r.message], [false, "planner_unreadable", "Couldn’t read the planner sheet. Ask Mo to check its permission."]);
+  assert.equal(JSON.stringify(r).includes(PLANNER_ID), false);
+  assert.deepEqual(Object.keys(call.fake.props).filter((k) => k.startsWith("PLAN_") && k !== "PLAN_FOLLOW"), ["PLAN_TRIED_AT"], "only the attempt is stamped");
   assert.equal(JSON.stringify(call.fake.tables.Stops), stops, "no stop changed");
+  // The gap holds while it is broken: an auto ask within the minute and a plain one within 15 seconds read nothing.
+  const reads = planReads(call);
+  later(call, 10);
+  assert.equal((await call("syncPlan", {})).data.skipped, true);
+  later(call, 30);
+  assert.equal((await call("syncPlan", { auto: true })).data.skipped, true);
+  assert.equal(planReads(call), reads);
+  const plain = await call("syncPlan", {});
+  assert.equal(plain.error, "planner_unreadable", "a plain ask after 15 seconds reads again");
+  assert.equal(planReads(call), reads + 1);
   assert.equal(JSON.stringify(await call("load")).includes(PLANNER_ID), false);
   call.fake.planner.fails = false;
   delete call.fake.planner.tabs.Plan;
+  later(call, 20);
   assert.deepEqual(await call("syncPlan", {}).then((r) => [r.error, r.message]), ["planner_columns", "The planner has no Plan tab to read."]);
+  later(call, 20);
   call.fake.planner.tabs.Plan = [["stop_id", "date", "what"], prow(MUSEUM)];
   assert.deepEqual(await call("syncPlan", {}).then((r) => [r.error, r.message]), ["planner_columns", "The planner’s Plan tab has no row with the columns stop_id, date, time and what."]);
+  later(call, 10);
+  assert.equal((await call("syncPlan", {})).data.skipped, true, "the gap counts from the failed read too");
   assert.equal(JSON.stringify(call.fake.tables.Stops), stops);
   clean(call);
 });
@@ -459,11 +471,12 @@ test("the gap: an auto ask within a minute of the last pull reads nothing; a pla
   clean(call);
 });
 
-test("an older read landing after a newer one is dropped", async () => {
+test("overlapping reads: a read that began before another landed pull's read ended is dropped, whichever began first", async () => {
   const call = linked();
   await call("syncPlan", {});
   later(call, 20);
-  // Another pull reads the planner a moment later and lands while this one is between its read and the lock.
+  // While this pull reads (begun at T), another pull reads the planner, newer or older data alike,
+  // and lands with its reads ending at T + 1 s: this one may be the older and is dropped.
   const read = call.fake.world.plannerTab_;
   call.fake.world.plannerTab_ = (tab) => {
     const rows = read(tab);
@@ -477,8 +490,19 @@ test("an older read landing after a newer one is dropped", async () => {
   assert.equal(logRows(call).length, logged, "nothing written");
   assert.equal(stored(call, FULL.id).time, "10:00");
   call.fake.world.plannerTab_ = read;
+  // A read begun after the landed one ended goes through, and records when its own reads ended.
   later(call, 20);
-  assert.equal((await call("syncPlan", {})).data.changed, 1, "a later read goes through");
+  const clock = call.at.now;
+  let tick = 0;
+  call.fake.world.plannerTab_ = (tab) => {
+    const rows = read(tab);
+    tick++;
+    call.at.now = new Date(Date.parse(clock) + tick * 500).toISOString(); // the reads take a second
+    return rows;
+  };
+  assert.equal((await call("syncPlan", {})).data.changed, 1);
+  assert.equal(call.fake.props.PLAN_READ_AT, new Date(Date.parse(clock) + 1000).toISOString(), "the end of its reads");
+  call.fake.world.plannerTab_ = read;
   clean(call);
 });
 
@@ -687,8 +711,12 @@ test("planDiff: for the check key and the first person on their own link only; i
   const tables = JSON.stringify(call.fake.tables);
   const props = JSON.stringify(call.fake.props);
   const asCheck = await call.fake({ key: CHECK_KEY, action: "planDiff", args: {} });
-  const asMo = await call.fake({ key: mo, action: "planDiff", args: {} });
   assert.equal(asCheck.ok, true, JSON.stringify(asCheck));
+  // At most once a minute, whoever asks.
+  const soon = await call.fake({ key: mo, action: "planDiff", args: {} });
+  assert.deepEqual([soon.ok, soon.error, soon.message], [false, "too_soon", "The plan check was run less than a minute ago. Try again in a minute."]);
+  later(call, 60);
+  const asMo = await call.fake({ key: mo, action: "planDiff", args: {} });
   assert.deepEqual(asMo.data, asCheck.data);
   const refused = "Only Mo can run the plan check.";
   for (const key of [izzah, KEY]) {
@@ -698,7 +726,9 @@ test("planDiff: for the check key and the first person on their own link only; i
   const viaClaude = await call.fake.claude("planDiff", {});
   assert.deepEqual([viaClaude.ok, viaClaude.error], [false, "bad_input"]);
   assert.equal(JSON.stringify(call.fake.tables), tables, "no table changed");
-  assert.equal(JSON.stringify(call.fake.props), props, "no property changed");
+  const { PLAN_DIFF_AT, ...rest } = call.fake.props;
+  assert.equal(PLAN_DIFF_AT, call.at.now, "the one property: when it last read");
+  assert.equal(JSON.stringify(rest), props, "no other property changed");
   const d = asCheck.data;
   assert.deepEqual(d.adds, [{ id: "teststop0009", row: 4, date: "2026-12-27", time: "09:00", title: "Breakfast counter", booked: false, fixed: true }]);
   assert.deepEqual(d.edits, [
@@ -707,7 +737,8 @@ test("planDiff: for the check key and the first person on their own link only; i
   ]);
   assert.deepEqual(d.removals, [{ id: "teststop0003", date: "2026-12-30", time: "19:30", title: "Late show" }]);
   assert.deepEqual(d.onlyInApp, [{ id: "teststop0004", date: "2026-12-28", time: "", title: "Our own extra" }]);
-  assert.deepEqual([d.same, d.held, d.tickets], [1, 0, []], "the pier is the planner's and the same");
+  assert.deepEqual([d.same, d.held, d.heldAdds, d.tickets], [1, 0, 0, []], "the pier is the planner's and the same");
+  assert.deepEqual(d.ticketColumns, { found: [], missing: ["confirmation", "holder", "traveler", "seat"] }, "no Tickets tab");
   assert.deepEqual(d.problems, [{ id: "teststop0010", message: "Pick a day of the trip.", row: 6, what: "Off the trip" }]);
   // The museum: adopted with its change (it was the app's); the pier is the same.
   // Then follow, and the pull does exactly that.
@@ -715,7 +746,7 @@ test("planDiff: for the check key and the first person on their own link only; i
   const r = await call("syncPlan", {});
   assert.deepEqual(counts(r.data), [1, 1, 1, 1, 0, 1]);
   assert.deepEqual(r.data.problems, d.problems);
-  later(call, 20);
+  later(call, 60);
   const after = (await call.fake({ key: CHECK_KEY, action: "planDiff", args: {} })).data;
   assert.deepEqual([after.adds, after.edits, after.removals, after.same], [[], [], [], 4], "nothing left to do");
   clean(call);
@@ -731,6 +762,7 @@ test("planDiff: no planner, an unreadable planner and a missing tab say so, neve
   assert.equal(JSON.stringify(r).includes(PLANNER_ID), false);
   call.fake.planner.fails = false;
   delete call.fake.planner.tabs.Plan;
+  later(call, 60);
   assert.equal((await call.fake({ key: CHECK_KEY, action: "planDiff", args: {} })).error, "planner_columns");
   // An old Sheet without the planner column: nobody led yet.
   const old = linked({ over: { missingColumns: ["Stops.planner", "Stops.tk_planner", "Stops.moved_from"] } });
@@ -749,12 +781,14 @@ const TK1 = { ticket_id: "T01", stop_id: "teststop0001", title: "Museum entry", 
 const TK2 = { ...TK1, ticket_id: "T02", traveler: "Izzah" };
 
 test("planTicketsFromRows: no stop_id column is not linked and no problem; the active rows of a stop give its four details", () => {
-  assert.deepEqual(P.planTicketsFromRows([["ticket_id", "title", "status"], ["T01", "Museum entry", "active"]], NAMES), { linked: false, byStop: {}, problems: [] });
-  assert.deepEqual(P.planTicketsFromRows(null, NAMES), { linked: false, byStop: {}, problems: [] });
-  assert.deepEqual(P.planTicketsFromRows([], NAMES), { linked: false, byStop: {}, problems: [] });
+  const off = { linked: false, byStop: {}, problems: [], found: [] };
+  assert.deepEqual(P.planTicketsFromRows([["ticket_id", "title", "status"], ["T01", "Museum entry", "active"]], NAMES), off);
+  assert.deepEqual(P.planTicketsFromRows(null, NAMES), off);
+  assert.deepEqual(P.planTicketsFromRows([], NAMES), off);
   const r = P.planTicketsFromRows([THEAD, trow(TK1), trow(TK2), trow({ ...TK1, ticket_id: "T03", traveler: "Mo", status: "pending", confirmation: "ZZ00000" })], NAMES);
   assert.equal(r.linked, true);
   assert.deepEqual(r.problems, []);
+  assert.deepEqual(r.found, ["confirmation", "holder", "traveler", "seat"]);
   assert.deepEqual(r.byStop, { teststop0001: { tkRef: "ZZ99999", tkName: "Sam Example", tkPeople: "Mo, Izzah", tkSeat: "" } }, "two travellers on one booking; the pending row is ignored");
 });
 
@@ -882,4 +916,105 @@ test("tickets: an older app change of a stop whose details the Tickets tab now l
   assert.equal(u.ok, true, JSON.stringify(u));
   assert.deepEqual([stored(call, FULL.id).note, stored(call, FULL.id).tk_ref], ["Our note", "ZZ99999"]);
   clean(call);
+});
+
+// ---------- review 1 fixes ----------
+
+test("I1: a Tickets tab missing one of its four detail columns leads no detail: nothing is blanked, locked or let go, and the list says which", () => {
+  const head = THEAD.filter((h) => h !== "holder");
+  const row = (o) => head.map((h) => (o[h] === undefined ? "" : o[h]));
+  const tix = P.planTicketsFromRows([head, row(TK1)], NAMES);
+  assert.deepEqual(tix, { linked: false, byStop: {}, found: ["confirmation", "traveler", "seat"], problems: [{ id: "", message: "The planner’s Tickets tab has no holder column, so no ticket details were changed.", row: null, what: "" }] });
+  const two = P.planTicketsFromRows([THEAD.filter((h) => h !== "holder" && h !== "seat"), []], NAMES);
+  assert.equal(two.problems[0].message, "The planner’s Tickets tab has no holder and seat columns, so no ticket details were changed.");
+  const read = P.planFromRows([HEAD, prow(MUSEUM)], DAYS);
+  const led = cur({ tkRef: "ZZ00001", tkName: "Sam Example" }, { tkLed: true });
+  const j = P.planJobs(read, tix, [led], DAYS, true);
+  assert.deepEqual([j.same, j.edits], [1, []], "the led details stay as they are, and stay led");
+  const own = P.planJobs(read, tix, [cur({ tkRef: "ZZ00001" })], DAYS, true);
+  assert.deepEqual([own.same, own.edits], [1, []], "the app's own details stay the app's");
+});
+
+test("I1 through the pull, the dry run and the guard: a renamed holder column changes no detail and keeps each guard as it was", async () => {
+  const head = THEAD.map((h) => (h === "holder" ? "name on booking" : h));
+  const row = (o) => THEAD.map((h) => (o[h] === undefined ? "" : o[h]));
+  const call = linked({ stops: [{ ...FULL, fromPlanner: true, tkFromPlanner: true }, { ...APP_PIER, fromPlanner: true, tkRef: "ZZ00002" }, { ...APP_SHOW, fromPlanner: true }], tickets: [head, row(TK1), row({ ...TK1, stop_id: "teststop0002" })] });
+  const before = JSON.stringify(call.fake.tables.Stops);
+  const r = await call("syncPlan", {});
+  assert.deepEqual(counts(r.data), [0, 0, 0, 0, 0, 3]);
+  assert.deepEqual(r.data.problems.map((p) => p.message), ["The planner’s Tickets tab has no holder column, so no ticket details were changed."]);
+  assert.equal(JSON.stringify(call.fake.tables.Stops), before, "no detail blanked, none locked or let go");
+  assert.equal((await call("updateStop", { id: FULL.id, patch: { tkName: "Someone Else" } })).error, "planner_led", "a led stop keeps its guard");
+  assert.equal((await call("updateStop", { id: "teststop0002", patch: { tkName: "Someone Else" } })).ok, true, "the app's own stays editable");
+  const d = (await call.fake({ key: CHECK_KEY, action: "planDiff", args: {} })).data;
+  assert.deepEqual(d.ticketColumns, { found: ["confirmation", "traveler", "seat"], missing: ["holder"] });
+  assert.deepEqual(d.tickets, []);
+  clean(call);
+});
+
+test("I2a: when removals are held, every add in that pull is held too, in the same one line", () => {
+  const current = [cur({}), cur(PIER_STOP)];
+  const NEW = { stop_id: "teststop0009", date: "2026-12-27", time: "", what: "Breakfast counter" };
+  const blind = P.planJobs(P.planFromRows([HEAD, prow(MUSEUM), prow(NEW), prow({ ...SHOW, stop_id: "" })], DAYS), NOTIX, current, DAYS, true);
+  assert.deepEqual([blind.adds, blind.removals, blind.held, blind.heldAdds], [[], [], 1, 1]);
+  assert.equal(blind.problems.at(-1).message, "1 stop is not in the Plan tab, and a row there has no usable id. Nothing was taken off: fix that row first. Its 1 new stop wasn’t brought in either.");
+  // The reviewer's case: 20 planner stops whose ids were all rewritten.
+  const many = [];
+  for (let i = 1; i <= 20; i++) many.push(cur({ id: "teststop" + String(i).padStart(4, "0"), title: "Stop " + i }));
+  const rewritten = many.map((c, i) => ({ ...MUSEUM, stop_id: "testnew" + String(i + 1).padStart(4, "0"), what: c.stop.title }));
+  const j = P.planJobs(P.planFromRows([HEAD, ...rewritten.map(prow)], DAYS), NOTIX, many, DAYS, true);
+  assert.deepEqual([j.adds, j.removals, j.edits, j.held, j.heldAdds], [[], [], [], 20, 20]);
+  assert.deepEqual(j.problems, [{ id: "", message: "The Plan tab no longer lists 20 stops. That is too many to take off at once, so none were. If it’s meant, take them off a few at a time. Its 20 new stops weren’t brought in either.", row: null, what: "" }]);
+  // Removals that go through do not hold the adds.
+  const others3 = ["teststop0003", "teststop0004", "teststop0005"];
+  const fine = P.planJobs(P.planFromRows([HEAD, prow(MUSEUM), ...others3.map((id) => prow({ ...MUSEUM, stop_id: id })), prow(NEW)], DAYS), NOTIX, [cur({}), cur(PIER_STOP), ...others3.map((id) => cur({ id }))], DAYS, true);
+  assert.deepEqual([fine.adds.length, fine.removals.length, fine.heldAdds], [1, 1, 0]);
+});
+
+test("I2b: more than 8 new stops, when that is more than half the stops the planner leads, are held; the first sync's 7 are not", () => {
+  const fresh = (n, from = 100) => Array.from({ length: n }, (_, i) => ({ ...PIER, stop_id: "teststop" + String(from + i).padStart(4, "0"), what: "New " + i }));
+  const led = (n) => Array.from({ length: n }, (_, i) => cur({ id: "teststop" + String(i + 1).padStart(4, "0"), title: "Stop " + i }));
+  const keep = (cs) => cs.map((c) => ({ ...MUSEUM, stop_id: c.stop.id, what: c.stop.title }));
+  const rows = (list) => P.planFromRows([HEAD, ...list.map(prow)], DAYS);
+  const seven = P.planJobs(rows(fresh(7)), NOTIX, [], DAYS, true);
+  assert.deepEqual([seven.adds.length, seven.heldAdds, seven.problems], [7, 0, []]);
+  const ten = led(10);
+  const nine = P.planJobs(rows([...keep(ten), ...fresh(9)]), NOTIX, ten, DAYS, true);
+  assert.deepEqual([nine.adds, nine.heldAdds], [[], 9]);
+  assert.deepEqual(nine.problems, [{ id: "", message: "The Plan tab has 9 stops the app doesn’t have yet. That is too many to bring in at once, so none were. If it’s meant, add them a few at a time.", row: null, what: "" }]);
+  const twenty = led(20);
+  assert.equal(P.planJobs(rows([...keep(twenty), ...fresh(9)]), NOTIX, twenty, DAYS, true).adds.length, 9, "9 is not more than half of 20");
+  const eight = P.planJobs(rows([...keep(ten), ...fresh(8)]), NOTIX, ten, DAYS, true);
+  assert.equal(eight.adds.length, 8);
+  // Adopting app stops is not adding.
+  const own = Array.from({ length: 12 }, (_, i) => cur({ id: "teststop" + String(i + 1).padStart(4, "0") }, { led: false }));
+  assert.equal(P.planJobs(rows(keep(own)), NOTIX, own, DAYS, true).edits.length, 12);
+});
+
+test("I2 through the pull: 20 rewritten ids write nothing and say so in one line", async () => {
+  const stops = [];
+  for (let i = 1; i <= 20; i++) stops.push({ ...APP_PIER, id: "teststop" + String(i).padStart(4, "0"), title: "Stop " + i, fromPlanner: true });
+  const plan = [HEAD, ...stops.map((s, i) => prow({ stop_id: "testnew" + String(i + 1).padStart(4, "0"), date: s.date, what: s.title }))];
+  const call = linked({ stops, plan });
+  const before = JSON.stringify(call.fake.tables.Stops);
+  const logged = logRows(call).length;
+  const r = await call("syncPlan", {});
+  assert.deepEqual([...counts(r.data), r.data.held, r.data.heldAdds, r.data.problems.length], [0, 0, 0, 0, 0, 0, 20, 20, 1]);
+  assert.equal(JSON.stringify(call.fake.tables.Stops), before);
+  assert.equal(logRows(call).length, logged);
+  clean(call);
+});
+
+test("a booked or fixed column missing from the header leaves every stop's flag as it was, and says so", () => {
+  const head = ["stop_id", "date", "time", "what", "fixed"];
+  const read = P.planFromRows([head, ["teststop0001", "2026-12-28", "10:00", "Corner museum", ""], ["teststop0009", "2026-12-27", "", "Breakfast counter", "yes"]], DAYS);
+  assert.deepEqual(read.columns, { booked: false, fixed: true });
+  const j = P.planJobs(read, NOTIX, [cur({ booked: true }, { led: true })], DAYS, true);
+  assert.deepEqual([j.same, j.edits], [1, []], "booked stays yes");
+  assert.equal(j.adds[0].value.booked, false);
+  assert.equal(j.adds[0].value.fixed, true);
+  assert.deepEqual(j.problems, [{ id: "", message: "The planner’s Plan tab has no booked column, so every stop’s booked was left as it was.", row: null, what: "" }]);
+  assert.equal(read.blind, false, "not a reason to hold removals");
+  const neither = P.planJobs(P.planFromRows([["stop_id", "date", "time", "what"], ["teststop0001", "2026-12-28", "10:00", "Corner museum"]], DAYS), NOTIX, [cur({ booked: true, fixed: true })], DAYS, true);
+  assert.deepEqual([neither.same, neither.problems.length], [1, 2]);
 });

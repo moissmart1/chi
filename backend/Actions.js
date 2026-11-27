@@ -78,6 +78,7 @@ var MSG_ = {
   planMoved: "Moved from {day} in the planner. Check how to get there.",
   planAddOff: "New stops go in the planner’s Plan tab. They come in here within a few minutes.",
   planDiffOwnerOnly: "Only {owner} can run the plan check.",
+  planDiffSoon: "The plan check was run less than a minute ago. Try again in a minute.",
 };
 var STAMP_REFUSALS_ = { not_open: "stampNotOpen", closed: "stampClosed", late: "stampLate", future: "stampFuture" };
 
@@ -2286,21 +2287,41 @@ function planCurrent_() {
   });
 }
 
+// Milliseconds since the later of two stamps (Script Properties); NaN when neither is set.
+function planSince_(keys) {
+  var last = NaN;
+  keys.forEach(function (k) {
+    var t = Date.parse(getProp_(k) || "");
+    if (isFinite(t) && !(t <= last)) last = t;
+  });
+  return Date.parse(nowIso_()) - last;
+}
+
 function syncPlan_(args, ctx) {
   if (args.auto !== undefined && typeof args.auto !== "boolean") return err_("bad_input", MSG_.badRequest);
   if (!plannerId_()) return err_("no_planner", MSG_.noPlanner);
   if (!planFollow_()) return planZero_({ off: true, skipped: true });
   if (!hasColumn_("Stops", "moved_from")) return err_("needs_migrate", MSG_.needsMigrate);
-  var since = Date.parse(nowIso_()) - Date.parse(getProp_("PLAN_PULLED_AT") || "");
+  // The gaps count from the last pull, or the last read that failed
+  // (PLAN_TRIED_AT), so a broken planner is not read on every ask.
+  var since = planSince_(["PLAN_PULLED_AT", "PLAN_TRIED_AT"]);
   if (since >= 0 && (since < PLAN_FORCE_GAP_MS_ || (args.auto === true && since < PLAN_AUTO_GAP_MS_))) return planZero_({ skipped: true });
 
   var started = nowIso_();
   var got = planRead_();
-  if (got.error) return got.error;
+  if (got.error) {
+    setProp_("PLAN_TRIED_AT", started);
+    return got.error;
+  }
   var tix = planTickets_(ctx.names);
+  // When the reads were done: their data is from between started and this.
+  var finished = nowIso_();
   var dayDates = tripDates_();
   var read = planFromRows(got.rows, dayDates);
-  if (read.missing) return err_("planner_columns", read.missing);
+  if (read.missing) {
+    setProp_("PLAN_TRIED_AT", started);
+    return err_("planner_columns", read.missing);
+  }
 
   // The same tab as at the last full pull, and no write to the app's Sheet
   // since (rev): nothing can differ, so no lock and no Stops read.
@@ -2310,12 +2331,15 @@ function syncPlan_(args, ctx) {
     return planZero_({ unchanged: true, pulledAt: started });
   }
   return withLock_(function () {
-    // A pull that read the planner later has already landed: this read is the
-    // older one and must not put old values back.
+    // Another pull landed whose reads ended after this one's began
+    // (PLAN_READ_AT is when a landed pull's reads ended): the two reads
+    // overlapped, and this one's data may be the older, so it must not put
+    // old values back. Dropped; the next ask reads again. A read that began
+    // after the landed one ended is newer and goes through.
     var landed = Date.parse(getProp_("PLAN_READ_AT") || "");
     if (isFinite(landed) && landed > Date.parse(started)) return planZero_({ skipped: true });
     var done = pullPlan_(read, tix, dayDates, ctx);
-    setProp_("PLAN_READ_AT", started);
+    setProp_("PLAN_READ_AT", finished);
     setProp_("PLAN_PROBLEMS", JSON.stringify(plannerProblemsToStore_(started, done.data.problems)));
     // A pull cut short (more to write) is not done: the next one carries on at once.
     if (!done.data.more) {
@@ -2339,7 +2363,7 @@ function pullPlan_(read, tix, dayDates, ctx) {
   var byId = {};
   current.forEach(function (c) { byId[c.stop.id] = c.stop; });
   var jobs = planJobs(read, tix, current, dayDates, PLAN_APP_STOPS_);
-  var out = { added: 0, changed: 0, removed: 0, restored: 0, adopted: 0, same: jobs.same, problems: jobs.problems, more: false, held: jobs.held, pulledAt: "" };
+  var out = { added: 0, changed: 0, removed: 0, restored: 0, adopted: 0, same: jobs.same, problems: jobs.problems, more: false, held: jobs.held, heldAdds: jobs.heldAdds, pulledAt: "" };
   var writes = 0;
   var room = function () {
     if (writes < PLAN_MAX_WRITES_) return true;
@@ -2386,12 +2410,19 @@ function pullPlan_(read, tix, dayDates, ctx) {
 }
 
 // The dry run (planDiff): what a pull would do now, whether or not the app
-// follows the planner. No lock, no write, no property, no History. It
-// names the stops whose ticket details would change and never a value.
+// follows the planner. No lock, no write to the Sheet, no History; the one
+// property it keeps is when it last read (PLAN_DIFF_AT), so it reads the
+// planner at most once a minute. It names the stops whose ticket details
+// would change and never a value, and which of the Tickets tab's four
+// detail columns it found.
 // -> { adds, edits: [{ id, row, title, action, changes: { field: [from, to] } }],
-// removals, onlyInApp, same, problems, held, tickets: [{ id, title }] }.
+// removals, onlyInApp, same, problems, held, heldAdds, tickets: [{ id, title }],
+// ticketColumns: { found, missing } }.
 function planDiff_() {
   if (!plannerId_()) return err_("no_planner", MSG_.noPlanner);
+  var since = planSince_(["PLAN_DIFF_AT"]);
+  if (since >= 0 && since < PLAN_AUTO_GAP_MS_) return err_("too_soon", MSG_.planDiffSoon);
+  setProp_("PLAN_DIFF_AT", nowIso_());
   var got = planRead_();
   if (got.error) return got.error;
   var tix = planTickets_(peopleNames_());
@@ -2421,7 +2452,9 @@ function planDiff_() {
     same: jobs.same,
     problems: jobs.problems,
     held: jobs.held,
+    heldAdds: jobs.heldAdds,
     tickets: planDiffTickets_(jobs),
+    ticketColumns: { found: tix.found || [], missing: ["confirmation", "holder", "traveler", "seat"].filter(function (c) { return (tix.found || []).indexOf(c) === -1; }) },
   }, rev_());
 }
 

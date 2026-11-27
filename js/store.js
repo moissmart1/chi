@@ -1559,7 +1559,8 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
         const movedIds = new Set(state.stops.filter((x) => x && typeof x.movedFrom === "string" && x.movedFrom !== "").map((x) => x.id));
         const shown = (state.planProblems.list || []).filter((x) => !(x && x.row === null && movedIds.has(x.id)));
         const key = (l) => l.slice(0, 20).map((x) => x.id + "|" + x.row + "|" + x.message).join("\n");
-        stale = d.problems.length !== shown.length + (state.planProblems.more || 0) || key(d.problems) !== key(shown);
+        // Compared over what is shown: with moved lines in front, fewer than 20 of the pull's are.
+        stale = d.problems.length !== shown.length + (state.planProblems.more || 0) || key(d.problems.slice(0, shown.length)) !== key(shown);
       }
       if (moved || stale) {
         await refresh();

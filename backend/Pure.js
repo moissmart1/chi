@@ -1645,6 +1645,9 @@ var PLAN_TICKET_NEEDS_ = ["ticket_id", "stop_id", "status"];
 var PLAN_TICKET_MAX_ROWS_ = 300;
 // The most stops one read may take off; more (or more than half) and none are.
 var PLAN_MAX_REMOVALS_ = 8;
+// The most new stops one read may bring in, unless the planner already leads
+// at least twice as many; more and none are.
+var PLAN_MAX_ADDS_ = 8;
 
 // A Plan tab day cell as "YYYY-MM-DD", or "". ISO text that is a real day is
 // itself, on the trip or not (validateStop judges that); a number is Sheets'
@@ -1708,13 +1711,15 @@ function planYes(v, booked) {
 // rows: the Plan tab as Sheets hands it back from A1 (null or [] when there
 // is no tab); dayDates: the trip's days.
 // -> { stops: [{ id, row, date, time, timeOk, title, booked, fixed }],
-// problems: [{ id, message, row, what }], missing, capped, blind }: row is
-// the sheet's own row number; missing is why the tab can't be read at all
-// (else null); capped: more than 200 rows; blind: a row's id could not be
-// read (or the tab was cut), so no stop may be taken off on this read.
+// problems: [{ id, message, row, what }], missing, capped, blind, columns }:
+// row is the sheet's own row number; missing is why the tab can't be read at
+// all (else null); capped: more than 200 rows; blind: a row's id could not be
+// read (or the tab was cut), so no stop may be taken off on this read;
+// columns: { booked, fixed }, whether the header has each (an absent one
+// reads as no here; planJobs leaves the stops' own flags as they are).
 function planFromRows(rows, dayDates) {
   var list = Array.isArray(rows) ? rows : [];
-  var none = function (message) { return { stops: [], problems: [], missing: message, capped: false, blind: true }; };
+  var none = function (message) { return { stops: [], problems: [], missing: message, capped: false, blind: true, columns: { booked: false, fixed: false } }; };
   if (!list.length) return none("The planner has no Plan tab to read.");
   var h = headerAt_(list, PLAN_NEEDS_);
   if (h === -1) return none("The planner’s Plan tab has no row with the columns stop_id, date, time and what.");
@@ -1768,7 +1773,7 @@ function planFromRows(rows, dayDates) {
       fixed: planYes(cell(row, "fixed"), false),
     });
   }
-  return { stops: stops, problems: problems, missing: null, capped: capped, blind: problems.length > 0 || capped };
+  return { stops: stops, problems: problems, missing: null, capped: capped, blind: problems.length > 0 || capped, columns: { booked: head.indexOf("booked") !== -1, fixed: head.indexOf("fixed") !== -1 } };
 }
 
 
@@ -1779,19 +1784,32 @@ function planUniq_(values) {
   return out;
 }
 
+// The column of the Tickets tab each ticket detail comes from.
+var PLAN_TICKET_SOURCES_ = [["tkRef", "confirmation"], ["tkName", "holder"], ["tkPeople", "traveler"], ["tkSeat", "seat"]];
+
 // rows: the planner's Tickets tab as Sheets hands it back from A1; names: the
 // people on the trip. Until it has a stop_id column (with ticket_id and
-// status) it is not linked, and that is not a problem.
-// -> { linked, byStop: { [stopId]: { tkRef, tkName, tkPeople, tkSeat } }, problems }:
-// from the rows whose status is active, per stop. A problem's what is a few
+// status) it is not linked, and that is not a problem. While any of the four
+// detail columns (confirmation, holder, traveler, seat) is missing it is not
+// linked either, with one problem: no detail is changed or let go, so a
+// renamed column never blanks or locks one.
+// -> { linked, byStop: { [stopId]: { tkRef, tkName, tkPeople, tkSeat } },
+// problems, found }: from the rows whose status is active, per stop; found:
+// which of the four detail columns the header has. A problem's what is a few
 // words of the row's title, never a ticket value.
 function planTicketsFromRows(rows, names) {
   var list = Array.isArray(rows) ? rows : [];
-  var off = { linked: false, byStop: {}, problems: [] };
+  var off = { linked: false, byStop: {}, problems: [], found: [] };
   if (!list.length) return off;
   var h = headerAt_(list, PLAN_TICKET_NEEDS_);
   if (h === -1) return off;
   var head = headOf_(list[h]);
+  var found = PLAN_TICKET_SOURCES_.map(function (x) { return x[1]; }).filter(function (c) { return head.indexOf(c) !== -1; });
+  var lacking = PLAN_TICKET_SOURCES_.map(function (x) { return x[1]; }).filter(function (c) { return head.indexOf(c) === -1; });
+  if (lacking.length) {
+    var named = lacking.length === 1 ? lacking[0] : lacking.slice(0, -1).join(", ") + " and " + lacking[lacking.length - 1];
+    return { linked: false, byStop: {}, found: found, problems: [{ id: "", message: "The planner’s Tickets tab has no " + named + " column" + (lacking.length === 1 ? "" : "s") + ", so no ticket details were changed.", row: null, what: "" }] };
+  }
   var width = headWidth_(head);
   var cell = function (row, name) {
     var c = head.indexOf(name);
@@ -1834,17 +1852,27 @@ function planTicketsFromRows(rows, names) {
       tkSeat: cutText_(seat, TICKET_LIMITS.fact),
     };
   });
-  return { linked: true, byStop: byStop, problems: problems };
+  return { linked: true, byStop: byStop, problems: problems, found: found };
 }
 
 var PLAN_TICKET_COLS_ = [["tkRef", "tk_ref"], ["tkName", "tk_name"], ["tkPeople", "tk_people"], ["tkSeat", "tk_seat"]];
 
-function planBlind_(n) {
-  return (n === 1 ? "1 stop is" : n + " stops are") + " not in the Plan tab, and a row there has no usable id. Nothing was taken off: fix that row first.";
+// What is said of the new stops held with the removals (adds: how many).
+function planAddsToo_(adds) {
+  if (!adds) return "";
+  return adds === 1 ? " Its 1 new stop wasn’t brought in either." : " Its " + adds + " new stops weren’t brought in either.";
 }
 
-function planTooMany_(n) {
-  return "The Plan tab no longer lists " + n + (n === 1 ? " stop" : " stops") + ". That is too many to take off at once, so none were. If it’s meant, take them off a few at a time.";
+function planBlind_(n, adds) {
+  return (n === 1 ? "1 stop is" : n + " stops are") + " not in the Plan tab, and a row there has no usable id. Nothing was taken off: fix that row first." + planAddsToo_(adds);
+}
+
+function planTooMany_(n, adds) {
+  return "The Plan tab no longer lists " + n + (n === 1 ? " stop" : " stops") + ". That is too many to take off at once, so none were. If it’s meant, take them off a few at a time." + planAddsToo_(adds);
+}
+
+function planAddsTooMany_(n) {
+  return "The Plan tab has " + n + " stops the app doesn’t have yet. That is too many to bring in at once, so none were. If it’s meant, add them a few at a time.";
 }
 
 // The planner's five fields of a stop.
@@ -1858,18 +1886,25 @@ function planLed_(s) {
 // tkFromPlanner); appStops: whether a phone may add stops of its own.
 // -> { adds: [{ id, row, what, value, tk }], edits: [{ id, row, what, cols,
 // action, next }], removals: [{ id, what }], same, onlyInApp: [{ id, date,
-// time, title }], problems, held }: cols are the Sheet columns an edit
+// time, title }], problems, held, heldAdds }: cols are the Sheet columns an edit
 // writes; action "edit", "restore" or "adopt" (only the markers change);
 // value is the new stop (validateStop's), tk its ticket facts or null; held
-// is how many stops were not taken off because of a guard.
+// is how many stops were not taken off because of a guard, heldAdds how
+// many new ones were not brought in.
 function planJobs(read, tix, current, dayDates, appStops) {
   tix = tix || { linked: false, byStop: {}, problems: [] };
   var byId = {};
   current.forEach(function (c) { byId[c.stop.id] = c; });
   var inPlan = {};
   read.stops.forEach(function (p) { inPlan[p.id] = true; });
-  var out = { adds: [], edits: [], removals: [], same: 0, onlyInApp: [], problems: read.problems.concat(tix.problems), held: 0 };
+  var out = { adds: [], edits: [], removals: [], same: 0, onlyInApp: [], problems: read.problems.concat(tix.problems), held: 0, heldAdds: 0 };
   var factsOf = function (id) { return tix.linked && Object.prototype.hasOwnProperty.call(tix.byStop, id) ? tix.byStop[id] : null; };
+  // A booked or fixed column the header lacks (renamed, deleted): each stop
+  // keeps its own flag, and the list says so.
+  var absent = ["booked", "fixed"].filter(function (k) { return read.columns && read.columns[k] === false; });
+  absent.forEach(function (k) {
+    out.problems.push({ id: "", message: "The planner’s Plan tab has no " + k + " column, so every stop’s " + k + " was left as it was.", row: null, what: "" });
+  });
 
   read.stops.forEach(function (p) {
     var c = Object.prototype.hasOwnProperty.call(byId, p.id) ? byId[p.id] : null;
@@ -1880,7 +1915,7 @@ function planJobs(read, tix, current, dayDates, appStops) {
       return;
     }
     var want = c ? stopFields_(c.stop) : { id: p.id };
-    PLAN_LED_.forEach(function (k) { want[k] = p[k]; });
+    PLAN_LED_.forEach(function (k) { want[k] = absent.indexOf(k) === -1 ? p[k] : c ? c.stop[k] : false; });
     want.id = p.id;
     var v = validateStop(want, dayDates);
     if (!v.ok) {
@@ -1927,20 +1962,31 @@ function planJobs(read, tix, current, dayDates, appStops) {
     out.edits.push({ id: p.id, row: p.row, what: what, cols: cols, action: action, next: planLed_(v.value) });
   });
 
+  // Stops going and coming are held together: when removals are held (a
+  // blind read, or too many), so is every add, said in the same line; and
+  // more than PLAN_MAX_ADDS_ new stops, when that is more than half the
+  // stops the planner already leads, are held on their own.
   var gone = current.filter(function (c) { return !c.stop.deleted && !inPlan[c.stop.id] && (c.led || !appStops); });
+  var adds = out.adds.length;
   if (read.blind) {
     if (gone.length) {
-      out.problems.push({ id: "", message: planBlind_(gone.length), row: null, what: "" });
+      out.problems.push({ id: "", message: planBlind_(gone.length, adds), row: null, what: "" });
       out.held = gone.length;
     }
   } else if (gone.length) {
     var base = current.filter(function (c) { return !c.stop.deleted && (appStops ? c.led : true); }).length;
     if (gone.length > PLAN_MAX_REMOVALS_ || gone.length * 2 > base) {
-      out.problems.push({ id: "", message: planTooMany_(gone.length), row: null, what: "" });
+      out.problems.push({ id: "", message: planTooMany_(gone.length, adds), row: null, what: "" });
       out.held = gone.length;
     } else {
       out.removals = gone.map(function (c) { return { id: c.stop.id, what: plannerWhat_(c.stop.title) }; });
     }
+  }
+  var ledNow = current.filter(function (c) { return !c.stop.deleted && c.led; }).length;
+  if (out.held > 0 || (adds > PLAN_MAX_ADDS_ && adds * 2 > ledNow)) {
+    if (out.held === 0) out.problems.push({ id: "", message: planAddsTooMany_(adds), row: null, what: "" });
+    out.heldAdds = adds;
+    out.adds = [];
   }
   if (appStops) {
     out.onlyInApp = current.filter(function (c) { return !c.stop.deleted && !c.led && !inPlan[c.stop.id]; }).map(function (c) {
@@ -1962,5 +2008,5 @@ function stopFields_(s) {
 if (typeof module !== "undefined") {
   module.exports = { TABS, KINDS, tripMismatch, rateRounded, TRIP_TZ_, TRIP_UTC_OFFSET_MS_, TRIP_ZONE_WORD_, HOME_CURRENCY_, TRIP_CURRENCY_, TRIP_FIRST_DAY_, TRIP_LAST_DAY_, isTextColumn, sanitizeCell, unsanitizeCell, rowToObj, objToRow, validateExpense, validatePayment, validatePersonPatch, validateStop, validateStay, validateDayPatch, DAY_PATCH_KEYS, safeUrl, safeHttpsUrl, dayLabel, stopFromRow, stopToRow, stayFromRow, stayToRow, dayFromRow, dayToRow, expenseFromRow, paymentFromRow, personFromRow, cellDate_, cellStamp_, summarize, undoTarget, canUndo, entryFromRow, parseLogRow, expenseToRow, paymentToRow, setupSeedRows, shouldFetchRate, rateSource, sameKey, hexOfBytes, personKeysFrom, personKeysReadable, keyHolder, blankSecrets, shortDay_, stampWindow, pressRefusal, stampDefFromRow, stampFromRow, stampSnap_, TICKET_LIMITS, validateTicket, ticketChunks, joinTicketChunks, ticketFromRow, ticketSnap_, logSnap_, coordsOf_, pointFromLink, metresBetween_,
     paymentsFromRows, expenseFromPayment, paymentIdOf, todosFromRows, bookByDay, todoFromRow, isBooked, colLetter, changeLogRow, plannerWhat_,
-    planDay, planTime, planYes, planFromRows, planTicketsFromRows, planJobs, PLAN_LED_, PLAN_MAX_REMOVALS_ };
+    planDay, planTime, planYes, planFromRows, planTicketsFromRows, planJobs, PLAN_LED_, PLAN_MAX_REMOVALS_, PLAN_MAX_ADDS_, PLAN_TICKET_NEEDS_ };
 }

@@ -218,17 +218,21 @@ test("checkPlanner's plan lines: rows read, rows that need a look, the Tickets s
   const lines = (w) => w.logged.filter((l) => /^(Plan|Tickets):/.test(l));
   const on = plannerWorld({ props: { PLANNER_ID, PLAN_FOLLOW: "on" }, tabs, get: get(PLAN, TICKETS) });
   on.ctx.checkPlanner();
-  assert.deepEqual(lines(on), ["Plan: 4 rows, columns ok", "Plan: 3 rows need a look", "Tickets: stop_id column found, 2 active rows name a stop", "Plan: following"]);
+  // No fixed column: one more line needs a look. Two of the four detail columns: details not followed.
+  assert.deepEqual(lines(on), ["Plan: 4 rows, columns ok", "Plan: 4 rows need a look", "Tickets: stop_id column found, 2 active rows name a stop", "Tickets: detail columns found: confirmation, holder; missing: traveler, seat (ticket details are not followed)", "Plan: following"]);
+  const full = plannerWorld({ props: { PLANNER_ID }, tabs, get: get(PLAN.map((r, i) => (i === 1 ? [...r, "fixed"] : r)), TICKETS.map((r, i) => (i === 0 ? [...r, "traveler", "seat"] : r))) });
+  full.ctx.checkPlanner();
+  assert.deepEqual(lines(full).slice(1, 4), ["Plan: 3 rows need a look", "Tickets: stop_id column found, 2 active rows name a stop", "Tickets: detail columns found: confirmation, holder, traveler, seat"]);
   const plain = plannerWorld({ props: { PLANNER_ID }, tabs, get: get(PLAN.slice(0, 3), [["ticket_id", "status", "confirmation"], ["T1", "active", "ZZ99999"]]) });
   plain.ctx.checkPlanner();
-  assert.deepEqual(lines(plain), ["Plan: 1 rows, columns ok", "Tickets: no stop_id column yet (tickets are not followed)", "Plan: not following (PLAN_FOLLOW is not on)"]);
+  assert.deepEqual(lines(plain), ["Plan: 1 rows, columns ok", "Plan: 1 rows need a look", "Tickets: no stop_id column yet (tickets are not followed)", "Plan: not following (PLAN_FOLLOW is not on)"]);
   const shut = plannerWorld({ props: { PLANNER_ID, PLAN_FOLLOW: "on" }, tabs, get: get(new Error("denied " + PLANNER_ID), new Error("denied " + PLANNER_ID)) });
   shut.ctx.checkPlanner();
   assert.deepEqual(lines(shut), ["Plan: couldn’t read it.", "Tickets: couldn’t read it.", "Plan: following"]);
   const noHead = plannerWorld({ props: { PLANNER_ID }, tabs, get: get([["stop_id", "what"], ["teststop0001", "Secret museum"]], TICKETS) });
   noHead.ctx.checkPlanner();
   assert.equal(lines(noHead)[0], "Plan: The planner’s Plan tab has no row with the columns stop_id, date, time and what.");
-  const all = [on, plain, shut, noHead].flatMap((w) => w.logged).join("\n");
+  const all = [on, full, plain, shut, noHead].flatMap((w) => w.logged).join("\n");
   assert.equal(all.includes(PLANNER_ID), false);
   assert.equal(/Secret|Hidden|Private|Off the trip|ZZ9999|Sam Example|teststop|Made-up/.test(all), false, all);
 });

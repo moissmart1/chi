@@ -3789,10 +3789,10 @@ test("untickTodo: while the tick itself is still on its way, it waits for it and
 // says nothing in this stage; it reloads when a stop changed. Every value
 // here is made up.
 
-const PL_HEAD = ["stop_id", "date", "time", "what"];
+const PL_HEAD = ["stop_id", "date", "time", "what", "booked", "fixed"];
 const PL_MUSEUM = { id: "teststop0001", date: "2026-12-28", time: "10:00", title: "Corner museum" };
 const PL_PIER = { id: "teststop0002", date: "2026-12-29", time: "", title: "Pier stop" };
-const plRow = (s) => [s.id, s.date, s.time, s.title];
+const plRow = (s) => [s.id, s.date, s.time, s.title, "", ""];
 const planPhone = ({ follow = true, plan = [PL_HEAD, plRow(PL_MUSEUM), plRow(PL_PIER)], stops = [PL_MUSEUM, PL_PIER], storage } = {}) => {
   const at = { ms: NOW };
   const fake = createFakeBackend({ ...SEED, stops, plannerId: PLANNER_ID, plannerTabs: { Plan: plan }, props: follow ? { PLAN_FOLLOW: "on" } : {} }, { clock: () => new Date(at.ms).toISOString() });
@@ -3962,6 +3962,22 @@ test("autoPlan: a moved stop's line in front of the list is not news on every as
   p.at.ms += 3 * 60 * 1000;
   assert.equal((await p.store.autoPlan()).changed, 1);
   assert.deepEqual(p.store.state.planProblems.list.map((x) => x.message), ["Moved from Mon Dec 28 in the planner. Check how to get there."]);
+  const loads = loadsOf(p);
+  p.at.ms += 3 * 60 * 1000;
+  p.fake.props.PLAN_PRINT = ""; // a full pull, which finds nothing new
+  await p.store.autoPlan();
+  assert.equal(loadsOf(p), loads, "no reload");
+});
+
+test("autoPlan: a full list (20 shown, more beyond) behind a moved stop's line is not news either", async () => {
+  const walk = { ...PL_MUSEUM, gettingThere: "Walk north" };
+  const noIds = Array.from({ length: 21 }, (_, i) => ["", "2026-12-30", "", "No id " + i, "", ""]);
+  const p = planPhone({ stops: [walk, PL_PIER], plan: [PL_HEAD, plRow({ ...PL_MUSEUM, date: "2026-12-30" }), plRow(PL_PIER), ...noIds] });
+  await p.store.boot();
+  const r = await p.store.autoPlan();
+  assert.equal(r.problems.length, 21);
+  const pp = p.store.state.planProblems;
+  assert.deepEqual([pp.list.length, pp.more, pp.list[0].row], [20, 2, null], "the moved line first, then 19 of the pull's");
   const loads = loadsOf(p);
   p.at.ms += 3 * 60 * 1000;
   p.fake.props.PLAN_PRINT = ""; // a full pull, which finds nothing new
