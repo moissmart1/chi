@@ -352,7 +352,7 @@ test("a stop with no time is allowed, and a pasted Maps link is a place", () => 
 test("stop rows round-trip, and a hand-typed row reads safely", () => {
   const s = { ...P.validateStop({ ...STOP, travelMin: 30, fixed: true, signJp: "渋谷" }, DATES).value };
   const back = P.stopFromRow(P.stopToRow(s));
-  assert.deepEqual(back, { ...s, deleted: false });
+  assert.deepEqual(back, { ...s, deleted: false, fromPlanner: false, tkFromPlanner: false, movedFrom: "" });
   assert.equal("deleted_at" in P.stopToRow(s), false);
   const hand = P.stopFromRow({ id: "h1", date: new Date(Date.UTC(2026, 11, 28)), time: "9:5", title: 7, travel_min: "abc", fixed: "TRUE", link: "javascript:x", photo: "ftp://x", deleted_at: "2026-12-17T00:00:00Z" });
   assert.deepEqual([hand.time, hand.title, hand.travelMin, hand.fixed, hand.link, hand.photo, hand.deleted], ["", "7", 0, true, "", "", true]);

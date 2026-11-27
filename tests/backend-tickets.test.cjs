@@ -383,13 +383,15 @@ test("Sheets.js: appendObjs_ writes one block, columnValues_ and cellsAt_ read i
     return sh;
   };
   const old = {};
-  for (const [tab, headers] of Object.entries(P.TABS)) if (!/^Ticket/.test(tab)) old[tab] = [tab === "Stops" ? headers.filter((h) => !/^tk_/.test(h)) : headers.slice()];
+  // The plan's three columns came after the tickets: an older Sheet lacks them too.
+  const PLAN_COLS = ["planner", "tk_planner", "moved_from"];
+  for (const [tab, headers] of Object.entries(P.TABS)) if (!/^Ticket/.test(tab)) old[tab] = [tab === "Stops" ? headers.filter((h) => !/^tk_/.test(h) && !PLAN_COLS.includes(h)) : headers.slice()];
   for (const [name, grid] of Object.entries(old)) make(name, grid);
   const ss = { getSheetByName: (n) => sheets.get(n) || null, insertSheet: (n) => make(n, []) };
   const ctx = vm.createContext({ SpreadsheetApp: { getActiveSpreadsheet: () => ss } });
   for (const f of ["Pure.js", "Sheets.js"]) vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "backend", f), "utf8"), ctx, { filename: f });
   const added = Array.from(ctx.ensureColumns_());
-  assert.deepEqual(added, [...["tk_ref", "tk_name", "tk_people", "tk_seat"].map((h) => "Stops." + h), ...P.TABS.Tickets.map((h) => "Tickets." + h), ...P.TABS.TicketData.map((h) => "TicketData." + h)]);
+  assert.deepEqual(added, [...["tk_ref", "tk_name", "tk_people", "tk_seat", ...PLAN_COLS].map((h) => "Stops." + h), ...P.TABS.Tickets.map((h) => "Tickets." + h), ...P.TABS.TicketData.map((h) => "TicketData." + h)]);
   assert.deepEqual(Array.from(ctx.ensureColumns_()), []);
   assert.deepEqual(sheets.get("TicketData").grid[0], ["ticket", "n", "data"]);
 

@@ -34,7 +34,8 @@ var TABS = {
   People: ["name", "initials", "order", "etransfer", "simplify", "email", "photo"],
   // lat and lng (where things are) came last, so they sit at the end, where migrate adds them.
   Days: ["date", "city", "title", "line_jp", "line_en", "line_colour", "from_jp", "from_en", "to_jp", "to_en", "lat", "lng"],
-  Stops: ["id", "date", "time", "title", "detail", "getting_there", "travel_min", "fixed", "place", "sign_jp", "booked", "link", "photo", "note", "deleted_at", "tk_ref", "tk_name", "tk_people", "tk_seat", "lat", "lng"],
+  // planner, tk_planner and moved_from (the plan led by the planner's Plan tab) came last, at the end.
+  Stops: ["id", "date", "time", "title", "detail", "getting_there", "travel_min", "fixed", "place", "sign_jp", "booked", "link", "photo", "note", "deleted_at", "tk_ref", "tk_name", "tk_people", "tk_seat", "lat", "lng", "planner", "tk_planner", "moved_from"],
   Stays: ["id", "name", "name_jp", "address_jp", "first_night", "last_night", "note", "place", "link", "photo", "deleted_at", "lat", "lng"],
   Expenses: ["id", "day", "title", "amount", "currency", "rate", "paid_by", "split", "split_mode", "split_vals", "note", "kind", "receipt", "added_by", "added_at", "deleted_at", "planner_id"],
   Settlements: ["id", "from", "to", "cad", "stamped_by", "stamped_at", "seed", "rot", "removed_at"],
@@ -505,11 +506,14 @@ function expenseFromRow(o) {
 }
 
 // What the Log keeps of an item: the item, minus what is read from the row
-// each time and never written back (an expense's fromPlanner).
+// each time and never written back (an expense's fromPlanner; a stop's
+// fromPlanner, tkFromPlanner and movedFrom).
+var LOG_DROPS_ = { expense: ["fromPlanner"], stop: ["fromPlanner", "tkFromPlanner", "movedFrom"] };
 function logSnap_(kind, x) {
-  if (kind !== "expense" || !x || typeof x !== "object" || !("fromPlanner" in x)) return x;
+  var drop = Object.prototype.hasOwnProperty.call(LOG_DROPS_, kind) ? LOG_DROPS_[kind] : null;
+  if (!drop || !x || typeof x !== "object" || !drop.some(function (k) { return k in x; })) return x;
   var out = {};
-  Object.keys(x).forEach(function (k) { if (k !== "fromPlanner") out[k] = x[k]; });
+  Object.keys(x).forEach(function (k) { if (drop.indexOf(k) === -1) out[k] = x[k]; });
   return out;
 }
 
@@ -586,6 +590,13 @@ function stopFromRow(o) {
     tkName: cellText_(o.tk_name),
     tkPeople: cellText_(o.tk_people),
     tkSeat: cellText_(o.tk_seat),
+    // Led by the planner's Plan tab (its day, time, name, booked and fixed),
+    // and its ticket details by the Tickets tab; the day it was moved from
+    // while its directions wait for a look. Read from the cells each time:
+    // never written from a phone or the connector, never kept in the Log.
+    fromPlanner: cellText_(o.planner) === "yes",
+    tkFromPlanner: cellText_(o.tk_planner) === "yes",
+    movedFrom: cellDate_(o.moved_from),
   };
 }
 
@@ -994,6 +1005,8 @@ function canUndo(entry, allEntries) {
   if (entry.kind === "todo" && entry.action === "takeoff") return false;
   // A note that the planner kept a Booked the app could not record.
   if (entry.kind === "planner") return false;
+  // A stop changed by the planner's Plan tab: the next read would put it back.
+  if (entry.kind === "stop" && entry.via === "planner") return false;
   if (entry.undoneBy !== null && entry.undoneBy !== undefined && entry.undoneBy !== "") return false;
   for (var i = 0; i < allEntries.length; i++) {
     var o = allEntries[i];
@@ -1617,7 +1630,250 @@ function ticketSnap_(t, stopTitle) {
   return { id: t.id, stop: t.stop, who: t.who, seat: t.seat, page: t.page, mime: t.mime, w: t.w, h: t.h, size: t.size, chunks: t.chunks, by: t.by, at: t.at, gone: t.gone === true, stopTitle: cellText_(stopTitle) };
 }
 
+// ---- the plan, led by the planner's Plan tab (README, The planner: The plan) ----
+// The planner's Plan tab holds one row per stop: its id, day, time, name,
+// booked and fixed. Its rows are untrusted text: these read them, and work
+// out (planJobs) what a pull would add, change, put back or take off in the
+// Stops tab. Nothing here talks to the planner or the Sheet.
+
+var PLAN_NEEDS_ = ["stop_id", "date", "time", "what"];
+var PLAN_MAX_ROWS_ = 200;
+// The fields of a stop the planner leads (the API's names; the Sheet's are the same).
+var PLAN_LED_ = ["date", "time", "title", "booked", "fixed"];
+// The most stops one read may take off; more (or more than half) and none are.
+var PLAN_MAX_REMOVALS_ = 8;
+
+// A Plan tab day cell as "YYYY-MM-DD", or "". ISO text that is a real day is
+// itself, on the trip or not (validateStop judges that); a number is Sheets'
+// serial day; month-name text with a year is that day; month-name text with
+// no year is read in each of the trip's years, in order, and the first that
+// is a trip day wins (else the first answer).
+function planDay(v, dayDates) {
+  if (typeof v === "number") return bookByDay(v, NaN);
+  if (typeof v !== "string") return "";
+  var once = bookByDay(v, NaN);
+  if (once !== "") return once;
+  var years = [];
+  (dayDates || []).forEach(function (d) {
+    var y = Number(String(d).slice(0, 4));
+    if (isFinite(y) && years.indexOf(y) === -1) years.push(y);
+  });
+  var first = "";
+  for (var i = 0; i < years.length; i++) {
+    var day = bookByDay(v, years[i]);
+    if (day === "") continue;
+    if (dayDates.indexOf(day) !== -1) return day;
+    if (first === "") first = day;
+  }
+  return first;
+}
+
+// A Plan tab time cell -> { ok: true, value: "HH:MM" or "" } | { ok: false }.
+// Blank is no set time. A number is a time cell (a fraction of a day). Text:
+// H:MM or HH:MM, seconds dropped, with am or pm in any case, with or without
+// a space or dots (7:00 PM is 19:00, 12:15 am is 00:15).
+var PLAN_TIME_RE_ = /^(\d{1,2}):([0-5]\d)(?::[0-5]\d)?(?:\s*([AaPp])\.?\s*[Mm]\.?)?$/;
+function planTime(v) {
+  if (typeof v === "number" || v instanceof Date) {
+    var t = cellTime_(v);
+    return t === "" ? { ok: false } : { ok: true, value: t };
+  }
+  if (v === undefined || v === null || (typeof v === "string" && v.trim() === "")) return { ok: true, value: "" };
+  if (typeof v !== "string") return { ok: false };
+  var m = PLAN_TIME_RE_.exec(v.trim());
+  if (!m) return { ok: false };
+  var h = Number(m[1]);
+  if (m[3]) {
+    if (h < 1 || h > 12) return { ok: false };
+    var pm = m[3].toLowerCase() === "p";
+    h = h % 12 + (pm ? 12 : 0);
+  } else if (h > 23) {
+    return { ok: false };
+  }
+  return { ok: true, value: pad2_(h) + ":" + m[2] };
+}
+
+// A Plan tab yes/no cell: yes, true, a ticked box, y, x or a tick mark; for
+// booked, also text that starts with the word Booked.
+function planYes(v, booked) {
+  if (plannerYes_(v)) return true;
+  var t = plannerText_(v).toLowerCase();
+  if (t === "y" || t === "x" || t === "✓") return true;
+  return booked === true && isBooked(v);
+}
+
+// rows: the Plan tab as Sheets hands it back from A1 (null or [] when there
+// is no tab); dayDates: the trip's days.
+// -> { stops: [{ id, row, date, time, timeOk, title, booked, fixed }],
+// problems: [{ id, message, row, what }], missing, capped, blind }: row is
+// the sheet's own row number; missing is why the tab can't be read at all
+// (else null); capped: more than 200 rows; blind: a row's id could not be
+// read (or the tab was cut), so no stop may be taken off on this read.
+function planFromRows(rows, dayDates) {
+  var list = Array.isArray(rows) ? rows : [];
+  var none = function (message) { return { stops: [], problems: [], missing: message, capped: false, blind: true }; };
+  if (!list.length) return none("The planner has no Plan tab to read.");
+  var h = headerAt_(list, PLAN_NEEDS_);
+  if (h === -1) return none("The planner’s Plan tab has no row with the columns stop_id, date, time and what.");
+  var head = headOf_(list[h]);
+  var width = headWidth_(head);
+  var cell = function (row, name) {
+    var c = head.indexOf(name);
+    return c === -1 || !Array.isArray(row) ? "" : row[c];
+  };
+  var stops = [];
+  var problems = [];
+  var seen = {};
+  var read = 0;
+  var capped = false;
+  for (var r = h + 1; r < list.length; r++) {
+    var row = list[r];
+    // A blank row never ends the table.
+    if (plannerBlank_(row, width)) continue;
+    if (read === PLAN_MAX_ROWS_) {
+      capped = true;
+      break;
+    }
+    read++;
+    if (headerAt_([row], PLAN_NEEDS_) === 0) continue;
+    var id = plannerText_(cell(row, "stop_id"));
+    var what = plannerWhat_(cell(row, "what"));
+    // A heading line ("Tue Dec 29"): no id and no day.
+    if (id === "" && plannerText_(cell(row, "date")) === "") continue;
+    if (id === "") {
+      problems.push({ id: "", message: "That row has no id, so it wasn’t brought in.", row: r + 1, what: what });
+      continue;
+    }
+    if (!ID_RE_.test(id)) {
+      problems.push({ id: "", message: "That row’s id isn’t usable.", row: r + 1, what: what });
+      continue;
+    }
+    if (seen[id] === true) {
+      problems.push({ id: id, message: "That id is in the Plan tab twice.", row: r + 1, what: what });
+      continue;
+    }
+    seen[id] = true;
+    var time = planTime(cell(row, "time"));
+    stops.push({
+      id: id,
+      row: r + 1,
+      date: planDay(cell(row, "date"), dayDates),
+      time: time.ok ? time.value : "",
+      timeOk: time.ok,
+      title: plannerText_(cell(row, "what")),
+      booked: planYes(cell(row, "booked"), true),
+      fixed: planYes(cell(row, "fixed"), false),
+    });
+  }
+  return { stops: stops, problems: problems, missing: null, capped: capped, blind: problems.length > 0 || capped };
+}
+
+
+function planBlind_(n) {
+  return (n === 1 ? "1 stop is" : n + " stops are") + " not in the Plan tab, and a row there has no usable id. Nothing was taken off: fix that row first.";
+}
+
+function planTooMany_(n) {
+  return "The Plan tab no longer lists " + n + (n === 1 ? " stop" : " stops") + ". That is too many to take off at once, so none were. If it’s meant, take them off a few at a time.";
+}
+
+// The planner's five fields of a stop.
+function planLed_(s) {
+  return { date: s.date, time: s.time, title: s.title, booked: s.booked, fixed: s.fixed };
+}
+
+// What a pull would do. read: planFromRows; tix: the planner's Tickets tab
+// as read (its problems only, for now); current: [{ stop, led, tkLed }] for every Stops row with
+// an id (stop as stopFromRow reads it; led its fromPlanner, tkLed its
+// tkFromPlanner); appStops: whether a phone may add stops of its own.
+// -> { adds: [{ id, row, what, value }], edits: [{ id, row, what, cols,
+// action, next }], removals: [{ id, what }], same, onlyInApp: [{ id, date,
+// time, title }], problems, held }: cols are the Sheet columns an edit
+// writes; action "edit", "restore" or "adopt" (only the markers change);
+// value is the new stop (validateStop's); held
+// is how many stops were not taken off because of a guard.
+function planJobs(read, tix, current, dayDates, appStops) {
+  tix = tix || { linked: false, byStop: {}, problems: [] };
+  var byId = {};
+  current.forEach(function (c) { byId[c.stop.id] = c; });
+  var inPlan = {};
+  read.stops.forEach(function (p) { inPlan[p.id] = true; });
+  var out = { adds: [], edits: [], removals: [], same: 0, onlyInApp: [], problems: read.problems.concat(tix.problems), held: 0 };
+
+  read.stops.forEach(function (p) {
+    var c = Object.prototype.hasOwnProperty.call(byId, p.id) ? byId[p.id] : null;
+    var what = plannerWhat_(p.title);
+    var kept = c ? " Left as it was." : "";
+    if (!p.timeOk) {
+      out.problems.push({ id: p.id, message: "Use a time like 14:30." + kept, row: p.row, what: what });
+      return;
+    }
+    var want = c ? stopFields_(c.stop) : { id: p.id };
+    PLAN_LED_.forEach(function (k) { want[k] = p[k]; });
+    want.id = p.id;
+    var v = validateStop(want, dayDates);
+    if (!v.ok) {
+      out.problems.push({ id: p.id, message: v.message + kept, row: p.row, what: what });
+      return;
+    }
+    if (!c) {
+      out.adds.push({ id: p.id, row: p.row, what: what, value: v.value });
+      return;
+    }
+    var was = stopToRow(planLed_(c.stop));
+    var now = stopToRow(planLed_(v.value));
+    var cols = {};
+    Object.keys(now).forEach(function (k) { if (!same_(now[k], was[k])) cols[k] = now[k]; });
+    var edited = Object.keys(cols).length > 0;
+    if (!c.led) cols.planner = "yes";
+    if (c.stop.deleted) cols.deleted_at = "";
+    if (v.value.date !== c.stop.date) {
+      var directions = c.stop.gettingThere !== "" || c.stop.travelMin > 0;
+      if (v.value.date === c.stop.movedFrom) cols.moved_from = "";
+      else if (c.stop.movedFrom === "" && directions) cols.moved_from = c.stop.date;
+    }
+    if (Object.keys(cols).length === 0) {
+      out.same++;
+      return;
+    }
+    var action = c.stop.deleted ? "restore" : edited ? "edit" : "adopt";
+    out.edits.push({ id: p.id, row: p.row, what: what, cols: cols, action: action, next: planLed_(v.value) });
+  });
+
+  var gone = current.filter(function (c) { return !c.stop.deleted && !inPlan[c.stop.id] && (c.led || !appStops); });
+  if (read.blind) {
+    if (gone.length) {
+      out.problems.push({ id: "", message: planBlind_(gone.length), row: null, what: "" });
+      out.held = gone.length;
+    }
+  } else if (gone.length) {
+    var base = current.filter(function (c) { return !c.stop.deleted && (appStops ? c.led : true); }).length;
+    if (gone.length > PLAN_MAX_REMOVALS_ || gone.length * 2 > base) {
+      out.problems.push({ id: "", message: planTooMany_(gone.length), row: null, what: "" });
+      out.held = gone.length;
+    } else {
+      out.removals = gone.map(function (c) { return { id: c.stop.id, what: plannerWhat_(c.stop.title) }; });
+    }
+  }
+  if (appStops) {
+    out.onlyInApp = current.filter(function (c) { return !c.stop.deleted && !c.led && !inPlan[c.stop.id]; }).map(function (c) {
+      return { id: c.stop.id, date: c.stop.date, time: c.stop.time, title: c.stop.title };
+    });
+  }
+  return out;
+}
+
+// The fields of a stop a person can change, as a fresh object (Actions.js
+// planFields_ for a stop, which Pure.js cannot reach).
+var STOP_FIELDS_ = ["date", "time", "title", "detail", "gettingThere", "travelMin", "fixed", "place", "signJp", "booked", "link", "photo", "note", "lat", "lng", "tkRef", "tkName", "tkPeople", "tkSeat"];
+function stopFields_(s) {
+  var out = { id: s.id };
+  STOP_FIELDS_.forEach(function (k) { out[k] = s[k]; });
+  return out;
+}
+
 if (typeof module !== "undefined") {
   module.exports = { TABS, KINDS, tripMismatch, rateRounded, TRIP_TZ_, TRIP_UTC_OFFSET_MS_, TRIP_ZONE_WORD_, HOME_CURRENCY_, TRIP_CURRENCY_, TRIP_FIRST_DAY_, TRIP_LAST_DAY_, isTextColumn, sanitizeCell, unsanitizeCell, rowToObj, objToRow, validateExpense, validatePayment, validatePersonPatch, validateStop, validateStay, validateDayPatch, DAY_PATCH_KEYS, safeUrl, safeHttpsUrl, dayLabel, stopFromRow, stopToRow, stayFromRow, stayToRow, dayFromRow, dayToRow, expenseFromRow, paymentFromRow, personFromRow, cellDate_, cellStamp_, summarize, undoTarget, canUndo, entryFromRow, parseLogRow, expenseToRow, paymentToRow, setupSeedRows, shouldFetchRate, rateSource, sameKey, hexOfBytes, personKeysFrom, personKeysReadable, keyHolder, blankSecrets, shortDay_, stampWindow, pressRefusal, stampDefFromRow, stampFromRow, stampSnap_, TICKET_LIMITS, validateTicket, ticketChunks, joinTicketChunks, ticketFromRow, ticketSnap_, logSnap_, coordsOf_, pointFromLink, metresBetween_,
-    paymentsFromRows, expenseFromPayment, paymentIdOf, todosFromRows, bookByDay, todoFromRow, isBooked, colLetter, changeLogRow, plannerWhat_ };
+    paymentsFromRows, expenseFromPayment, paymentIdOf, todosFromRows, bookByDay, todoFromRow, isBooked, colLetter, changeLogRow, plannerWhat_,
+    planDay, planTime, planYes, planFromRows, planJobs, PLAN_LED_, PLAN_MAX_REMOVALS_ };
 }
