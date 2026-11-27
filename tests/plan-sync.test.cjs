@@ -507,3 +507,167 @@ test("the print: an unchanged tab on an auto ask takes no lock and reads no Stop
   assert.equal(locks, locksNow + 1, "the pull takes the lock");
   clean(call);
 });
+
+// ---------- the guards on a phone's and the connector's writes ----------
+
+const T = { t: "claude-token" };
+const rpc = (name, args) => ({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args } });
+const mcpText = (r) => JSON.stringify(r);
+const LED = "The day, time and name of this stop come from the planner. Change them there and they come in here.";
+
+// A world where the three stops are already the planner's (one pull done).
+async function adopted(opts) {
+  const call = linked(opts);
+  const r = await call("syncPlan", {});
+  assert.equal(r.data.adopted, 3, JSON.stringify(r));
+  later(call, 20);
+  return call;
+}
+
+test("guards: a planner stop's day, time, name, booked and fixed are refused from a phone and the connector; its own detail saves; a restated value passes", async () => {
+  const call = await adopted();
+  for (const patch of [{ time: "12:00" }, { date: "2026-12-29" }, { title: "Renamed here" }, { booked: false }, { fixed: true }, { note: "ok", title: "Renamed here" }]) {
+    const r = await call("updateStop", { id: FULL.id, patch });
+    assert.deepEqual([r.ok, r.error, r.message], [false, "planner_led", LED], JSON.stringify(patch));
+  }
+  const viaClaude = call.fake.mcp(rpc("change_stop", { id: FULL.id, time: "12:00" }), T);
+  assert.ok(mcpText(viaClaude).includes(LED), mcpText(viaClaude));
+  assert.equal(stored(call, FULL.id).time, "10:00");
+  // An older phone's whole-stop patch, restating the five as they are, saves its detail.
+  const whole = { date: "2026-12-28", time: "10:00", title: " Corner museum ", booked: true, fixed: false, detail: "A new line of ours" };
+  const ok = await call("updateStop", { id: FULL.id, patch: whole });
+  assert.equal(ok.ok, true, JSON.stringify(ok));
+  assert.equal(ok.data.stop.detail, "A new line of ours");
+  assert.equal(ok.data.stop.fromPlanner, true);
+  const viaClaudeOk = call.fake.mcp(rpc("change_stop", { id: FULL.id, note: "From the connector" }), T);
+  assert.equal(viaClaudeOk.result.isError, undefined, mcpText(viaClaudeOk));
+  assert.equal(stored(call, FULL.id).note, "From the connector");
+  clean(call);
+});
+
+test("guards: a planner stop can't be removed; one the planner took off can't be put back; an app stop works as today", async () => {
+  const call = await adopted({ stops: [FULL, APP_PIER, APP_SHOW, { id: "teststop0004", date: "2026-12-28", title: "Our own extra" }] });
+  const own = "This stop comes from the planner. Take its row out there and it goes from here.";
+  const r = await call("deleteStop", { id: FULL.id });
+  assert.deepEqual([r.ok, r.error, r.message], [false, "planner_led", own]);
+  assert.ok(mcpText(call.fake.mcp(rpc("remove_stop", { id: FULL.id }), T)).includes(own));
+  assert.equal(stored(call, FULL.id).deleted_at, "");
+  // The planner takes the pier off; it can't be put back here.
+  setPlan(call, MUSEUM, SHOW);
+  assert.equal((await call("syncPlan", {})).data.removed, 1);
+  const back = await call("restoreStop", { id: "teststop0002" });
+  assert.deepEqual([back.ok, back.error, back.message], [false, "planner_led", "This stop was taken off in the planner. Put its row back there and it comes back here."]);
+  assert.notEqual(stored(call, "teststop0002").deleted_at, "");
+  // The app's own stop: removed and put back as today.
+  assert.equal((await call("deleteStop", { id: "teststop0004" })).ok, true);
+  assert.equal((await call("restoreStop", { id: "teststop0004" })).ok, true);
+  const edit = await call("updateStop", { id: "teststop0004", patch: { time: "08:00", title: "Our own breakfast" } });
+  assert.equal(edit.ok, true, JSON.stringify(edit));
+  clean(call);
+});
+
+test("guards: a planner change can't be undone; an older app change on a stop the planner now leads undoes only its own detail", async () => {
+  const call = linked({ follow: false, plan: [HEAD, prow({ ...MUSEUM, time: "10:45" }), prow(PIER), prow(SHOW)] });
+  // Before following: the app changed the museum's note and time; the Plan tab was made with that time.
+  const e = await call("updateStop", { id: FULL.id, patch: { note: "Changed in the app", time: "10:45" } });
+  assert.equal(e.ok, true);
+  call.fake.props.PLAN_FOLLOW = "on";
+  assert.deepEqual(counts((await call("syncPlan", {})).data), [0, 0, 0, 0, 3, 0], "adopted: no line of its own");
+  // Undo of that older change: the note goes back, the planner's time stays.
+  const u = await call("undo", { logId: e.data.logId });
+  assert.equal(u.ok, true, JSON.stringify(u));
+  assert.deepEqual([stored(call, FULL.id).note, stored(call, FULL.id).time], ["Our note", "10:45"]);
+  assert.equal(u.data.stop.fromPlanner, true);
+  // A change from the planner: refused, from a phone and the connector.
+  later(call, 20);
+  setPlan(call, { ...MUSEUM, time: "11:00" }, PIER, SHOW);
+  assert.equal((await call("syncPlan", {})).data.changed, 1);
+  const planLine = logRows(call).at(-1);
+  assert.deepEqual([planLine.via, planLine.action, planLine.who], ["planner", "edit", "Mo"]);
+  const u1 = await call("undo", { logId: Number(planLine.id) });
+  assert.deepEqual([u1.ok, u1.error, u1.message], [false, "stale", "That change came from the planner. Change it there and it comes in here."]);
+  const viaClaude = call.fake.mcp(rpc("undo", { log_id: Number(planLine.id) }), T);
+  assert.ok(mcpText(viaClaude).includes("That change came from the planner."), mcpText(viaClaude));
+  assert.equal(stored(call, FULL.id).time, "11:00");
+  // An app change on it after the planner's: undone as today (its own detail).
+  const own = await call("updateStop", { id: FULL.id, patch: { detail: "Second line" } });
+  assert.equal((await call("undo", { logId: own.data.logId })).ok, true);
+  assert.deepEqual([stored(call, FULL.id).detail, stored(call, FULL.id).time], ["Our own line", "11:00"]);
+  clean(call);
+});
+
+test("guards: undo of an app add, once the planner leads that stop, has nothing of its own to put back", async () => {
+  const call = linked({ stops: [FULL, APP_PIER, APP_SHOW] });
+  const add = await call("addStop", { stop: { id: "teststop0004", date: "2026-12-28", title: "Our own extra" } });
+  assert.equal(add.ok, true);
+  setPlan(call, MUSEUM, PIER, SHOW, { stop_id: "teststop0004", date: "2026-12-28", what: "Our own extra" });
+  assert.equal((await call("syncPlan", {})).data.adopted, 4);
+  const u = await call("undo", { logId: add.data.logId });
+  assert.deepEqual([u.ok, u.error, u.message], [false, "stale", LED]);
+  assert.equal(stored(call, "teststop0004").deleted_at, "");
+  clean(call);
+});
+
+test("guards hold only while following: with the switch off the same stop is the app's in every way", async () => {
+  const call = await adopted();
+  delete call.fake.props.PLAN_FOLLOW;
+  const r = await call("updateStop", { id: FULL.id, patch: { time: "12:00" } });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.equal(r.data.stop.fromPlanner, false, "a reply says so too");
+  assert.equal((await call("deleteStop", { id: FULL.id })).ok, true);
+  clean(call);
+});
+
+test("picture C (PLAN_APP_STOPS_ false): no stop is added on a phone or through the connector while following", async () => {
+  const call = await adopted();
+  call.fake.world.PLAN_APP_STOPS_ = false;
+  const off = "New stops go in the planner’s Plan tab. They come in here within a few minutes.";
+  const r = await call("addStop", { stop: { id: "teststop0004", date: "2026-12-28", title: "Our own extra" } });
+  assert.deepEqual([r.ok, r.error, r.message], [false, "planner_led", off]);
+  assert.ok(mcpText(call.fake.mcp(rpc("add_stop", { date: "2026-12-28", title: "Our own extra" }), T)).includes(off));
+  assert.equal(stored(call, "teststop0004"), undefined);
+  delete call.fake.props.PLAN_FOLLOW;
+  assert.equal((await call("addStop", { stop: { id: "teststop0004", date: "2026-12-28", title: "Our own extra" } })).ok, true, "not following: as today");
+  clean(call);
+});
+
+test("moved: load lists a stop the planner moved to another day while its directions wait for a look; editing them clears it", async () => {
+  const call = await adopted();
+  setPlan(call, { ...MUSEUM, date: "2026-12-30" }, PIER, SHOW);
+  await call("syncPlan", {});
+  const moved = { id: FULL.id, message: "Moved from Mon Dec 28 in the planner. Check how to get there.", row: null, what: "Corner museum" };
+  const l = (await call("load")).data;
+  assert.deepEqual(l.planProblems.list, [moved]);
+  assert.equal(l.stops.find((s) => s.id === FULL.id).movedFrom, "2026-12-28");
+  // Under the check key too: no private value is in it.
+  assert.deepEqual((await call.fake({ key: CHECK_KEY, action: "load", args: {} })).data.planProblems.list, [moved]);
+  // A detail edit leaves it; a change of directions clears it.
+  await call("updateStop", { id: FULL.id, patch: { note: "Still to check" } });
+  assert.equal((await call("load")).data.planProblems.list.length, 1);
+  const r = await call("updateStop", { id: FULL.id, patch: { gettingThere: "Bus 6 south" } });
+  assert.equal(r.data.stop.movedFrom, "");
+  assert.deepEqual((await call("load")).data.planProblems.list, []);
+  assert.equal(stored(call, FULL.id).moved_from, "");
+  // Minutes count as a look too.
+  later(call, 20);
+  setPlan(call, MUSEUM, PIER, SHOW);
+  await call("syncPlan", {});
+  assert.equal((await call("load")).data.planProblems.list.length, 1, "moved back: from Dec 30 now");
+  await call("updateStop", { id: FULL.id, patch: { travelMin: 15 } });
+  assert.deepEqual((await call("load")).data.planProblems.list, []);
+  clean(call);
+});
+
+test("load's planProblems: the pull's own list after the moved lines, at most 20, more counting the rest", async () => {
+  const rows = [];
+  for (let i = 1; i <= 25; i++) rows.push({ stop_id: "", date: "2026-12-28", what: "Row " + i });
+  const call = await adopted();
+  setPlan(call, MUSEUM, PIER, SHOW, ...rows);
+  const r = await call("syncPlan", {});
+  assert.equal(r.data.problems.length, 25);
+  const p = (await call("load")).data.planProblems;
+  assert.equal(p.at, call.at.now);
+  assert.deepEqual([p.list.length, p.more], [20, 5]);
+  assert.deepEqual(p.list[0], { id: "", message: "That row has no id, so it wasn’t brought in.", row: 5, what: "Row 1" });
+  clean(call);
+});

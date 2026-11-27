@@ -422,12 +422,7 @@ function load_(holder) {
         st.tkName = "";
       }
       // Not following the planner: every stop is the app's, whatever its cells say.
-      if (!following) {
-        st.fromPlanner = false;
-        st.tkFromPlanner = false;
-        st.movedFrom = "";
-      }
-      return st;
+      return stopShown_(st, following);
     }),
     stays: readTable_("Stays").filter(function (r) { return cellText_(r.id) !== ""; }).map(stayFromRow),
     expenses: readTable_("Expenses").filter(function (r) { return cellText_(r.id) !== ""; }).map(expenseFromRow),
@@ -902,8 +897,18 @@ function editPlanItem_(kind, ref, cur, next, ctx) {
 
 function planReply_(kind, item, logId) {
   var data = { logId: logId };
-  data[kind] = item;
+  data[kind] = kind === "stop" ? stopShown_(item, planFollow_()) : item;
   return data;
+}
+
+// A stop as a reply gives it: while the app does not follow the planner,
+// every stop is the app's, whatever its cells say.
+function stopShown_(st, following) {
+  if (following || !st) return st;
+  st.fromPlanner = false;
+  st.tkFromPlanner = false;
+  st.movedFrom = "";
+  return st;
 }
 
 // Coordinates come only from the app (a pasted Maps link) or locate: the
@@ -913,6 +918,8 @@ function claudeCoords_(input, ctx) {
 }
 
 function addStop_(args, ctx) {
+  // Every stop is a Plan tab row (picture C): none is added here.
+  if (!PLAN_APP_STOPS_ && planFollow_()) return err_("planner_led", MSG_.planAddOff);
   if (claudeCoords_(args.stop, ctx)) return err_("bad_input", MSG_.stopPatchKey);
   var v = validateStop(args.stop, tripDates_());
   if (!v.ok) return err_("bad_input", v.message);
@@ -946,6 +953,12 @@ function updateStop_(args, ctx) {
   merged.id = id;
   var v = validateStop(merged, tripDates_());
   if (!v.ok) return err_("bad_input", v.message);
+  // A stop the planner leads: its five fields change only there. A key that
+  // restates the value it has passes (an older phone sends the whole stop).
+  var following = planFollow_();
+  if (following && cur.fromPlanner && keys.some(function (k) { return PLAN_LED_.indexOf(k) !== -1 && !same_(v.value[k], cur[k]); })) {
+    return err_("planner_led", MSG_.plannerLed);
+  }
   if (v.value.lat !== "" && !hasColumn_("Stops", "lat")) return err_("needs_migrate", MSG_.needsMigrate);
   if (factsNeedMigrate_(v.value)) return err_("needs_migrate", MSG_.needsMigrate);
   // A new place: the old coordinates were for the old one (unless new ones came with it).
@@ -953,7 +966,14 @@ function updateStop_(args, ctx) {
     v.value.lat = "";
     v.value.lng = "";
   }
-  return editPlanItem_("stop", id, cur, v.value, ctx);
+  var done = editPlanItem_("stop", id, cur, v.value, ctx);
+  // Moved by the planner to another day: once its directions or minutes are
+  // changed they have had their look.
+  if (following && done.ok && cur.movedFrom !== "" && (v.value.gettingThere !== cur.gettingThere || v.value.travelMin !== cur.travelMin)) {
+    updateById_("Stops", id, { moved_from: "" });
+    done.data.stop.movedFrom = "";
+  }
+  return done;
 }
 
 // ---- where things are: locate ----
@@ -1148,10 +1168,24 @@ function setPlanDeleted_(kind, args, ctx, deleted) {
   if (!row) return err_("not_found", plan.missing);
   var cur = plan.fromRow(row);
   if (cur.deleted === deleted) return ok_(planReply_(kind, cur, null), rev_());
+  // Whether a stop exists is the planner's, for the stops it leads.
+  if (kind === "stop" && planFollow_()) {
+    if (deleted && cur.fromPlanner) return err_("planner_led", MSG_.plannerOwnsStop);
+    if (!deleted && plannerTookOff_(id)) return err_("planner_led", MSG_.plannerTookOff);
+  }
   var saved = writePlan_(plan, id, { deleted_at: deleted ? nowIso_() : "" });
   var action = deleted ? "delete" : "restore";
   var log = appendLog_(ctx, action, kind, id, summarize(action, kind, cur, saved), cur, saved);
   return ok_(planReply_(kind, saved, log.id), bumpRev_());
+}
+
+// Whether a stop's last History line is the planner taking it off.
+function plannerTookOff_(id) {
+  var last = null;
+  logRows_().forEach(function (r) {
+    if (cellText_(r.kind) === "stop" && cellText_(r.ref) === id && (last === null || Number(r.id) > Number(last.id))) last = r;
+  });
+  return last !== null && cellText_(last.action) === "delete" && cellText_(last.via) === "planner";
 }
 
 function setDay_(args, ctx) {
@@ -2363,6 +2397,9 @@ function undo_(args, ctx) {
   if (entry.kind === "ticket") return undoTicket_(entry, rows, ctx);
   var plan = planKind_(entry.kind);
   if (entry.kind !== "expense" && entry.kind !== "payment" && !plan) return err_("stale", MSG_.cantUndo);
+  // A planner change is undone in the planner (the next read would put it back).
+  var following = planFollow_();
+  if (entry.kind === "stop" && entry.via === "planner") return err_("stale", following ? MSG_.plannerUndo : MSG_.cantUndo);
   if (entry.undoneBy !== null) return err_("stale", MSG_.undone);
   if (!canUndo(entry, rows.map(logShape_))) return err_("stale", MSG_.newer);
   if (!entry.before && !entry.after) return err_("stale", MSG_.cantUndo);
@@ -2393,7 +2430,13 @@ function undo_(args, ctx) {
       }
     }
     if (plan.deletable) patch.deleted_at = target.deleted ? (cur.deleted ? undefined : nowIso_()) : "";
+    // An older change of a stop the planner now leads undoes only its own detail.
+    if (entry.kind === "stop" && following && cur.fromPlanner) {
+      PLAN_LED_.concat(["deleted_at"]).forEach(function (k) { delete patch[k]; });
+      if (!Object.keys(patch).some(function (k) { return patch[k] !== undefined; })) return err_("stale", MSG_.plannerLed);
+    }
     saved = writePlan_(plan, entry.ref, patch);
+    if (entry.kind === "stop") saved = stopShown_(saved, following);
   } else if (isExpense) {
     cur = expenseFromRow(curRow);
     patch = expenseToRow(editableOf_(target));
