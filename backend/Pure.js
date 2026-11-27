@@ -1640,6 +1640,9 @@ var PLAN_NEEDS_ = ["stop_id", "date", "time", "what"];
 var PLAN_MAX_ROWS_ = 200;
 // The fields of a stop the planner leads (the API's names; the Sheet's are the same).
 var PLAN_LED_ = ["date", "time", "title", "booked", "fixed"];
+// The planner's Tickets tab is followed once it has these (stop_id is added there by hand).
+var PLAN_TICKET_NEEDS_ = ["ticket_id", "stop_id", "status"];
+var PLAN_TICKET_MAX_ROWS_ = 300;
 // The most stops one read may take off; more (or more than half) and none are.
 var PLAN_MAX_REMOVALS_ = 8;
 
@@ -1769,6 +1772,73 @@ function planFromRows(rows, dayDates) {
 }
 
 
+// The different non-blank values, in order.
+function planUniq_(values) {
+  var out = [];
+  values.forEach(function (v) { if (v !== "" && out.indexOf(v) === -1) out.push(v); });
+  return out;
+}
+
+// rows: the planner's Tickets tab as Sheets hands it back from A1; names: the
+// people on the trip. Until it has a stop_id column (with ticket_id and
+// status) it is not linked, and that is not a problem.
+// -> { linked, byStop: { [stopId]: { tkRef, tkName, tkPeople, tkSeat } }, problems }:
+// from the rows whose status is active, per stop. A problem's what is a few
+// words of the row's title, never a ticket value.
+function planTicketsFromRows(rows, names) {
+  var list = Array.isArray(rows) ? rows : [];
+  var off = { linked: false, byStop: {}, problems: [] };
+  if (!list.length) return off;
+  var h = headerAt_(list, PLAN_TICKET_NEEDS_);
+  if (h === -1) return off;
+  var head = headOf_(list[h]);
+  var width = headWidth_(head);
+  var cell = function (row, name) {
+    var c = head.indexOf(name);
+    return c === -1 || !Array.isArray(row) ? "" : plannerText_(row[c]);
+  };
+  var rowsOf = {};
+  var order = [];
+  var problems = [];
+  var read = 0;
+  for (var r = h + 1; r < list.length; r++) {
+    var row = list[r];
+    if (plannerBlank_(row, width)) continue;
+    if (read === PLAN_TICKET_MAX_ROWS_) break;
+    read++;
+    if (headerAt_([row], PLAN_TICKET_NEEDS_) === 0) continue;
+    var stop = cell(row, "stop_id");
+    if (stop === "" || cell(row, "status").toLowerCase() !== "active") continue;
+    if (!ID_RE_.test(stop)) {
+      problems.push({ id: "", message: "That ticket row’s stop id isn’t usable.", row: r + 1, what: plannerWhat_(cell(row, "title")) });
+      continue;
+    }
+    if (!Object.prototype.hasOwnProperty.call(rowsOf, stop)) {
+      rowsOf[stop] = [];
+      order.push(stop);
+    }
+    rowsOf[stop].push({ ref: cell(row, "confirmation"), holder: cell(row, "holder"), traveler: cell(row, "traveler"), seat: cell(row, "seat") });
+  }
+  var everyone = (names || []).join(", ");
+  var byStop = {};
+  order.forEach(function (stop) {
+    var got = rowsOf[stop];
+    var people = got.map(function (x) { return x.traveler.toLowerCase() === "all" ? everyone : x.traveler; });
+    var seated = got.filter(function (x) { return x.seat !== ""; });
+    var seats = planUniq_(seated.map(function (x) { return x.seat; }));
+    var seat = seats.length === 0 ? "" : seats.length === 1 ? seats[0] : seated.map(function (x) { return (x.traveler + " " + x.seat).trim(); }).join(", ");
+    byStop[stop] = {
+      tkRef: cutText_(planUniq_(got.map(function (x) { return x.ref; })).join(" / "), TICKET_LIMITS.fact),
+      tkName: cutText_(planUniq_(got.map(function (x) { return x.holder; })).join(", "), TICKET_LIMITS.fact),
+      tkPeople: cutText_(planUniq_(people).join(", "), TICKET_LIMITS.fact),
+      tkSeat: cutText_(seat, TICKET_LIMITS.fact),
+    };
+  });
+  return { linked: true, byStop: byStop, problems: problems };
+}
+
+var PLAN_TICKET_COLS_ = [["tkRef", "tk_ref"], ["tkName", "tk_name"], ["tkPeople", "tk_people"], ["tkSeat", "tk_seat"]];
+
 function planBlind_(n) {
   return (n === 1 ? "1 stop is" : n + " stops are") + " not in the Plan tab, and a row there has no usable id. Nothing was taken off: fix that row first.";
 }
@@ -1782,15 +1852,15 @@ function planLed_(s) {
   return { date: s.date, time: s.time, title: s.title, booked: s.booked, fixed: s.fixed };
 }
 
-// What a pull would do. read: planFromRows; tix: the planner's Tickets tab
-// as read (its problems only, for now); current: [{ stop, led, tkLed }] for every Stops row with
+// What a pull would do. read: planFromRows; tix: planTicketsFromRows (or the
+// not-linked shape); current: [{ stop, led, tkLed }] for every Stops row with
 // an id (stop as stopFromRow reads it; led its fromPlanner, tkLed its
 // tkFromPlanner); appStops: whether a phone may add stops of its own.
-// -> { adds: [{ id, row, what, value }], edits: [{ id, row, what, cols,
+// -> { adds: [{ id, row, what, value, tk }], edits: [{ id, row, what, cols,
 // action, next }], removals: [{ id, what }], same, onlyInApp: [{ id, date,
 // time, title }], problems, held }: cols are the Sheet columns an edit
 // writes; action "edit", "restore" or "adopt" (only the markers change);
-// value is the new stop (validateStop's); held
+// value is the new stop (validateStop's), tk its ticket facts or null; held
 // is how many stops were not taken off because of a guard.
 function planJobs(read, tix, current, dayDates, appStops) {
   tix = tix || { linked: false, byStop: {}, problems: [] };
@@ -1799,6 +1869,7 @@ function planJobs(read, tix, current, dayDates, appStops) {
   var inPlan = {};
   read.stops.forEach(function (p) { inPlan[p.id] = true; });
   var out = { adds: [], edits: [], removals: [], same: 0, onlyInApp: [], problems: read.problems.concat(tix.problems), held: 0 };
+  var factsOf = function (id) { return tix.linked && Object.prototype.hasOwnProperty.call(tix.byStop, id) ? tix.byStop[id] : null; };
 
   read.stops.forEach(function (p) {
     var c = Object.prototype.hasOwnProperty.call(byId, p.id) ? byId[p.id] : null;
@@ -1816,8 +1887,9 @@ function planJobs(read, tix, current, dayDates, appStops) {
       out.problems.push({ id: p.id, message: v.message + kept, row: p.row, what: what });
       return;
     }
+    var f = factsOf(p.id);
     if (!c) {
-      out.adds.push({ id: p.id, row: p.row, what: what, value: v.value });
+      out.adds.push({ id: p.id, row: p.row, what: what, value: v.value, tk: f });
       return;
     }
     var was = stopToRow(planLed_(c.stop));
@@ -1831,6 +1903,21 @@ function planJobs(read, tix, current, dayDates, appStops) {
       var directions = c.stop.gettingThere !== "" || c.stop.travelMin > 0;
       if (v.value.date === c.stop.movedFrom) cols.moved_from = "";
       else if (c.stop.movedFrom === "" && directions) cols.moved_from = c.stop.date;
+    }
+    // The ticket details the Tickets tab leads, once it names stops: when no
+    // active row names this stop any more, the details stay and are the app's again.
+    if (tix.linked) {
+      if (f) {
+        PLAN_TICKET_COLS_.forEach(function (tc) {
+          if (f[tc[0]] !== c.stop[tc[0]]) {
+            cols[tc[1]] = f[tc[0]];
+            edited = true;
+          }
+        });
+        if (!c.tkLed) cols.tk_planner = "yes";
+      } else if (c.tkLed) {
+        cols.tk_planner = "";
+      }
     }
     if (Object.keys(cols).length === 0) {
       out.same++;
@@ -1875,5 +1962,5 @@ function stopFields_(s) {
 if (typeof module !== "undefined") {
   module.exports = { TABS, KINDS, tripMismatch, rateRounded, TRIP_TZ_, TRIP_UTC_OFFSET_MS_, TRIP_ZONE_WORD_, HOME_CURRENCY_, TRIP_CURRENCY_, TRIP_FIRST_DAY_, TRIP_LAST_DAY_, isTextColumn, sanitizeCell, unsanitizeCell, rowToObj, objToRow, validateExpense, validatePayment, validatePersonPatch, validateStop, validateStay, validateDayPatch, DAY_PATCH_KEYS, safeUrl, safeHttpsUrl, dayLabel, stopFromRow, stopToRow, stayFromRow, stayToRow, dayFromRow, dayToRow, expenseFromRow, paymentFromRow, personFromRow, cellDate_, cellStamp_, summarize, undoTarget, canUndo, entryFromRow, parseLogRow, expenseToRow, paymentToRow, setupSeedRows, shouldFetchRate, rateSource, sameKey, hexOfBytes, personKeysFrom, personKeysReadable, keyHolder, blankSecrets, shortDay_, stampWindow, pressRefusal, stampDefFromRow, stampFromRow, stampSnap_, TICKET_LIMITS, validateTicket, ticketChunks, joinTicketChunks, ticketFromRow, ticketSnap_, logSnap_, coordsOf_, pointFromLink, metresBetween_,
     paymentsFromRows, expenseFromPayment, paymentIdOf, todosFromRows, bookByDay, todoFromRow, isBooked, colLetter, changeLogRow, plannerWhat_,
-    planDay, planTime, planYes, planFromRows, planJobs, PLAN_LED_, PLAN_MAX_REMOVALS_ };
+    planDay, planTime, planYes, planFromRows, planTicketsFromRows, planJobs, PLAN_LED_, PLAN_MAX_REMOVALS_ };
 }

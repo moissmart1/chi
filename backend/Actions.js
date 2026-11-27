@@ -966,6 +966,9 @@ function updateStop_(args, ctx) {
   if (following && cur.fromPlanner && keys.some(function (k) { return PLAN_LED_.indexOf(k) !== -1 && !same_(v.value[k], cur[k]); })) {
     return err_("planner_led", MSG_.plannerLed);
   }
+  if (following && cur.tkFromPlanner && keys.some(function (k) { return TICKET_FACTS_.indexOf(k) !== -1 && v.value[k] !== cur[k]; })) {
+    return err_("planner_led", MSG_.plannerTicket);
+  }
   if (v.value.lat !== "" && !hasColumn_("Stops", "lat")) return err_("needs_migrate", MSG_.needsMigrate);
   if (factsNeedMigrate_(v.value)) return err_("needs_migrate", MSG_.needsMigrate);
   // A new place: the old coordinates were for the old one (unless new ones came with it).
@@ -2264,6 +2267,17 @@ function planRead_() {
   }
 }
 
+// The planner's Tickets tab as planTicketsFromRows reads it, read with no
+// lock held. A read that fails is not linked this time, with one problem:
+// the stops still come in, and no ticket detail is let go.
+function planTickets_(names) {
+  try {
+    return planTicketsFromRows(plannerTab_(PLAN_TICKETS_TAB_), names);
+  } catch (e) {
+    return { linked: false, byStop: {}, problems: [{ id: "", message: "The planner’s Tickets tab couldn’t be read this time.", row: null, what: "" }] };
+  }
+}
+
 // Every Stops row with an id, as planJobs takes it: { stop, led, tkLed }.
 function planCurrent_() {
   return readTable_("Stops").filter(function (r) { return cellText_(r.id) !== ""; }).map(function (r) {
@@ -2283,7 +2297,7 @@ function syncPlan_(args, ctx) {
   var started = nowIso_();
   var got = planRead_();
   if (got.error) return got.error;
-  var tix = { linked: false, byStop: {}, problems: [] };
+  var tix = planTickets_(ctx.names);
   var dayDates = tripDates_();
   var read = planFromRows(got.rows, dayDates);
   if (read.missing) return err_("planner_columns", read.missing);
@@ -2346,6 +2360,14 @@ function pullPlan_(read, tix, dayDates, ctx) {
     var row = stopToRow(job.value);
     row.deleted_at = "";
     row.planner = "yes";
+    // Ticket details the Tickets tab already has for it come in with it.
+    if (job.tk) {
+      row.tk_ref = job.tk.tkRef;
+      row.tk_name = job.tk.tkName;
+      row.tk_people = job.tk.tkPeople;
+      row.tk_seat = job.tk.tkSeat;
+      row.tk_planner = "yes";
+    }
     appendObj_("Stops", row);
     var saved = stopFromRow(findRow_("Stops", job.id));
     writes++;
@@ -2372,7 +2394,7 @@ function planDiff_() {
   if (!plannerId_()) return err_("no_planner", MSG_.noPlanner);
   var got = planRead_();
   if (got.error) return got.error;
-  var tix = { linked: false, byStop: {}, problems: [] };
+  var tix = planTickets_(peopleNames_());
   var dayDates = tripDates_();
   var read = planFromRows(got.rows, dayDates);
   if (read.missing) return err_("planner_columns", read.missing);
@@ -2399,8 +2421,21 @@ function planDiff_() {
     same: jobs.same,
     problems: jobs.problems,
     held: jobs.held,
-    tickets: [],
+    tickets: planDiffTickets_(jobs),
   }, rev_());
+}
+
+// The stops whose ticket details a pull would change: their id and name, never a value.
+function planDiffTickets_(jobs) {
+  var out = [];
+  var facts = ["tk_ref", "tk_name", "tk_people", "tk_seat"];
+  jobs.edits.forEach(function (j) {
+    if (facts.some(function (k) { return Object.prototype.hasOwnProperty.call(j.cols, k); })) out.push({ id: j.id, title: j.next.title });
+  });
+  jobs.adds.forEach(function (j) {
+    if (j.tk && TICKET_FACTS_.some(function (k) { return j.tk[k] !== ""; })) out.push({ id: j.id, title: j.value.title });
+  });
+  return out;
 }
 
 // What load gives as planProblems: the last pull's list, and in front of it
@@ -2478,8 +2513,9 @@ function undo_(args, ctx) {
     }
     if (plan.deletable) patch.deleted_at = target.deleted ? (cur.deleted ? undefined : nowIso_()) : "";
     // An older change of a stop the planner now leads undoes only its own detail.
-    if (entry.kind === "stop" && following && cur.fromPlanner) {
-      PLAN_LED_.concat(["deleted_at"]).forEach(function (k) { delete patch[k]; });
+    if (entry.kind === "stop" && following && (cur.fromPlanner || cur.tkFromPlanner)) {
+      var led = (cur.fromPlanner ? PLAN_LED_.concat(["deleted_at"]) : []).concat(cur.tkFromPlanner ? ["tk_ref", "tk_name", "tk_people", "tk_seat"] : []);
+      led.forEach(function (k) { delete patch[k]; });
       if (!Object.keys(patch).some(function (k) { return patch[k] !== undefined; })) return err_("stale", MSG_.plannerLed);
     }
     saved = writePlan_(plan, entry.ref, patch);

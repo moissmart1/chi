@@ -299,7 +299,8 @@ const later = (call, seconds) => { call.at.now = new Date(Date.parse(call.at.now
 const stored = (call, id) => call.fake.tables.Stops.find((r) => r.id === id);
 const planOf = (call) => call.fake.planner.tabs.Plan;
 const setPlan = (call, ...rows) => { call.fake.planner.tabs.Plan = [HEAD, ...rows.map(prow)]; };
-const planReads = (call) => call.fake.planner.calls.filter((c) => c.op === "read").length;
+// Reads of the Plan tab (each real read also reads the Tickets tab).
+const planReads = (call) => call.fake.planner.calls.filter((c) => c.op === "read" && c.tab === "Plan").length;
 const logRows = (call) => call.fake.tables.Log;
 const loadStops = async (call) => (await call("load")).data.stops;
 const counts = (d) => [d.added, d.changed, d.removed, d.restored, d.adopted, d.same];
@@ -319,7 +320,7 @@ test("off is off: with PLAN_FOLLOW unset syncPlan answers off and reads nothing;
   assert.equal(r.ok, true, JSON.stringify(r));
   assert.deepEqual(r.data, { added: 0, changed: 0, removed: 0, restored: 0, adopted: 0, same: 0, problems: [], more: false, pulledAt: "", off: true, skipped: true });
   assert.equal((await call("syncPlan", { auto: true })).data.off, true);
-  assert.equal(planReads(call), 0, "no planner read at all");
+  assert.equal(call.fake.planner.calls.length, 0, "no planner read at all");
   const l = (await call("load")).data;
   assert.deepEqual([l.planFollow, l.planPulledAt, l.planProblems], [false, "", { at: "", list: [], more: 0 }]);
   assert.ok(l.stops.every((s) => s.fromPlanner === false && s.tkFromPlanner === false && s.movedFrom === ""));
@@ -736,4 +737,148 @@ test("planDiff: no planner, an unreadable planner and a missing tab say so, neve
   assert.deepEqual(o.edits.map((e) => e.action), ["adopt", "adopt", "adopt"]);
   clean(call);
   clean(old);
+});
+
+// ---------- the Tickets tab (stage 1b) ----------
+
+const THEAD = ["ticket_id", "stop_id", "title", "traveler", "holder", "confirmation", "seat", "status", "file"];
+const trow = (o) => THEAD.map((h) => (o[h] === undefined ? "" : o[h]));
+const NAMES = ["Mo", "Izzah"];
+const TK1 = { ticket_id: "T01", stop_id: "teststop0001", title: "Museum entry", traveler: "Mo", holder: "Sam Example", confirmation: "ZZ99999", seat: "", status: "active" };
+const TK2 = { ...TK1, ticket_id: "T02", traveler: "Izzah" };
+
+test("planTicketsFromRows: no stop_id column is not linked and no problem; the active rows of a stop give its four details", () => {
+  assert.deepEqual(P.planTicketsFromRows([["ticket_id", "title", "status"], ["T01", "Museum entry", "active"]], NAMES), { linked: false, byStop: {}, problems: [] });
+  assert.deepEqual(P.planTicketsFromRows(null, NAMES), { linked: false, byStop: {}, problems: [] });
+  assert.deepEqual(P.planTicketsFromRows([], NAMES), { linked: false, byStop: {}, problems: [] });
+  const r = P.planTicketsFromRows([THEAD, trow(TK1), trow(TK2), trow({ ...TK1, ticket_id: "T03", traveler: "Mo", status: "pending", confirmation: "ZZ00000" })], NAMES);
+  assert.equal(r.linked, true);
+  assert.deepEqual(r.problems, []);
+  assert.deepEqual(r.byStop, { teststop0001: { tkRef: "ZZ99999", tkName: "Sam Example", tkPeople: "Mo, Izzah", tkSeat: "" } }, "two travellers on one booking; the pending row is ignored");
+});
+
+test("planTicketsFromRows: ALL is everyone; different confirmations are joined; seats with names when they differ; each cut at 60; a bad stop id is a problem named by its title", () => {
+  const rows = [["Made-up tickets"], THEAD,
+    trow({ ...TK1, stop_id: "teststop0003", traveler: "ALL", confirmation: "ZZ99999", seat: "Row C 4" }),
+    trow({ ...TK1, ticket_id: "T05", stop_id: "teststop0002", traveler: "Mo", confirmation: "ZZ11111", seat: "12A" }),
+    trow({ ...TK1, ticket_id: "T06", stop_id: "teststop0002", traveler: "Izzah", confirmation: "ZZ22222", seat: "12B", status: " Active " }),
+    trow({ ...TK1, ticket_id: "T07", stop_id: "teststop0004", traveler: "Mo", seat: "Gate 3" }),
+    trow({ ...TK1, ticket_id: "T08", stop_id: "teststop0004", traveler: "Izzah", seat: "Gate 3" }),
+    trow({ ...TK1, ticket_id: "T09", stop_id: "teststop0006", holder: "x".repeat(70) }),
+    trow({ ...TK1, ticket_id: "T10", stop_id: "bad id", title: "Broken ticket row" }),
+    trow({ ...TK1, ticket_id: "T11", stop_id: "", title: "Not linked yet" }),
+  ];
+  const r = P.planTicketsFromRows(rows, NAMES);
+  assert.deepEqual(r.byStop.teststop0003, { tkRef: "ZZ99999", tkName: "Sam Example", tkPeople: "Mo, Izzah", tkSeat: "Row C 4" });
+  assert.deepEqual(r.byStop.teststop0002, { tkRef: "ZZ11111 / ZZ22222", tkName: "Sam Example", tkPeople: "Mo, Izzah", tkSeat: "Mo 12A, Izzah 12B" });
+  assert.equal(r.byStop.teststop0004.tkSeat, "Gate 3", "every seat the same: that seat");
+  assert.equal(r.byStop.teststop0006.tkName, "x".repeat(59) + "…");
+  assert.deepEqual(r.problems, [{ id: "", message: "That ticket row’s stop id isn’t usable.", row: 9, what: "Broken ticket row" }]);
+  assert.equal(JSON.stringify(r.problems).includes("ZZ"), false);
+});
+
+test("planJobs with tickets: facts come in with the planner's mark; the same facts are the same; when the last active row goes the details stay and are the app's again", () => {
+  const read = P.planFromRows([HEAD, prow(MUSEUM), prow(PIER)], DAYS);
+  const tix = P.planTicketsFromRows([THEAD, trow(TK1), trow({ ...TK1, ticket_id: "T09", stop_id: "teststop0002", confirmation: "ZZ99998" })], NAMES);
+  const j = P.planJobs(read, tix, [cur({})], DAYS, true);
+  assert.deepEqual(j.edits.map((e) => [e.action, e.cols]), [["edit", { tk_ref: "ZZ99999", tk_name: "Sam Example", tk_people: "Mo", tk_planner: "yes" }]]);
+  assert.deepEqual(j.adds[0].tk, { tkRef: "ZZ99998", tkName: "Sam Example", tkPeople: "Mo", tkSeat: "" });
+  const led = cur({ tkRef: "ZZ99999", tkName: "Sam Example", tkPeople: "Mo" }, { tkLed: true });
+  assert.equal(P.planJobs(read, tix, [led], DAYS, true).same, 1);
+  const adopt = P.planJobs(read, tix, [cur({ tkRef: "ZZ99999", tkName: "Sam Example", tkPeople: "Mo" })], DAYS, true);
+  assert.deepEqual(adopt.edits.map((e) => [e.action, e.cols]), [["adopt", { tk_planner: "yes" }]]);
+  const none = P.planTicketsFromRows([THEAD], NAMES);
+  const freed = P.planJobs(read, none, [led], DAYS, true);
+  assert.deepEqual(freed.edits.map((e) => [e.action, e.cols]), [["adopt", { tk_planner: "" }]], "the values stay");
+  const notLinked = P.planJobs(read, NOTIX, [led], DAYS, true);
+  assert.equal(notLinked.same, 1, "a tab not linked (or not read) frees nothing");
+});
+
+test("tickets through the pull: facts arrive with tk_planner; the app's edit of them is refused; the last active row going leaves them and frees them", async () => {
+  const call = linked({ stops: [{ ...FULL, tkRef: "", tkName: "", tkPeople: "", tkSeat: "" }, APP_PIER, APP_SHOW], tickets: [THEAD, trow(TK1), trow(TK2)] });
+  const r = await call("syncPlan", {});
+  assert.deepEqual(counts(r.data), [0, 1, 0, 0, 2, 0]);
+  assert.deepEqual(logRows(call).at(-1).summary, "changed Corner museum: ticket", "the label only, never a value");
+  const s = (await loadStops(call)).find((x) => x.id === FULL.id);
+  assert.deepEqual([s.tkRef, s.tkName, s.tkPeople, s.tkSeat, s.tkFromPlanner], ["ZZ99999", "Sam Example", "Mo, Izzah", "", true]);
+  const refused = await call("updateStop", { id: FULL.id, patch: { tkRef: "ZZ00000" } });
+  assert.deepEqual([refused.ok, refused.error, refused.message], [false, "planner_led", "This stop’s ticket details come from the planner’s Tickets tab. Change them there."]);
+  assert.equal((await call("updateStop", { id: FULL.id, patch: { tkRef: "ZZ99999", note: "Bring both" } })).ok, true, "restating passes");
+  // Ticket pictures stay the app's: still a detail edit of the stop works.
+  // The last active row goes (marked pending): the details stay and are the app's.
+  later(call, 20);
+  call.fake.planner.tabs.Tickets = [THEAD, trow({ ...TK1, status: "pending" }), trow({ ...TK2, status: "pending" })];
+  const freed = await call("syncPlan", {});
+  assert.deepEqual(counts(freed.data), [0, 0, 0, 0, 1, 2]);
+  const after = (await loadStops(call)).find((x) => x.id === FULL.id);
+  assert.deepEqual([after.tkRef, after.tkFromPlanner], ["ZZ99999", false]);
+  assert.equal((await call("updateStop", { id: FULL.id, patch: { tkRef: "ZZ00000" } })).ok, true);
+  // A new Plan row whose tickets are already there: they come in with it.
+  later(call, 20);
+  call.fake.planner.tabs.Tickets = [THEAD, trow({ ...TK1, stop_id: "teststop0009", seat: "Row A" })];
+  setPlan(call, MUSEUM, PIER, SHOW, { stop_id: "teststop0009", date: "2026-12-27", what: "Breakfast counter" });
+  assert.equal((await call("syncPlan", {})).data.added, 1);
+  const added = (await loadStops(call)).find((x) => x.id === "teststop0009");
+  assert.deepEqual([added.tkRef, added.tkSeat, added.tkFromPlanner], ["ZZ99999", "Row A", true]);
+  clean(call);
+});
+
+test("tickets: a Tickets read that throws still pulls the stops, frees no detail, and stores the one problem", async () => {
+  const call = linked({ stops: [{ ...FULL, tkFromPlanner: true, fromPlanner: true }, APP_PIER, APP_SHOW], tickets: [THEAD, trow(TK1)] });
+  const read = call.fake.world.plannerTab_;
+  call.fake.world.plannerTab_ = (tab) => {
+    if (tab === "Tickets") { read(tab); throw new Error("boom: " + PLANNER_ID); }
+    return read(tab);
+  };
+  setPlan(call, { ...MUSEUM, time: "10:30" }, PIER, SHOW);
+  const r = await call("syncPlan", {});
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.deepEqual(counts(r.data), [0, 1, 0, 0, 2, 0]);
+  const one = { id: "", message: "The planner’s Tickets tab couldn’t be read this time.", row: null, what: "" };
+  assert.deepEqual(r.data.problems, [one]);
+  assert.deepEqual((await call("load")).data.planProblems.list, [one]);
+  assert.equal(stored(call, FULL.id).tk_planner, "yes", "not freed");
+  assert.equal(stored(call, FULL.id).tk_ref, "ZZ00001", "nor changed");
+  assert.equal(JSON.stringify(r).includes(PLANNER_ID), false);
+  call.fake.world.plannerTab_ = read;
+  clean(call);
+});
+
+test("ZZ99999: a booking number in the Tickets tab reaches the stop's tkRef on a person's key and nowhere else", async () => {
+  const call = linked({ stops: [{ ...FULL, tkRef: "", tkName: "" }, APP_PIER, APP_SHOW], tickets: [THEAD, trow(TK1), trow({ ...TK1, ticket_id: "T09", stop_id: "bad id", title: "Broken ticket row" })] });
+  const mo = call.fake.personKey("Mo");
+  const diff = await call.fake({ key: CHECK_KEY, action: "planDiff", args: {} });
+  assert.deepEqual(diff.data.tickets, [{ id: FULL.id, title: "Corner museum" }]);
+  const sync = await call("syncPlan", {});
+  const mine = (await call.fake({ key: mo, action: "load", args: {} })).data;
+  assert.equal(mine.stops.find((s) => s.id === FULL.id).tkRef, "ZZ99999");
+  const checked = await call.fake({ key: CHECK_KEY, action: "load", args: {} });
+  const hist = await call("history");
+  const places = {
+    "the pull's problems": sync.data.problems,
+    "load's planProblems": mine.planProblems,
+    "the stored problems": call.fake.props.PLAN_PROBLEMS,
+    "a Log summary": logRows(call).map((l) => l.summary),
+    "History": hist.data.entries.map((e) => e.summary),
+    "the dry run": diff,
+    "the owner's log": call.fake.logged,
+    "the executions log": call.fake.consoleLines,
+    "load under the check key": checked,
+  };
+  for (const [where, v] of Object.entries(places)) assert.equal(JSON.stringify(v).includes("ZZ99999"), false, where);
+  assert.equal(sync.data.problems.length, 1, "the bad row is listed, by its title");
+  clean(call);
+});
+
+test("tickets: an older app change of a stop whose details the Tickets tab now leads undoes only what is the app's", async () => {
+  const call = linked({ follow: false, tickets: [THEAD, trow({ ...TK1, traveler: "Mo, Izzah", seat: "Row C" })] });
+  const e = await call("updateStop", { id: FULL.id, patch: { tkRef: "ZZ99999", note: "Changed in the app" } });
+  assert.equal(e.ok, true);
+  call.fake.props.PLAN_FOLLOW = "on";
+  assert.deepEqual(counts((await call("syncPlan", {})).data), [0, 0, 0, 0, 3, 0]);
+  assert.equal(stored(call, FULL.id).tk_planner, "yes");
+  const u = await call("undo", { logId: e.data.logId });
+  assert.equal(u.ok, true, JSON.stringify(u));
+  assert.deepEqual([stored(call, FULL.id).note, stored(call, FULL.id).tk_ref], ["Our note", "ZZ99999"]);
+  clean(call);
 });
