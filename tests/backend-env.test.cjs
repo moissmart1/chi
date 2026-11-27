@@ -174,24 +174,27 @@ const byRange = (payments, book = BOOK, log = CLOG) => (id, range) => {
   throw new Error("Unable to parse range: " + range);
 };
 
+// What checkPlanner adds at the end for a planner with no Plan tab (chi#16).
+const NO_PLAN = ["Plan: The planner has no Plan tab to read.", "Tickets: no stop_id column yet (tickets are not followed)", "Plan: not following (PLAN_FOLLOW is not on)"];
+
 test("checkPlanner logs the row count or the problem, never a value or the id", () => {
   const row = PHEAD.map((h) => ({ payment_id: "X7", payer: "Mo", description: "Secret Inn", amount: 247.5, currency: "USD", split_between: "Mo", split_type: "equal", include_in_split: "yes" })[h] || "");
   const tabs = ["Payments", "Book Now", "Change Log"];
   const good = plannerWorld({ props: { PLANNER_ID }, tabs, get: byRange([PHEAD, row, [], row.map((c, i) => (i === 0 ? "X8" : c))]) });
   good.ctx.checkPlanner();
-  assert.deepEqual(good.logged, ["Planner: 2 payment rows, columns ok", "Book Now: 2 items, columns ok", "Book Now: 0 Status cells are formulas (the app leaves those alone).", "Change Log: found"]);
+  assert.deepEqual(good.logged, ["Planner: 2 payment rows, columns ok", "Book Now: 2 items, columns ok", "Book Now: 0 Status cells are formulas (the app leaves those alone).", "Change Log: found", ...NO_PLAN]);
 
   const missing = plannerWorld({ props: { PLANNER_ID }, tabs, get: byRange([PHEAD.filter((h) => h !== "amount_cad"), row], [["#", "Item", "Book by"]], [["#", "Tab"]]) });
   missing.ctx.checkPlanner();
-  assert.deepEqual(missing.logged, ["Planner: The planner’s Payments tab is missing the column amount_cad.", "Book Now: The planner’s Book Now tab has no row with the columns #, Item, Book by and Status.", "Change Log: not found"]);
+  assert.deepEqual(missing.logged, ["Planner: The planner’s Payments tab is missing the column amount_cad.", "Book Now: The planner’s Book Now tab has no row with the columns #, Item, Book by and Status.", "Change Log: not found", ...NO_PLAN]);
 
   const fails = plannerWorld({ props: { PLANNER_ID }, tabs, get: () => { throw new Error("Requested entity was not found: " + PLANNER_ID); } });
   fails.ctx.checkPlanner();
-  assert.deepEqual(fails.logged, ["Planner: couldn’t read its Payments tab. Check the id and that this account can open the sheet.", "Book Now: couldn’t read it.", "Change Log: couldn’t read it."]);
+  assert.deepEqual(fails.logged, ["Planner: couldn’t read its Payments tab. Check the id and that this account can open the sheet.", "Book Now: couldn’t read it.", "Change Log: couldn’t read it.", ...NO_PLAN]);
 
   const noTab = plannerWorld({ props: { PLANNER_ID }, tabs: [], get: () => { throw new Error("Unable to parse range"); } });
   noTab.ctx.checkPlanner();
-  assert.deepEqual(noTab.logged, ["Planner: The planner has no Payments tab to read.", "Book Now: The planner has no Book Now tab to read.", "Change Log: not found"]);
+  assert.deepEqual(noTab.logged, ["Planner: The planner has no Payments tab to read.", "Book Now: The planner has no Book Now tab to read.", "Change Log: not found", ...NO_PLAN]);
 
   const none = plannerWorld({ props: {}, get: () => { throw new Error("not called"); } });
   none.ctx.checkPlanner();
@@ -200,6 +203,34 @@ test("checkPlanner logs the row count or the problem, never a value or the id", 
   const all = [good, missing, fails, noTab, none].flatMap((w) => w.logged).join("\n");
   assert.equal(all.includes(PLANNER_ID), false);
   assert.equal(/Secret Inn|247\.5|X7|Secret Tour|Hidden Inn|Private|Made-up/.test(all), false);
+});
+
+test("checkPlanner's plan lines: rows read, rows that need a look, the Tickets stop_id column, and whether the app follows; never a value or the id", () => {
+  const PLAN = [["Made-up plan title"], ["stop_id", "date", "time", "what", "booked"], ["teststop0001", "2026-12-28", "10:00", "Secret museum", "yes"], [], ["", "", "", "Tue Dec 29", ""], ["teststop0002", "Dec 29", "7 PM", "Hidden pier", ""], ["", "2026-12-30", "", "Private show", ""], ["teststop0003", "2027-03-01", "", "Off the trip", ""]];
+  const TICKETS = [["ticket_id", "stop_id", "status", "confirmation", "holder"], ["T1", "teststop0001", "active", "ZZ99999", "Sam Example"], ["T2", "teststop0001", "Active", "ZZ99999", "Sam Example"], ["T3", "teststop0002", "pending", "ZZ99998", "Sam Example"], ["T4", "", "active", "ZZ99997", "Sam Example"]];
+  const tabs = ["Payments", "Book Now", "Change Log", "Plan", "Tickets"];
+  const get = (plan, tickets) => (id, range) => {
+    const tab = tabOf(range);
+    if (tab === "Plan") { if (plan instanceof Error) throw plan; return { values: plan }; }
+    if (tab === "Tickets") { if (tickets instanceof Error) throw tickets; return { values: tickets }; }
+    return byRange([PHEAD])(id, range);
+  };
+  const lines = (w) => w.logged.filter((l) => /^(Plan|Tickets):/.test(l));
+  const on = plannerWorld({ props: { PLANNER_ID, PLAN_FOLLOW: "on" }, tabs, get: get(PLAN, TICKETS) });
+  on.ctx.checkPlanner();
+  assert.deepEqual(lines(on), ["Plan: 4 rows, columns ok", "Plan: 3 rows need a look", "Tickets: stop_id column found, 2 active rows name a stop", "Plan: following"]);
+  const plain = plannerWorld({ props: { PLANNER_ID }, tabs, get: get(PLAN.slice(0, 3), [["ticket_id", "status", "confirmation"], ["T1", "active", "ZZ99999"]]) });
+  plain.ctx.checkPlanner();
+  assert.deepEqual(lines(plain), ["Plan: 1 rows, columns ok", "Tickets: no stop_id column yet (tickets are not followed)", "Plan: not following (PLAN_FOLLOW is not on)"]);
+  const shut = plannerWorld({ props: { PLANNER_ID, PLAN_FOLLOW: "on" }, tabs, get: get(new Error("denied " + PLANNER_ID), new Error("denied " + PLANNER_ID)) });
+  shut.ctx.checkPlanner();
+  assert.deepEqual(lines(shut), ["Plan: couldn’t read it.", "Tickets: couldn’t read it.", "Plan: following"]);
+  const noHead = plannerWorld({ props: { PLANNER_ID }, tabs, get: get([["stop_id", "what"], ["teststop0001", "Secret museum"]], TICKETS) });
+  noHead.ctx.checkPlanner();
+  assert.equal(lines(noHead)[0], "Plan: The planner’s Plan tab has no row with the columns stop_id, date, time and what.");
+  const all = [on, plain, shut, noHead].flatMap((w) => w.logged).join("\n");
+  assert.equal(all.includes(PLANNER_ID), false);
+  assert.equal(/Secret|Hidden|Private|Off the trip|ZZ9999|Sam Example|teststop|Made-up/.test(all), false, all);
 });
 
 test("checkPlanner asks for every permission first, the full Sheets one included (R46)", () => {

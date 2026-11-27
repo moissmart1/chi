@@ -638,6 +638,7 @@ function checkPlanner() {
   }
   checkPlannerPayments_();
   checkPlannerTodos_();
+  checkPlannerPlan_();
 }
 
 function checkPlannerPayments_() {
@@ -686,4 +687,48 @@ function checkPlannerTodos_() {
   } catch (e) {
     Logger.log("Change Log: couldn’t read it.");
   }
+}
+
+// The plan (chi#16): whether the Plan tab can be read, how many of its rows
+// need a look (judged against the trip's fixed days), whether the Tickets tab
+// has its stop_id column yet, and whether the app follows the plan. Counts
+// only: never a value from the sheet and never its id.
+function checkPlannerPlan_() {
+  try {
+    var read = planFromRows(plannerTab_("Plan"), tripDaysFixed_());
+    if (read.missing) {
+      Logger.log("Plan: " + read.missing);
+    } else {
+      Logger.log("Plan: " + (read.stops.length + read.problems.length) + " rows, columns ok");
+      var look = planJobs(read, { linked: false, byStop: {}, problems: [] }, [], tripDaysFixed_(), true).problems.length;
+      if (look) Logger.log("Plan: " + look + " rows need a look");
+    }
+  } catch (e) {
+    Logger.log("Plan: couldn’t read it.");
+  }
+  try {
+    var list = plannerTab_("Tickets") || [];
+    var h = headerAt_(list, ["stop_id", "status"]);
+    if (h === -1) {
+      Logger.log("Tickets: no stop_id column yet (tickets are not followed)");
+    } else {
+      var head = headOf_(list[h]);
+      var active = list.slice(h + 1).filter(function (row) {
+        return Array.isArray(row) && plannerText_(row[head.indexOf("stop_id")]) !== "" && plannerText_(row[head.indexOf("status")]).toLowerCase() === "active";
+      }).length;
+      Logger.log("Tickets: stop_id column found, " + active + " active rows name a stop");
+    }
+  } catch (e2) {
+    Logger.log("Tickets: couldn’t read it.");
+  }
+  Logger.log(getProp_("PLAN_FOLLOW") === "on" ? "Plan: following" : "Plan: not following (PLAN_FOLLOW is not on)");
+}
+
+// The trip's days from its fixed first and last day (Pure.js), without the Sheet.
+function tripDaysFixed_() {
+  var out = [];
+  var t = Date.parse(TRIP_FIRST_DAY_ + "T00:00:00Z");
+  var end = Date.parse(TRIP_LAST_DAY_ + "T00:00:00Z");
+  for (; t <= end; t += 86400000) out.push(new Date(t).toISOString().slice(0, 10));
+  return out;
 }
