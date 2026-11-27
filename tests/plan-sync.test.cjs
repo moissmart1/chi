@@ -986,6 +986,10 @@ test("I2b: more than 8 new stops, when that is more than half the stops the plan
   assert.equal(P.planJobs(rows([...keep(twenty), ...fresh(9)]), NOTIX, twenty, DAYS, true).adds.length, 9, "9 is not more than half of 20");
   const eight = P.planJobs(rows([...keep(ten), ...fresh(8)]), NOTIX, ten, DAYS, true);
   assert.equal(eight.adds.length, 8);
+  // The first sync: 20 app stops the tab lists (adopted in this read) and 9 new rows: all 9 come in.
+  const app20 = Array.from({ length: 20 }, (_, i) => cur({ id: "teststop" + String(i + 1).padStart(4, "0"), title: "Stop " + i }, { led: false }));
+  const first = P.planJobs(rows([...keep(app20), ...fresh(9)]), NOTIX, app20, DAYS, true);
+  assert.deepEqual([first.adds.length, first.heldAdds, first.edits.length], [9, 0, 20]);
   // Adopting app stops is not adding.
   const own = Array.from({ length: 12 }, (_, i) => cur({ id: "teststop" + String(i + 1).padStart(4, "0") }, { led: false }));
   assert.equal(P.planJobs(rows(keep(own)), NOTIX, own, DAYS, true).edits.length, 12);

@@ -1645,8 +1645,8 @@ var PLAN_TICKET_NEEDS_ = ["ticket_id", "stop_id", "status"];
 var PLAN_TICKET_MAX_ROWS_ = 300;
 // The most stops one read may take off; more (or more than half) and none are.
 var PLAN_MAX_REMOVALS_ = 8;
-// The most new stops one read may bring in, unless the planner already leads
-// at least twice as many; more and none are.
+// The most new stops one read may bring in, unless the planner leads at least
+// twice as many once this read's adoptions are in; more and none are.
 var PLAN_MAX_ADDS_ = 8;
 
 // A Plan tab day cell as "YYYY-MM-DD", or "". ISO text that is a real day is
@@ -1965,7 +1965,7 @@ function planJobs(read, tix, current, dayDates, appStops) {
   // Stops going and coming are held together: when removals are held (a
   // blind read, or too many), so is every add, said in the same line; and
   // more than PLAN_MAX_ADDS_ new stops, when that is more than half the
-  // stops the planner already leads, are held on their own.
+  // stops the planner leads after this read's adoptions, are held on their own.
   var gone = current.filter(function (c) { return !c.stop.deleted && !inPlan[c.stop.id] && (c.led || !appStops); });
   var adds = out.adds.length;
   if (read.blind) {
@@ -1982,8 +1982,9 @@ function planJobs(read, tix, current, dayDates, appStops) {
       out.removals = gone.map(function (c) { return { id: c.stop.id, what: plannerWhat_(c.stop.title) }; });
     }
   }
-  var ledNow = current.filter(function (c) { return !c.stop.deleted && c.led; }).length;
-  if (out.held > 0 || (adds > PLAN_MAX_ADDS_ && adds * 2 > ledNow)) {
+  // The stops the planner leads once this read's adoptions are in: the live ones it lists.
+  var ledAfter = current.filter(function (c) { return !c.stop.deleted && inPlan[c.stop.id]; }).length;
+  if (out.held > 0 || (adds > PLAN_MAX_ADDS_ && adds * 2 > ledAfter)) {
     if (out.held === 0) out.problems.push({ id: "", message: planAddsTooMany_(adds), row: null, what: "" });
     out.heldAdds = adds;
     out.adds = [];
