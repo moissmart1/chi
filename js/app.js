@@ -766,13 +766,17 @@ function start() {
     return inFlight;
   };
   // Each look also asks for the planner's payments, at most every 10 minutes
-  // (store.autoPayments; nothing while no planner is linked).
-  const look = () => {
+  // (store.autoPayments; nothing while no planner is linked), and for the
+  // planner's plan, at most every 3 minutes, every 30 seconds when the app
+  // has just come to the front (store.autoPlan; nothing while the trip does
+  // not follow the planner).
+  const look = (front = false) => {
     check();
     store.autoPayments();
+    store.autoPlan({ front });
   };
   const startChecking = () => {
-    if (connected && !checking) checking = setInterval(look, CHECK_MS);
+    if (connected && !checking) checking = setInterval(() => look(), CHECK_MS);
   };
   const stopChecking = () => {
     clearInterval(checking);
@@ -783,7 +787,7 @@ function start() {
       store.markSeen();
       stopChecking();
     } else {
-      look();
+      look(true);
       startChecking();
     }
   });
@@ -794,6 +798,7 @@ function start() {
 
   if (connected) store.boot({ candidate: taken.candidate }).then(() => {
     store.autoPayments();
+    store.autoPlan({ front: true });
     before.wake();
     // History is fetched quietly, so it opens at once (it then keeps itself up to date).
     if (store.state.status === "ready") store.loadHistory();

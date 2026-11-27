@@ -61,7 +61,15 @@ const TODO_PULLS = 4;
 
 // How often an open phone asks for the planner's payments on its own.
 const PAY_AUTO_MS = 10 * 60 * 1000;
-const DATA_KEYS = ["trip", "people", "days", "stops", "stays", "expenses", "payments", "rateToday", "rateSource", "sheetUrl", "plannerLinked", "todos", "todosPulledAt", "paymentsPulledAt", "stampDefs", "stamps", "paymentProblems", "todoProblems", "tickets"];
+// How often an open phone asks for the planner's plan on its own, and how
+// soon again when the app comes to the front (the backend reads the planner
+// at most once a minute whatever the phones ask).
+const PLAN_AUTO_MS = 3 * 60 * 1000;
+const PLAN_FRONT_MS = 30 * 1000;
+// What syncPlan asks at most in a row while the backend says more remain.
+const PLAN_PULLS = 4;
+const NO_PROBLEMS = () => ({ at: "", list: [], more: 0 });
+const DATA_KEYS = ["trip", "people", "days", "stops", "stays", "expenses", "payments", "rateToday", "rateSource", "sheetUrl", "plannerLinked", "todos", "todosPulledAt", "paymentsPulledAt", "stampDefs", "stamps", "paymentProblems", "todoProblems", "tickets", "planFollow", "planPulledAt", "planProblems"];
 // Every kind of item the store keeps, the field it is found by and the flag
 // that marks it gone. Stays and day headers only ever change here through an
 // undo from History (their writes come in later tasks). A todo is an item
@@ -207,6 +215,7 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
   const state = {
     status: "boot", online: true, rev: null, me: null,
     trip: null, people: [], days: [], stops: [], stays: [], expenses: [], payments: [], rateToday: null, rateSource: null, sheetUrl: "", plannerLinked: false, todos: [], todosPulledAt: "", paymentsPulledAt: "", stampDefs: [], stamps: [], paymentProblems: { at: "", list: [], more: 0 }, todoProblems: { at: "", list: [], more: 0 }, tickets: [], ticketsReady: false,
+    planFollow: false, planPulledAt: "", planProblems: NO_PROBLEMS(),
     loadedAt: null, seenAt: null, lastChange: null, notice: null, setAside: [], keyRefused: false, tripProblem: null,
     // personal: this phone opened its own person's link (load said so); me is then theirs.
     // cleared: the trip was taken off this phone after its key was refused ({ kept: own unsent lines kept }).
@@ -252,6 +261,11 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
     if (base) for (const k of DATA_KEYS) state[k] = base[k];
     // A cache or a backend from before the book has neither list.
     if (!Array.isArray(state.stampDefs)) state.stampDefs = [];
+    // A cache or a backend from before the plan followed the planner (version 8) has none of these.
+    if (state.planFollow !== true) state.planFollow = false;
+    if (typeof state.planPulledAt !== "string") state.planPulledAt = "";
+    const pp = state.planProblems;
+    if (!pp || typeof pp !== "object" || typeof pp.at !== "string" || !Array.isArray(pp.list) || typeof pp.more !== "number") state.planProblems = NO_PROBLEMS();
     // A backend where migrate has not made the ticket tabs sends no tickets at all.
     state.ticketsReady = !!base && Array.isArray(base.tickets);
     const lists = {};
@@ -422,6 +436,7 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
     Object.assign(state, {
       rev: null, me: null, personal: false, sheetUrl: "", tripProblem: null, ticketsReady: false, plannerLinked: false, todosPulledAt: "", paymentsPulledAt: "",
       paymentProblems: { at: "", list: [], more: 0 }, todoProblems: { at: "", list: [], more: 0 },
+      planFollow: false, planPulledAt: "", planProblems: NO_PROBLEMS(),
       loadedAt: null, lastChange: null, notice: null, setAside: [],
       history: { entries: [], more: false, loading: false, error: null },
       cleared: had ? { kept: mine.length } : null,
@@ -1498,6 +1513,93 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
     }
   }
 
+  // ---- the plan, led by the planner's Plan tab (chi#16) ----
+
+  const PLAN_COUNTS = ["added", "changed", "removed", "restored", "adopted", "same"];
+  const planCounts = (d) => {
+    const out = {};
+    for (const k of PLAN_COUNTS) out[k] = Number.isFinite(d[k]) ? d[k] : 0;
+    return out;
+  };
+
+  // The planner's plan, asked for on its own while the app is open and the
+  // trip follows the planner (load says so): at most once every PLAN_AUTO_MS
+  // on this phone, PLAN_FRONT_MS when the app has just come to the front.
+  // One at a time. Quiet: it reloads when a stop changed or the list of rows
+  // that need a look did, and says nothing. Resolves with the counts, or
+  // null when it did not ask or it did not go through.
+  let planBusy = false;
+  let planAt = -Infinity;
+  async function autoPlan({ front = false } = {}) {
+    if (planBusy || state.status !== "ready" || state.planFollow !== true) return null;
+    const t = now();
+    if (t - planAt < (front ? PLAN_FRONT_MS : PLAN_AUTO_MS)) return null;
+    planBusy = true;
+    planAt = t;
+    try {
+      let r;
+      try {
+        r = await call("syncPlan", { auto: true });
+      } catch (err) {
+        // Never sent (no signal): ask again on the next look.
+        if (neverSent(err)) planAt = -Infinity;
+        return null;
+      }
+      const d = (r && r.data) || {};
+      if (d.skipped) return null;
+      // Cut short (15 stops at a time): carry on at the next look.
+      if (d.more) planAt = -Infinity;
+      const counts = planCounts(d);
+      const moved = counts.added || counts.changed || counts.removed || counts.restored || counts.adopted;
+      // The rows that need a look, as load shows them, less the moved-stop
+      // lines load adds in front (the pull's answer never has those). An
+      // unchanged tab's answer carries no list: nothing to compare.
+      let stale = false;
+      if (!d.unchanged && Array.isArray(d.problems)) {
+        const movedIds = new Set(state.stops.filter((x) => x && typeof x.movedFrom === "string" && x.movedFrom !== "").map((x) => x.id));
+        const shown = (state.planProblems.list || []).filter((x) => !(x && x.row === null && movedIds.has(x.id)));
+        const key = (l) => l.slice(0, 20).map((x) => x.id + "|" + x.row + "|" + x.message).join("\n");
+        stale = d.problems.length !== shown.length + (state.planProblems.more || 0) || key(d.problems) !== key(shown);
+      }
+      if (moved || stale) {
+        await refresh();
+        changed();
+      }
+      return { ...counts, problems: Array.isArray(d.problems) ? d.problems : [], more: !!d.more };
+    } finally {
+      planBusy = false;
+    }
+  }
+
+  // Pull now's plan part: a plain call, never queued, asked again while the
+  // backend says more remain (at most PLAN_PULLS calls), then a reload.
+  // Says nothing itself. Resolves { ok: true, added, changed, removed,
+  // restored, adopted, same, problems, more } or { ok: false, code, message }.
+  async function syncPlan() {
+    const total = planCounts({});
+    let problems = [];
+    let more = false;
+    let any = false;
+    try {
+      for (let n = 0; n < PLAN_PULLS; n++) {
+        const r = await call("syncPlan", {});
+        any = true;
+        const d = (r && r.data) || {};
+        const c = planCounts(d);
+        for (const k of PLAN_COUNTS) total[k] += c[k];
+        if (Array.isArray(d.problems)) problems = d.problems;
+        more = !!d.more;
+        if (!more) break;
+      }
+    } catch (err) {
+      // A later call failed: what the earlier ones wrote still shows.
+      if (any) await refresh();
+      return { ok: false, code: codeOf(err), message: (err && err.message) || "" };
+    }
+    await refresh();
+    return { ok: true, ...total, problems, more };
+  }
+
   // ---- "Before we go": the planner's Book Now list ----
 
   // Brings the list in from the planner: a plain call, never queued. While
@@ -1782,7 +1884,7 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
       return () => subs.delete(fn);
     },
     boot, refresh, checkRev, flush, idle,
-    setMe, setPerson, markSeen, forgot, unsentCount, notify, clearNotice, claudeToken, syncPayments, autoPayments,
+    setMe, setPerson, markSeen, forgot, unsentCount, notify, clearNotice, claudeToken, syncPayments, autoPayments, autoPlan, syncPlan,
     syncTodos, tickTodo, claimTodo, untickTodo,
     pressStamp,
     addTicket, ticketOutcome, fetchTicket,

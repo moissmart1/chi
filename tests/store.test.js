@@ -3781,3 +3781,190 @@ test("untickTodo: while the tick itself is still on its way, it waits for it and
   assert.equal(byId(p.store.state.todos, "1").tickedBy, "");
   assert.equal(p.fake.tables.Todos.find((r) => r.id === "1").ticked_by, "");
 });
+
+// ---------- the plan from the planner, kept up silently (chi#16, stage 2) ----------
+// autoPlan(): while the trip follows the planner's Plan tab (load says
+// planFollow), at most once every 3 minutes per phone (30 seconds when the
+// app comes to the front), the plan is asked for with { auto: true }. It
+// says nothing in this stage; it reloads when a stop changed. Every value
+// here is made up.
+
+const PL_HEAD = ["stop_id", "date", "time", "what"];
+const PL_MUSEUM = { id: "teststop0001", date: "2026-12-28", time: "10:00", title: "Corner museum" };
+const PL_PIER = { id: "teststop0002", date: "2026-12-29", time: "", title: "Pier stop" };
+const plRow = (s) => [s.id, s.date, s.time, s.title];
+const planPhone = ({ follow = true, plan = [PL_HEAD, plRow(PL_MUSEUM), plRow(PL_PIER)], stops = [PL_MUSEUM, PL_PIER], storage } = {}) => {
+  const at = { ms: NOW };
+  const fake = createFakeBackend({ ...SEED, stops, plannerId: PLANNER_ID, plannerTabs: { Plan: plan }, props: follow ? { PLAN_FOLLOW: "on" } : {} }, { clock: () => new Date(at.ms).toISOString() });
+  return { at, ...phone({ fake, storage, clock: () => at.ms }) };
+};
+const planCalls = (p) => p.net.sent.filter((b) => b.action === "syncPlan");
+const loadsOf = (p) => p.net.sent.filter((b) => b.action === "load").length;
+
+test("autoPlan asks nothing while the trip does not follow the planner", async () => {
+  const p = planPhone({ follow: false });
+  await p.store.boot();
+  assert.deepEqual([p.store.state.planFollow, p.store.state.planPulledAt, p.store.state.planProblems], [false, "", { at: "", list: [], more: 0 }]);
+  assert.equal(await p.store.autoPlan(), null);
+  assert.equal(await p.store.autoPlan({ front: true }), null);
+  assert.equal(planCalls(p).length, 0);
+  assert.deepEqual(p.fake.planner.calls, []);
+});
+
+test("autoPlan: the first ask adopts the planner's stops, reloads, and says nothing", async () => {
+  const p = planPhone();
+  await p.store.boot();
+  assert.equal(p.store.state.planFollow, true);
+  const notice = p.store.state.notice;
+  const loads = loadsOf(p);
+  const r = await p.store.autoPlan();
+  assert.deepEqual(planCalls(p).map((b) => b.args), [{ auto: true }]);
+  assert.deepEqual(r, { added: 0, changed: 0, removed: 0, restored: 0, adopted: 2, same: 0, problems: [], more: false });
+  assert.equal(loadsOf(p), loads + 1, "it reloads");
+  assert.ok(p.store.state.stops.every((s) => s.fromPlanner === true));
+  assert.equal(p.store.state.notice, notice, "no notice in this stage");
+  assert.equal(p.store.state.planPulledAt, new Date(NOW).toISOString());
+});
+
+test("autoPlan: not again within 3 minutes on this phone; within 30 seconds of the last ask even when the app comes to the front", async () => {
+  const p = planPhone();
+  await p.store.boot();
+  await p.store.autoPlan();
+  p.at.ms += 2 * 60 * 1000 + 59 * 1000;
+  assert.equal(await p.store.autoPlan(), null);
+  assert.equal(planCalls(p).length, 1);
+  p.at.ms += 1000;
+  await p.store.autoPlan();
+  assert.equal(planCalls(p).length, 2, "at 3 minutes it asks again");
+  p.at.ms += 29 * 1000;
+  assert.equal(await p.store.autoPlan({ front: true }), null);
+  assert.equal(planCalls(p).length, 2);
+  p.at.ms += 1000;
+  await p.store.autoPlan({ front: true });
+  assert.equal(planCalls(p).length, 3, "the front: 30 seconds");
+});
+
+test("autoPlan: refreshes on a change, not on an unchanged tab", async () => {
+  const p = planPhone();
+  await p.store.boot();
+  await p.store.autoPlan();
+  // Nothing changed in the planner: the backend answers from its print.
+  p.at.ms += 3 * 60 * 1000;
+  const loads = loadsOf(p);
+  const same = await p.store.autoPlan();
+  assert.equal(same.adopted, 0);
+  assert.equal(loadsOf(p), loads, "no reload");
+  // A time changes in the planner.
+  p.fake.planner.tabs.Plan = [PL_HEAD, plRow({ ...PL_MUSEUM, time: "11:30" }), plRow(PL_PIER)];
+  p.at.ms += 3 * 60 * 1000;
+  const r = await p.store.autoPlan();
+  assert.equal(r.changed, 1);
+  assert.equal(loadsOf(p), loads + 1);
+  assert.equal(byId(p.store.state.stops, "teststop0001").time, "11:30");
+  // Only a problem appears: the list is brought up to date, quietly.
+  p.fake.planner.tabs.Plan = [PL_HEAD, plRow({ ...PL_MUSEUM, time: "11:30" }), plRow(PL_PIER), ["", "2026-12-30", "", "No id here"]];
+  p.at.ms += 3 * 60 * 1000;
+  await p.store.autoPlan();
+  assert.equal(loadsOf(p), loads + 2);
+  assert.deepEqual(p.store.state.planProblems.list.map((x) => [x.row, x.what]), [[4, "No id here"]]);
+  // The same problem again is not news.
+  p.at.ms += 3 * 60 * 1000;
+  p.fake.props.PLAN_PRINT = ""; // as if a write landed since: a full pull, which finds nothing new
+  await p.store.autoPlan();
+  assert.equal(loadsOf(p), loads + 2, "same problems, no change: no reload");
+  assert.equal(p.store.state.notice, null);
+});
+
+test("autoPlan asks again at the next look after more, or after a send that never left", async () => {
+  const stops = [];
+  const plan = [PL_HEAD];
+  for (let i = 1; i <= 18; i++) {
+    const s = { id: "teststop" + String(i).padStart(4, "0"), date: "2026-12-28", time: "", title: "Stop " + i };
+    stops.push(s);
+    plan.push(plRow(s));
+  }
+  const p = planPhone({ stops, plan });
+  await p.store.boot();
+  const first = await p.store.autoPlan();
+  assert.deepEqual([first.adopted, first.more], [15, true]);
+  const second = await p.store.autoPlan();
+  assert.deepEqual([second.adopted, second.more], [3, false], "at once, not in 3 minutes");
+  assert.equal(await p.store.autoPlan(), null, "then it waits");
+  p.at.ms += 3 * 60 * 1000;
+  p.net.knownOffline = true;
+  assert.equal(await p.store.autoPlan(), null);
+  p.net.knownOffline = false;
+  await p.store.autoPlan();
+  assert.equal(planCalls(p).length, 3, "the send that never left is asked again at once");
+});
+
+test("autoPlan: one at a time; a refusal is not said", async () => {
+  const p = planPhone();
+  await p.store.boot();
+  const release = p.net.hold("syncPlan");
+  const first = p.store.autoPlan();
+  assert.equal(await p.store.autoPlan({ front: true }), null);
+  release();
+  await first;
+  assert.equal(planCalls(p).length, 1);
+  p.at.ms += 3 * 60 * 1000;
+  const before = p.store.state.notice;
+  p.net.override = (b) => (b.action === "syncPlan" ? { ok: false, error: "planner_unreadable", message: "Couldn’t read the planner sheet." } : null);
+  assert.equal(await p.store.autoPlan(), null);
+  assert.equal(p.store.state.notice, before);
+});
+
+test("syncPlan (Pull now's plan part): asks again while more remain, reloads, says nothing; a refusal comes back as ok false", async () => {
+  const stops = [];
+  const plan = [PL_HEAD];
+  for (let i = 1; i <= 18; i++) {
+    const s = { id: "teststop" + String(i).padStart(4, "0"), date: "2026-12-28", time: "", title: "Stop " + i };
+    stops.push(s);
+    plan.push(plRow(s));
+  }
+  const p = planPhone({ stops, plan });
+  await p.store.boot();
+  const notice = p.store.state.notice;
+  const r = await p.store.syncPlan();
+  assert.deepEqual(r, { ok: true, added: 0, changed: 0, removed: 0, restored: 0, adopted: 18, same: 15, problems: [], more: false });
+  assert.deepEqual(planCalls(p).map((b) => b.args), [{}, {}]);
+  assert.ok(p.store.state.stops.every((s) => s.fromPlanner === true));
+  assert.equal(p.store.state.notice, notice);
+  p.net.override = (b) => (b.action === "syncPlan" ? { ok: false, error: "planner_unreadable", message: "Couldn’t read the planner sheet. Ask Mo to check its permission." } : null);
+  const no = await p.store.syncPlan();
+  assert.deepEqual(no, { ok: false, code: "planner_unreadable", message: "Couldn’t read the planner sheet. Ask Mo to check its permission." });
+  assert.equal(p.store.state.notice, notice);
+});
+
+test("a cache from version 8 (no plan keys) loads, and reads as not following", async () => {
+  const p = planPhone({ follow: false });
+  const v8 = await backend(createFakeBackend());
+  for (const k of ["planFollow", "planPulledAt", "planProblems"]) delete v8[k];
+  p.storage.setItem("chi.cache", JSON.stringify({ data: v8, rev: 0, loadedAt: 1000 }));
+  const release = p.net.hold("load");
+  const booting = p.store.boot();
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(p.store.state.status, "ready");
+  assert.deepEqual([p.store.state.planFollow, p.store.state.planPulledAt, p.store.state.planProblems], [false, "", { at: "", list: [], more: 0 }]);
+  assert.equal(await p.store.autoPlan(), null);
+  release();
+  await booting;
+  assert.equal(p.store.state.planFollow, false);
+  assert.equal(planCalls(p).length, 0);
+});
+
+test("autoPlan: a moved stop's line in front of the list is not news on every ask", async () => {
+  const walk = { ...PL_MUSEUM, gettingThere: "Walk north" };
+  const p = planPhone({ stops: [walk, PL_PIER] });
+  await p.store.boot();
+  await p.store.autoPlan();
+  p.fake.planner.tabs.Plan = [PL_HEAD, plRow({ ...PL_MUSEUM, date: "2026-12-30" }), plRow(PL_PIER)];
+  p.at.ms += 3 * 60 * 1000;
+  assert.equal((await p.store.autoPlan()).changed, 1);
+  assert.deepEqual(p.store.state.planProblems.list.map((x) => x.message), ["Moved from Mon Dec 28 in the planner. Check how to get there."]);
+  const loads = loadsOf(p);
+  p.at.ms += 3 * 60 * 1000;
+  p.fake.props.PLAN_PRINT = ""; // a full pull, which finds nothing new
+  await p.store.autoPlan();
+  assert.equal(loadsOf(p), loads, "no reload");
+});
