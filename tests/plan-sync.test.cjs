@@ -383,6 +383,7 @@ test("each kind of change lands once, logged via the planner in the first person
   const full = others(stored(call, FULL.id));
   const first = await call("syncPlan", {}, "Izzah");
   assert.deepEqual(counts(first.data), [0, 0, 0, 0, 3, 0]);
+  assert.deepEqual(others(stored(call, FULL.id)), full, "adoption: the app's own columns are byte-identical");
   const steps = [
     ["change", [{ ...MUSEUM, time: "11:30", what: "Corner museum, east wing" }, PIER, SHOW], [0, 1, 0, 0, 0, 2], "edit", "renamed Corner museum to Corner museum, east wing"],
     ["move", [{ ...MUSEUM, date: "2026-12-31", time: "11:30", what: "Corner museum, east wing" }, PIER, SHOW], [0, 1, 0, 0, 0, 2], "edit", "moved Corner museum, east wing to Thu Dec 31 11:30"],
