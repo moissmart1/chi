@@ -69,6 +69,15 @@ var MSG_ = {
   notYours: "You can only change your own settings.",
   ownLink: "Open your own link to change an e-Transfer address.",
   notYourClaim: "Someone else is on this one. Ask them to hand it back first.",
+  // The plan, led by the planner's Plan tab (chi#16).
+  plannerLed: "The day, time and name of this stop come from the planner. Change them there and they come in here.",
+  plannerOwnsStop: "This stop comes from the planner. Take its row out there and it goes from here.",
+  plannerTookOff: "This stop was taken off in the planner. Put its row back there and it comes back here.",
+  plannerTicket: "This stop’s ticket details come from the planner’s Tickets tab. Change them there.",
+  plannerUndo: "That change came from the planner. Change it there and it comes in here.",
+  planMoved: "Moved from {day} in the planner. Check how to get there.",
+  planAddOff: "New stops go in the planner’s Plan tab. They come in here within a few minutes.",
+  planDiffOwnerOnly: "Only {owner} can run the plan check.",
 };
 var STAMP_REFUSALS_ = { not_open: "stampNotOpen", closed: "stampClosed", late: "stampLate", future: "stampFuture" };
 
@@ -82,6 +91,18 @@ var TODO_PULL_GAP_MS_ = 10 * 60 * 1000;
 var TODO_MAX_WRITES_ = 15;
 var TODO_MAX_RETRIES_ = 2;
 var TODO_FORCE_GAP_MS_ = 30 * 1000;
+// The plan (chi#16): the planner's Plan tab leads each stop's day, time, name,
+// booked and fixed, and whether it exists; its Tickets tab, once it has a
+// stop_id column, a stop's four ticket details. A phone's own ask reads the
+// planner at most once a minute, any ask at most every 15 seconds; a pull
+// writes at most 15 stops. PLAN_APP_STOPS_: a phone may still add stops of
+// its own (pictures A and B); false for C. PLAN_MAX_REMOVALS_ is in Pure.js.
+var PLAN_TAB_ = "Plan";
+var PLAN_TICKETS_TAB_ = "Tickets";
+var PLAN_AUTO_GAP_MS_ = 60000;
+var PLAN_FORCE_GAP_MS_ = 15000;
+var PLAN_MAX_WRITES_ = 15;
+var PLAN_APP_STOPS_ = true;
 
 // The trip plan: stops, stays and day headers differ only in these. `key` is
 // the column a row is found by (and the Log's ref); `fields` are the API
@@ -236,6 +257,7 @@ function dispatch_(body, holder) {
     case "removeTicket": write = removeTicket_; break;
     case "syncPayments": write = null; break;
     case "syncTodos": write = null; break;
+    case "syncPlan": write = null; break;
     default: return err_("bad_input", MSG_.badAction);
   }
   var names = peopleNames_();
@@ -251,6 +273,7 @@ function dispatch_(body, holder) {
   // Reads the planner first, then takes the lock itself.
   if (action === "syncPayments") return syncPayments_(args, ctx);
   if (action === "syncTodos") return syncTodos_(args, ctx);
+  if (action === "syncPlan") return syncPlan_(args, ctx);
   // Fetching the day's rate can take a few seconds; do it before taking the lock.
   if (action === "addExpense") ctx.rate = getRate_();
   // A write's planner part (then_) runs after the app's lock is let go (R49).
@@ -382,6 +405,7 @@ function load_(holder) {
   var rev = rev_();
   var rate = getRateInfo_();
   var book = stampBook_();
+  var following = planFollow_();
   var data = {
     trip: trip,
     people: peopleRows_().map(personFromRow).map(function (p) {
@@ -396,6 +420,12 @@ function load_(holder) {
       if (holder && holder.kind === "check") {
         st.tkRef = "";
         st.tkName = "";
+      }
+      // Not following the planner: every stop is the app's, whatever its cells say.
+      if (!following) {
+        st.fromPlanner = false;
+        st.tkFromPlanner = false;
+        st.movedFrom = "";
       }
       return st;
     }),
@@ -413,7 +443,10 @@ function load_(holder) {
     stamps: book.stamps,
     paymentProblems: plannerProblemsStored_("PAYMENT_PROBLEMS"),
     todoProblems: plannerProblemsStored_("TODO_PROBLEMS"),
+    planFollow: following,
+    planPulledAt: getProp_("PLAN_PULLED_AT") || "",
   };
+  data.planProblems = planProblemsShown_(data.stops, following);
   // The ticket pictures (never their data), once migrate has made the tabs;
   // until then the key is left out and the phones show no tickets.
   // Not those on a removed stop: putting the stop back brings them back.
@@ -2156,6 +2189,153 @@ function undoTicket_(entry, rows, ctx) {
   var shown = logShape_(log);
   shown.canUndo = true;
   return ok_({ entry: shown, logId: log.id, ticket: saved }, bumpRev_());
+}
+
+// ---- the plan, led by the planner's Plan tab (chi#16) ----
+// One owner per field, one direction: the planner's Plan tab owns a stop's
+// day, time, name, booked and fixed, and whether it exists; the app owns
+// everything else. The app reads the planner and never writes to it: no
+// write here goes anywhere but the app's own Stops tab and Log. A pull reads
+// the planner with no lock held, then writes the Stops tab under the app's
+// lock (R49), one row per stop, at most PLAN_MAX_WRITES_ a pull. Until the
+// owner sets the Script Property PLAN_FOLLOW to "on" nothing here reads the
+// planner (planDiff, the dry run, excepted) and every stop is the app's.
+// The planner's id is never in a reply or a log.
+
+// Whether the app follows the planner's Plan tab.
+function planFollow_() {
+  return plannerId_() !== null && getProp_("PLAN_FOLLOW") === "on";
+}
+
+// A pull's answer when nothing was read or written.
+function planZero_(extra) {
+  var out = { added: 0, changed: 0, removed: 0, restored: 0, adopted: 0, same: 0, problems: [], more: false, pulledAt: getProp_("PLAN_PULLED_AT") || "" };
+  Object.keys(extra).forEach(function (k) { out[k] = extra[k]; });
+  return ok_(out, rev_());
+}
+
+// The planner's Plan tab, read with no lock held. -> { rows } | { error }.
+function planRead_() {
+  try {
+    return { rows: plannerTab_(PLAN_TAB_) };
+  } catch (e) {
+    return { error: err_("planner_unreadable", MSG_.plannerUnreadable) };
+  }
+}
+
+// Every Stops row with an id, as planJobs takes it: { stop, led, tkLed }.
+function planCurrent_() {
+  return readTable_("Stops").filter(function (r) { return cellText_(r.id) !== ""; }).map(function (r) {
+    var stop = stopFromRow(r);
+    return { stop: stop, led: stop.fromPlanner, tkLed: stop.tkFromPlanner };
+  });
+}
+
+function syncPlan_(args, ctx) {
+  if (args.auto !== undefined && typeof args.auto !== "boolean") return err_("bad_input", MSG_.badRequest);
+  if (!plannerId_()) return err_("no_planner", MSG_.noPlanner);
+  if (!planFollow_()) return planZero_({ off: true, skipped: true });
+  if (!hasColumn_("Stops", "moved_from")) return err_("needs_migrate", MSG_.needsMigrate);
+  var since = Date.parse(nowIso_()) - Date.parse(getProp_("PLAN_PULLED_AT") || "");
+  if (since >= 0 && (since < PLAN_FORCE_GAP_MS_ || (args.auto === true && since < PLAN_AUTO_GAP_MS_))) return planZero_({ skipped: true });
+
+  var started = nowIso_();
+  var got = planRead_();
+  if (got.error) return got.error;
+  var tix = { linked: false, byStop: {}, problems: [] };
+  var dayDates = tripDates_();
+  var read = planFromRows(got.rows, dayDates);
+  if (read.missing) return err_("planner_columns", read.missing);
+
+  // The same tab as at the last full pull, and no write to the app's Sheet
+  // since (rev): nothing can differ, so no lock and no Stops read.
+  var print = sha256Hex_(JSON.stringify([read.stops, read.problems, read.capped, tix]));
+  if (args.auto === true && getProp_("PLAN_PRINT") === print + "|" + rev_()) {
+    setProp_("PLAN_PULLED_AT", started);
+    return planZero_({ unchanged: true, pulledAt: started });
+  }
+  return withLock_(function () {
+    // A pull that read the planner later has already landed: this read is the
+    // older one and must not put old values back.
+    var landed = Date.parse(getProp_("PLAN_READ_AT") || "");
+    if (isFinite(landed) && landed > Date.parse(started)) return planZero_({ skipped: true });
+    var done = pullPlan_(read, tix, dayDates, ctx);
+    setProp_("PLAN_READ_AT", started);
+    setProp_("PLAN_PROBLEMS", JSON.stringify(plannerProblemsToStore_(started, done.data.problems)));
+    // A pull cut short (more to write) is not done: the next one carries on at once.
+    if (!done.data.more) {
+      setProp_("PLAN_PULLED_AT", started);
+      setProp_("PLAN_PRINT", print + "|" + rev_());
+      done.data.pulledAt = started;
+    } else {
+      delProp_("PLAN_PRINT");
+    }
+    return done;
+  });
+}
+
+// The pull's writes to the Stops tab, under the app's lock: edits, then
+// adds, then removals, one row write per stop, at most PLAN_MAX_WRITES_.
+// Each change but an adoption is one History line, via the planner, in the
+// trip's first person's name; an adoption only marks the stop as the planner's.
+function pullPlan_(read, tix, dayDates, ctx) {
+  var who = { actor: ctx.names[0], via: "planner", names: ctx.names };
+  var current = planCurrent_();
+  var byId = {};
+  current.forEach(function (c) { byId[c.stop.id] = c.stop; });
+  var jobs = planJobs(read, tix, current, dayDates, PLAN_APP_STOPS_);
+  var out = { added: 0, changed: 0, removed: 0, restored: 0, adopted: 0, same: jobs.same, problems: jobs.problems, more: false, held: jobs.held, pulledAt: "" };
+  var writes = 0;
+  var room = function () {
+    if (writes < PLAN_MAX_WRITES_) return true;
+    out.more = true;
+    return false;
+  };
+  var counted = { edit: "changed", restore: "restored", adopt: "adopted" };
+  jobs.edits.forEach(function (job) {
+    if (!room()) return;
+    var before = byId[job.id];
+    var after = stopFromRow(updateWhere_("Stops", "id", job.id, job.cols));
+    writes++;
+    out[counted[job.action]]++;
+    if (job.action !== "adopt") appendLog_(who, job.action, "stop", job.id, summarize(job.action, "stop", before, after), before, after);
+  });
+  jobs.adds.forEach(function (job) {
+    if (!room()) return;
+    var row = stopToRow(job.value);
+    row.deleted_at = "";
+    row.planner = "yes";
+    appendObj_("Stops", row);
+    var saved = stopFromRow(findRow_("Stops", job.id));
+    writes++;
+    out.added++;
+    appendLog_(who, "add", "stop", job.id, summarize("add", "stop", null, saved), null, saved);
+  });
+  jobs.removals.forEach(function (job) {
+    if (!room()) return;
+    var before = byId[job.id];
+    var after = stopFromRow(updateWhere_("Stops", "id", job.id, { deleted_at: nowIso_(), planner: "", tk_planner: "" }));
+    writes++;
+    out.removed++;
+    appendLog_(who, "delete", "stop", job.id, summarize("delete", "stop", before, after), before, after);
+  });
+  return ok_(out, writes ? bumpRev_() : rev_());
+}
+
+// What load gives as planProblems: the last pull's list, and in front of it
+// a line for each live stop the planner moved to another day whose
+// directions have not been looked at since; at most 20, more counting the
+// rest. The empty shape while not following.
+function planProblemsShown_(stops, following) {
+  if (!following) return { at: "", list: [], more: 0 };
+  var stored = plannerProblemsStored_("PLAN_PROBLEMS");
+  var moved = stops.filter(function (st) {
+    return !st.deleted && st.movedFrom !== "" && (st.gettingThere !== "" || st.travelMin > 0);
+  }).map(function (st) {
+    return { id: st.id, message: MSG_.planMoved.replace("{day}", dayLabel(st.movedFrom)), row: null, what: plannerWhat_(st.title) };
+  });
+  var all = moved.concat(stored.list);
+  return { at: stored.at, list: all.slice(0, 20), more: stored.more + Math.max(0, all.length - 20) };
 }
 
 // ---- undo ----

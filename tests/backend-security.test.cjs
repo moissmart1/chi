@@ -253,6 +253,28 @@ test("the check key may load, rev, history and migrate, and nothing else; its lo
   assert.equal(JSON.stringify(load).includes("mo@example.com"), false);
 });
 
+test("the plan from the planner (chi#16): syncPlan under the check key or through the connector is refused; the planner's id is in no answer", async () => {
+  const PLANNER_ID = "fakePlannerSheet_0123456789abcdefXYZ";
+  const plan = [["stop_id", "date", "time", "what"], ["teststop0001", "2026-12-28", "10:00", "Corner museum"]];
+  const w = world(["Mo", "Izzah"], { ...SEED, ...PLAN, plannerId: PLANNER_ID, plannerTabs: { Plan: plan }, props: { PLAN_FOLLOW: "on" } });
+  const C = w.fake.CHECK_KEY;
+  for (const args of [{}, { auto: true }]) {
+    const r = await w.as(C, "syncPlan", args, { actor: "Mo" });
+    assert.deepEqual([r.ok, r.error, r.message], [false, "bad_input", "This key can only read the trip."]);
+  }
+  assert.equal(w.fake.planner.reads, 0);
+  const viaClaude = await w.fake.claude("syncPlan", {});
+  assert.deepEqual([viaClaude.ok, viaClaude.error], [false, "bad_input"]);
+  const answers = [await w.as(w.keys.Mo, "syncPlan", {}), await w.as(C, "load"), await w.as(w.keys.Izzah, "load")];
+  w.fake.planner.fails = true;
+  delete w.fake.props.PLAN_PULLED_AT; // as if the last pull were long ago
+  answers.push(await w.as(w.keys.Izzah, "syncPlan", {}));
+  assert.equal(answers[0].ok, true, JSON.stringify(answers[0]));
+  assert.equal(answers[3].error, "planner_unreadable");
+  assert.equal(JSON.stringify(answers).includes(PLANNER_ID), false);
+  assert.deepEqual(w.fake.planner.writes, []);
+});
+
 // ---------- the Claude link and the connector ----------
 
 test("the connector keeps working after TRIP_KEY is gone, and writes as the owner", () => {

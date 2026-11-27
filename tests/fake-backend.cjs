@@ -6,7 +6,9 @@
 // back the way Sheets hands them back (a stored "'=x" reads as "=x").
 //
 // seed = { expenses?, payments?, people?, addPeople?, days?, stops?, stays?,
-// missingColumns?, missingTabs? } (see constraints R6). An expense may carry
+// missingColumns?, missingTabs?, props? } (see constraints R6). props: more
+// Script Properties as they are kept ({ PLAN_FOLLOW: "on" }). A stop may
+// carry fromPlanner, tkFromPlanner and movedFrom: the cells a plan pull writes. An expense may carry
 // plannerId: it is then a line brought in from the planner (its planner_id). addPeople: more
 // People rows ({ name, initials, ... }) after the seed's Mo and Izzah;
 // missingColumns: ["Tab.column", ...] an older Sheet lacks until migrate
@@ -122,6 +124,8 @@ function createFakeBackend(seed, { clock, lockFails, keepsApostrophe = false } =
   if (seed && seed.paymentProblems) props.PAYMENT_PROBLEMS = JSON.stringify(seed.paymentProblems);
   // todoProblems: the last Book Now pull's list as load hands it back ({ at, list, more }).
   if (seed && seed.todoProblems) props.TODO_PROBLEMS = JSON.stringify(seed.todoProblems);
+  // props: any other Script Properties, as they are kept (PLAN_FOLLOW: "on", say).
+  if (seed && seed.props) Object.assign(props, copy(seed.props));
   const planner = {
     rows: seed && seed.planner !== undefined ? copy(seed.planner) : [], fails: false, reads: 0,
     tabs: copy((seed && seed.plannerTabs) || {}), writes: [], cellFails: false, appendFails: false,
@@ -565,8 +569,16 @@ function seedWorld(P, prim, tables, props, seed, now) {
       const at = now();
       const row = toRow(given);
       row.deleted_at = given.deleted ? at : "";
+      // A stop led by the planner's Plan tab (fromPlanner), its ticket details
+      // by the Tickets tab (tkFromPlanner), moved there from a day (movedFrom):
+      // the cells a pull writes.
+      if (kind === "stop") {
+        if (given.fromPlanner) row.planner = "yes";
+        if (given.tkFromPlanner) row.tk_planner = "yes";
+        if (given.movedFrom) row.moved_from = given.movedFrom;
+      }
       prim.appendObj_(tab, row);
-      const saved = fromRow(lastRow(tab));
+      const saved = P.logSnap_(kind, fromRow(lastRow(tab)));
       const live = { ...saved, deleted: false };
       const base = { at, who: "Mo", kind, ref: saved.id };
       events.push({ ...base, action: "add", summary: P.summarize("add", kind, null, live), before: null, after: live });

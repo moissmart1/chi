@@ -273,3 +273,237 @@ test("canUndo: a stop change from the planner can't be undone; the app's own can
   assert.equal(P.canUndo({ ...e, via: "app" }, []), true);
   assert.equal(P.canUndo({ ...e, kind: "expense", via: "planner" }, []), true, "a payment's line still can");
 });
+
+// ---------- the pull, through the fake backend ----------
+
+const { createFakeBackend, CHECK_KEY } = require("./fake-backend.cjs");
+const KEY = "test-key";
+const PLANNER_ID = "fakePlannerSheet_0123456789abcdefXYZ";
+// A stop with every column the app owns filled in.
+const FULL = { id: "teststop0001", date: "2026-12-28", time: "10:00", title: "Corner museum", detail: "Our own line", gettingThere: "Walk two blocks west", travelMin: 9, fixed: false, place: "https://maps.example.test/place/x", signJp: "Made-up sign", booked: true, link: "https://book.example.test/a", photo: "https://img.example.test/a.jpg", note: "Our note", lat: "41.88", lng: "-87.63", tkRef: "ZZ00001", tkName: "Sam Example", tkPeople: "Mo, Izzah", tkSeat: "Row C" };
+const APP_PIER = { id: "teststop0002", date: "2026-12-29", time: "", title: "Pier stop", booked: false };
+const APP_SHOW = { id: "teststop0003", date: "2026-12-30", time: "19:30", title: "Late show", booked: true, fixed: true };
+
+// A fake whose clock can be moved (at.now), following the planner unless follow is false.
+function linked({ stops = [FULL, APP_PIER, APP_SHOW], plan = [HEAD, prow(MUSEUM), prow(PIER), prow(SHOW)], tickets, follow = true, over = {} } = {}) {
+  const at = { now: "2026-12-20T15:00:00.000Z" };
+  const plannerTabs = { Plan: plan };
+  if (tickets) plannerTabs.Tickets = tickets;
+  const fake = createFakeBackend({ plannerId: PLANNER_ID, plannerTabs, stops, props: follow ? { PLAN_FOLLOW: "on" } : {}, ...over }, { clock: () => at.now });
+  const call = (action, args = {}, actor = "Mo") => fake({ key: KEY, actor, action, args });
+  call.fake = fake;
+  call.at = at;
+  return call;
+}
+const later = (call, seconds) => { call.at.now = new Date(Date.parse(call.at.now) + seconds * 1000).toISOString(); };
+const stored = (call, id) => call.fake.tables.Stops.find((r) => r.id === id);
+const planOf = (call) => call.fake.planner.tabs.Plan;
+const setPlan = (call, ...rows) => { call.fake.planner.tabs.Plan = [HEAD, ...rows.map(prow)]; };
+const planReads = (call) => call.fake.planner.calls.filter((c) => c.op === "read").length;
+const logRows = (call) => call.fake.tables.Log;
+const loadStops = async (call) => (await call("load")).data.stops;
+const counts = (d) => [d.added, d.changed, d.removed, d.restored, d.adopted, d.same];
+// Every scenario ends here: the planner received no write, and was never read under the app's lock.
+function clean(call) {
+  assert.deepEqual(call.fake.planner.writes, [], "nothing was written to the planner");
+  assert.equal(call.fake.planner.calls.some((c) => c.op !== "read"), false, "only reads reached the planner");
+  assert.equal(call.fake.planner.calls.some((c) => c.appLock), false, "never read under the app's lock (R49)");
+}
+// The columns of a Stops row a pull may never change.
+const PULL_COLS = ["date", "time", "title", "booked", "fixed", "deleted_at", "planner", "tk_planner", "moved_from", "tk_ref", "tk_name", "tk_people", "tk_seat"];
+const others = (row) => Object.fromEntries(Object.entries(row).filter(([k]) => !PULL_COLS.includes(k)));
+
+test("off is off: with PLAN_FOLLOW unset syncPlan answers off and reads nothing; load says not following and no stop is the planner's", async () => {
+  const call = linked({ follow: false, stops: [{ ...FULL, fromPlanner: true, tkFromPlanner: true, movedFrom: "2026-12-27" }, APP_PIER] });
+  const r = await call("syncPlan", {});
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.deepEqual(r.data, { added: 0, changed: 0, removed: 0, restored: 0, adopted: 0, same: 0, problems: [], more: false, pulledAt: "", off: true, skipped: true });
+  assert.equal((await call("syncPlan", { auto: true })).data.off, true);
+  assert.equal(planReads(call), 0, "no planner read at all");
+  const l = (await call("load")).data;
+  assert.deepEqual([l.planFollow, l.planPulledAt, l.planProblems], [false, "", { at: "", list: [], more: 0 }]);
+  assert.ok(l.stops.every((s) => s.fromPlanner === false && s.tkFromPlanner === false && s.movedFrom === ""));
+  // The stop whose planner cell says yes is edited, removed and undone as today.
+  const e = await call("updateStop", { id: FULL.id, patch: { time: "12:00", title: "Renamed here", tkRef: "ZZ00002" } });
+  assert.equal(e.ok, true, JSON.stringify(e));
+  assert.equal((await call("undo", { logId: e.data.logId })).ok, true);
+  assert.equal(stored(call, FULL.id).title, "Corner museum");
+  const d = await call("deleteStop", { id: FULL.id });
+  assert.equal(d.ok, true);
+  assert.equal((await call("undo", { logId: d.data.logId })).ok, true);
+  assert.equal(stored(call, FULL.id).deleted_at, "");
+  // With no planner linked at all: as for payments.
+  const none = linked({ follow: false, over: { plannerId: undefined } });
+  assert.equal((await none("syncPlan", {})).error, "no_planner");
+  clean(call);
+});
+
+test("bad input and an old Sheet: auto must be a boolean; no moved_from column says migrate", async () => {
+  const call = linked();
+  assert.equal((await call("syncPlan", { auto: "yes" })).error, "bad_input");
+  const old = linked({ over: { missingColumns: ["Stops.planner", "Stops.tk_planner", "Stops.moved_from"] } });
+  const r = await old("syncPlan", {});
+  assert.deepEqual([r.ok, r.error], [false, "needs_migrate"]);
+  assert.equal(planReads(old), 0);
+  clean(call);
+});
+
+test("the first sync: 20 stops the Plan tab already lists are adopted 15 then 5, with no History line, and only the planner column written", async () => {
+  const stops = [];
+  for (let i = 1; i <= 20; i++) stops.push({ ...FULL, id: "teststop" + String(i).padStart(4, "0"), title: "Stop " + i });
+  const plan = [HEAD, ...stops.map((s) => prow({ stop_id: s.id, date: s.date, time: s.time, what: s.title, booked: "yes" }))];
+  const call = linked({ stops, plan });
+  const before = JSON.parse(JSON.stringify(call.fake.tables.Stops));
+  const logged = logRows(call).length;
+  const rev = (await call("rev")).rev;
+  const one = await call("syncPlan", { auto: true });
+  assert.equal(one.ok, true, JSON.stringify(one));
+  assert.deepEqual([...counts(one.data), one.data.more], [0, 0, 0, 0, 15, 0, true]);
+  assert.equal(one.data.pulledAt, "", "not done while more remain");
+  assert.equal(one.rev, rev + 1, "rev moves once");
+  assert.equal((await call("load")).data.planPulledAt, "");
+  const two = await call("syncPlan", { auto: true });
+  assert.deepEqual([...counts(two.data), two.data.more], [0, 0, 0, 0, 5, 15, false]);
+  assert.equal(two.data.pulledAt, call.at.now);
+  later(call, 20);
+  const three = await call("syncPlan", {});
+  assert.deepEqual([...counts(three.data), three.data.more], [0, 0, 0, 0, 0, 20, false]);
+  assert.equal(logRows(call).length, logged, "no History line for an adoption");
+  call.fake.tables.Stops.forEach((row, i) => {
+    assert.deepEqual({ ...row, planner: "" }, { ...before[i], planner: "" }, "nothing but the planner column");
+    assert.equal(row.planner, "yes");
+  });
+  assert.ok((await loadStops(call)).every((s) => s.fromPlanner === true));
+  clean(call);
+});
+
+test("each kind of change lands once, logged via the planner in the first person's name; rev moves once a pull; the app's own columns never change", async () => {
+  const call = linked();
+  const full = others(stored(call, FULL.id));
+  const first = await call("syncPlan", {}, "Izzah");
+  assert.deepEqual(counts(first.data), [0, 0, 0, 0, 3, 0]);
+  const steps = [
+    ["change", [{ ...MUSEUM, time: "11:30", what: "Corner museum, east wing" }, PIER, SHOW], [0, 1, 0, 0, 0, 2], "edit", "renamed Corner museum to Corner museum, east wing"],
+    ["move", [{ ...MUSEUM, date: "2026-12-31", time: "11:30", what: "Corner museum, east wing" }, PIER, SHOW], [0, 1, 0, 0, 0, 2], "edit", "moved Corner museum, east wing to Thu Dec 31 11:30"],
+    ["add", [{ ...MUSEUM, date: "2026-12-31", time: "11:30", what: "Corner museum, east wing" }, PIER, SHOW, { stop_id: "teststop0009", date: "Dec 27", time: "9:00 am", what: "Breakfast counter" }], [1, 0, 0, 0, 0, 3], "add", "added Breakfast counter to Sun Dec 27"],
+    ["removal", [PIER, SHOW, { stop_id: "teststop0009", date: "Dec 27", time: "9:00 am", what: "Breakfast counter" }], [0, 0, 1, 0, 0, 3], "delete", "removed Corner museum, east wing from Thu Dec 31"],
+    ["return", [{ ...MUSEUM, date: "2026-12-31", time: "11:30", what: "Corner museum, east wing" }, PIER, SHOW, { stop_id: "teststop0009", date: "Dec 27", time: "9:00 am", what: "Breakfast counter" }], [0, 0, 0, 1, 0, 3], "restore", "put back Corner museum, east wing on Thu Dec 31"],
+  ];
+  for (const [name, rows, want, action, summary] of steps) {
+    later(call, 20);
+    setPlan(call, ...rows);
+    const rev = (await call("rev")).rev;
+    const logged = logRows(call).length;
+    const r = await call("syncPlan", {}, "Izzah");
+    assert.equal(r.ok, true, name + JSON.stringify(r));
+    assert.deepEqual(counts(r.data), want, name);
+    assert.equal(r.rev, rev + 1, name + ": rev moves once");
+    const lines = logRows(call).slice(logged);
+    assert.deepEqual(lines.map((l) => [l.who, l.via, l.action, l.kind, l.summary]), [["Mo", "planner", action, "stop", summary]], name);
+    assert.deepEqual(others(stored(call, FULL.id)), full, name + ": the app's own columns are byte-identical");
+    // The same read again changes nothing.
+    later(call, 20);
+    assert.deepEqual(counts((await call("syncPlan", {})).data).slice(0, 5), [0, 0, 0, 0, 0], name + " twice");
+  }
+  const museum = (await loadStops(call)).find((s) => s.id === FULL.id);
+  assert.deepEqual([museum.date, museum.time, museum.title, museum.deleted, museum.fromPlanner, museum.movedFrom], ["2026-12-31", "11:30", "Corner museum, east wing", false, true, "2026-12-28"]);
+  const added = (await loadStops(call)).find((s) => s.id === "teststop0009");
+  assert.deepEqual([added.date, added.time, added.title, added.fromPlanner, added.detail, added.photo], ["2026-12-27", "09:00", "Breakfast counter", true, "", ""]);
+  // History: each planner line says so and has no Undo.
+  const hist = (await call("history")).data.entries.filter((e) => e.via === "planner");
+  assert.equal(hist.length, 5);
+  assert.ok(hist.every((e) => e.canUndo === false));
+  clean(call);
+});
+
+test("unreadable: a Plan read that throws changes nothing and never says the planner's id; no tab or no header says which", async () => {
+  const call = linked();
+  call.fake.planner.fails = true;
+  const props = JSON.stringify(call.fake.props);
+  const stops = JSON.stringify(call.fake.tables.Stops);
+  for (const args of [{}, { auto: true }]) {
+    const r = await call("syncPlan", args);
+    assert.deepEqual([r.ok, r.error, r.message], [false, "planner_unreadable", "Couldn’t read the planner sheet. Ask Mo to check its permission."]);
+    assert.equal(JSON.stringify(r).includes(PLANNER_ID), false);
+  }
+  assert.equal(JSON.stringify(call.fake.props), props, "no property changed");
+  assert.equal(JSON.stringify(call.fake.tables.Stops), stops, "no stop changed");
+  assert.equal(JSON.stringify(await call("load")).includes(PLANNER_ID), false);
+  call.fake.planner.fails = false;
+  delete call.fake.planner.tabs.Plan;
+  assert.deepEqual(await call("syncPlan", {}).then((r) => [r.error, r.message]), ["planner_columns", "The planner has no Plan tab to read."]);
+  call.fake.planner.tabs.Plan = [["stop_id", "date", "what"], prow(MUSEUM)];
+  assert.deepEqual(await call("syncPlan", {}).then((r) => [r.error, r.message]), ["planner_columns", "The planner’s Plan tab has no row with the columns stop_id, date, time and what."]);
+  assert.equal(JSON.stringify(call.fake.tables.Stops), stops);
+  clean(call);
+});
+
+test("the gap: an auto ask within a minute of the last pull reads nothing; a plain one after 15 seconds reads", async () => {
+  const call = linked();
+  await call("syncPlan", {});
+  const reads = planReads(call);
+  later(call, 10);
+  assert.equal((await call("syncPlan", {})).data.skipped, true, "within 15 seconds even a plain ask is answered from what is there");
+  later(call, 40);
+  const auto = await call("syncPlan", { auto: true });
+  assert.deepEqual([auto.data.skipped, auto.data.pulledAt], [true, "2026-12-20T15:00:00.000Z"]);
+  assert.equal(planReads(call), reads, "nothing read");
+  const plain = await call("syncPlan", {});
+  assert.equal(plain.data.skipped, undefined);
+  assert.equal(planReads(call), reads + 1);
+  later(call, 61);
+  await call("syncPlan", { auto: true });
+  assert.equal(planReads(call), reads + 2, "an auto ask a minute on reads");
+  clean(call);
+});
+
+test("an older read landing after a newer one is dropped", async () => {
+  const call = linked();
+  await call("syncPlan", {});
+  later(call, 20);
+  // Another pull reads the planner a moment later and lands while this one is between its read and the lock.
+  const read = call.fake.world.plannerTab_;
+  call.fake.world.plannerTab_ = (tab) => {
+    const rows = read(tab);
+    call.fake.props.PLAN_READ_AT = new Date(Date.parse(call.at.now) + 1000).toISOString();
+    return rows;
+  };
+  setPlan(call, { ...MUSEUM, time: "08:00" }, PIER, SHOW);
+  const logged = logRows(call).length;
+  const r = await call("syncPlan", {});
+  assert.equal(r.data.skipped, true);
+  assert.equal(logRows(call).length, logged, "nothing written");
+  assert.equal(stored(call, FULL.id).time, "10:00");
+  call.fake.world.plannerTab_ = read;
+  later(call, 20);
+  assert.equal((await call("syncPlan", {})).data.changed, 1, "a later read goes through");
+  clean(call);
+});
+
+test("the print: an unchanged tab on an auto ask takes no lock and reads no Stops; an app write since, or a plain ask, pulls in full", async () => {
+  const call = linked();
+  let locks = 0;
+  const withLock = call.fake.world.withLock_;
+  call.fake.world.withLock_ = (fn) => { locks++; return withLock(fn); };
+  await call("syncPlan", { auto: true });
+  assert.equal(locks, 1);
+  later(call, 61);
+  const stopReads = call.fake.tableReads.Stops || 0;
+  const r = await call("syncPlan", { auto: true });
+  assert.deepEqual([r.data.unchanged, r.data.pulledAt], [true, call.at.now]);
+  assert.equal(locks, 1, "no lock");
+  assert.equal(call.fake.tableReads.Stops || 0, stopReads, "no Stops read");
+  assert.equal((await call("load")).data.planPulledAt, call.at.now, "counted as a pull for the gap");
+  // A plain ask ignores the print.
+  later(call, 20);
+  assert.equal((await call("syncPlan", {})).data.unchanged, undefined);
+  assert.equal(locks, 2);
+  // An app write moves rev: the next auto ask pulls in full.
+  assert.equal((await call("updateStop", { id: FULL.id, patch: { note: "A new note" } })).ok, true);
+  later(call, 61);
+  const locksNow = locks;
+  const full = await call("syncPlan", { auto: true });
+  assert.equal(full.data.unchanged, undefined);
+  assert.equal(locks, locksNow + 1, "the pull takes the lock");
+  clean(call);
+});
