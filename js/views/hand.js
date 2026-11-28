@@ -47,6 +47,9 @@ const BELL = `<svg class="bf-defs" width="0" height="0" aria-hidden="true" focus
 </symbol></defs></svg>`;
 
 const list = (v) => (Array.isArray(v) ? v : []);
+// Item texts compared as the backend's sameItem_ does: runs of spaces (non-breaking
+// ones too) count as one, and the ends are trimmed.
+const sameItem = (a, b) => String(a == null ? "" : a).replace(/[\s\u00a0]+/g, " ").trim() === String(b == null ? "" : b).replace(/[\s\u00a0]+/g, " ").trim();
 
 export function mountHand(root, store, { now = () => Date.now(), onSettled = () => {} } = {}) {
   const scrim = el("div", "scrim");
@@ -360,13 +363,26 @@ export function mountHand(root, store, { now = () => Date.now(), onSettled = () 
     }
   }
 
+  // A redraw between finger down and finger up (a quiet pull, another phone's
+  // claim) replaces the bell, so the tap is done on finger up. The bell press
+  // keeps the open slip's # and item text: a pull that renumbered the planner
+  // meanwhile can put another item under that #, and then nothing is rung (chi#13).
   const tap = tapOnRelease(sheet, {
     pick: (target) => {
       const b = target.closest("#bfBell, [data-act]");
       if (!b || !body.contains(b)) return null;
-      return b.id === "bfBell" ? "bell" : b.dataset.act;
+      if (b.id !== "bfBell") return b.dataset.act;
+      const t = current();
+      return t ? { bell: true, id: t.id, item: t.item } : null;
     },
-    act: (what) => doAct(what),
+    act: (what) => {
+      if (what && typeof what === "object") {
+        const t = current();
+        if (what.bell && t && t.id === what.id && sameItem(t.item, what.item)) ring();
+        return;
+      }
+      doAct(what);
+    },
   });
   sheet.addEventListener("click", (ev) => {
     if (tap.skip(ev)) return;

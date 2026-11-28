@@ -43,6 +43,7 @@ var MSG_ = {
   notYourPicture: "You can only change your own picture.",
   noTodo: "That one isn’t on the list any more.",
   todoDone: "That one is already done.",
+  todoChanged: "That number is another item in the planner now, so nothing was ticked. Check the list again.",
   tickTakenOff: "That number is another item in the planner now: its tick was taken off.",
   claimTakenOff: "That number is another item in the planner now: nobody is on it any more.",
   bothTakenOff: "That number is another item in the planner now: its tick was taken off and nobody is on it any more.",
@@ -1246,6 +1247,8 @@ var TODO_APP_ = "Wendy’s app";
 var TODO_TICK_WHY_ = "Ticked off in the " + TODO_APP_;
 var TODO_UNTICK_WHY_ = "Tick undone in the " + TODO_APP_;
 var TODO_UNRECORDED_WHY_ = "The " + TODO_APP_ + " couldn’t record the tick; put back";
+// The longest item text a tick may carry (an Item is cut to 300 characters).
+var TODO_ITEM_ARG_MAX_ = 1000;
 
 // Item texts compared as the same item: runs of spaces (non-breaking ones
 // too) count as one, and the ends are trimmed, on both sides.
@@ -1734,9 +1737,17 @@ function liveTodo_(args) {
 // Saved first under the app's lock (the tick stands on its own); the
 // planner write follows once the lock is let go (then_, run by dispatch_).
 function tickTodo_(args, ctx) {
+  // chi#13 (the Japan app's #78): the item the phone showed under that #. A
+  // phone from before it was sent sends none: ticked as before (no tick is
+  // ever kept on a phone to be sent later, so none can come from an older
+  // list than the page open on it).
+  if (args.item !== undefined && (typeof args.item !== "string" || args.item.length > TODO_ITEM_ARG_MAX_)) return err_("bad_input", MSG_.badRequest);
   var got = liveTodo_(args);
   if (got.env) return got.env;
   var cur = got.todo;
+  // A pull has put another item under that # since the phone drew its list:
+  // nothing is ticked, and the phone fetches the list again (R49).
+  if (args.item !== undefined && !sameItem_(args.item, cur.item)) return err_("item_changed", MSG_.todoChanged);
   if (cur.done) return err_("bad_input", MSG_.todoDone);
   // The connector never makes a tick (R49 M1): a tick is what reaches the planner.
   if (ctx.via === "claude") return err_("bad_input", MSG_.claudeTick);

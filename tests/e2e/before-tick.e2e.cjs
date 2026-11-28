@@ -4,12 +4,27 @@
 
 const assert = require("node:assert/strict");
 const { advance, until, text } = require("./helpers.cjs");
-const { makeBook, openBefore, shot, slip, railIds, spikeIds } = require("./before-fixture.cjs");
+const { makeBook, openBefore, shot, slip, railIds, spikeIds, asApp, whoText } = require("./before-fixture.cjs");
 
 const isOpen = (page) => page.locator("#bfHand").evaluate((n) => n.classList.contains("is-open") && !n.inert);
 // The ticks this phone sent (the fixture already ticked #7, from another phone, before the page opened).
 const ticks = (backend) => backend.requests.filter((r) => r.action === "tickTodo" && r.args.id !== "7");
 const statusOf = (backend, row) => backend.fake.planner.tabs["Book Now"][row][3];
+// chi#13: Mo renumbers his planner and Izzah's phone pulls it in, so #id is another item now.
+const renumber = async (backend, row, item) => {
+  backend.fake.planner.tabs["Book Now"][row][1] = item;
+  backend.now += 60 * 1000; // a forced pull reads the planner again after 30 seconds
+  const r = await asApp(backend, "Izzah", "syncTodos", { force: true });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.equal(!!r.data.stored, false, "the planner was read again");
+};
+const tickedBy = (backend, id) => (backend.fake.tables.Todos.find((r) => String(r.id) === id) || {}).ticked_by;
+// The finger goes down on the bell (and stays down), once the sheet has stopped sliding in.
+const pressBell = async (page) => {
+  await page.locator("#bfBell").hover();
+  await page.mouse.down();
+};
+const CHANGED = "That number is another item in the planner now, so nothing was ticked. Check the list again.";
 const focusedIs = (page, sel) => page.evaluate((s) => document.activeElement === document.querySelector(s), sel);
 const ring = async (page, id) => {
   await slip(page, id).click();
@@ -46,7 +61,7 @@ module.exports = [
       assert.equal(await text(page, "#beforeN"), "6");
       await ring(page, "1");
       await until(() => ticks(backend).length === 1, "one tickTodo was sent");
-      assert.deepEqual(ticks(backend)[0].args, { id: "1" });
+      assert.deepEqual(ticks(backend)[0].args, { id: "1", item: "Made-up rooftop table" }, "the item as shown goes with the #");
       // The rung form.
       assert.equal(await text(page, "#bfHand .bf-print"), "BOOKEDDEC 01 14:07 MO");
       assert.equal(await text(page, "#bfSay"), "Order up.It’s on the spike.");
@@ -258,6 +273,67 @@ module.exports = [
       await advance(page, backend, 1700);
       await until(async () => !(await isOpen(page)), "closed");
       assert.match((await page.locator("#bfDone [data-id='1'] .bf-slip").getAttribute("class")) || "", /\bis-new\b/);
+    },
+  },
+  {
+    name: "chi#13: a pull that puts another item under the open slip's # while a finger is on the bell: nothing is rung, the sheet shows the new item",
+    async run({ page }) {
+      const backend = await makeBook();
+      await openBefore(page, backend);
+      await slip(page, "1").click();
+      await until(() => isOpen(page), "open");
+      await pressBell(page);
+      await renumber(backend, 1, "Made-up renumbered item");
+      await page.evaluate(() => globalThis.__matTest.store.refresh());
+      await until(async () => (await text(page, "#bfHand .bf-n")) === "Made-up renumbered item", "the sheet was redrawn with the new item");
+      await page.mouse.up();
+      await advance(page, backend, 300);
+      await new Promise((r) => setTimeout(r, 300));
+      assert.equal(ticks(backend).length, 0, "no tick sent");
+      assert.equal(await page.locator("#bfHand .bf-print").count(), 0, "nothing printed");
+      assert.equal(await page.locator("#bfBell").isDisabled(), false, "the bell is still live");
+      assert.equal(await isOpen(page), true);
+      assert.equal(tickedBy(backend, "1"), "");
+      assert.equal(statusOf(backend, 1), "To book", "nothing written to the planner");
+    },
+  },
+  {
+    name: "chi#13: a redraw for the same item while a finger is on the bell still rings it",
+    async run({ page }) {
+      const backend = await makeBook();
+      await openBefore(page, backend);
+      await slip(page, "1").click();
+      await until(() => isOpen(page), "open");
+      await pressBell(page);
+      // Izzah takes #1 while the finger is down: the sheet is drawn again, same item.
+      await asApp(backend, "Izzah", "claimTodo", { id: "1", on: true });
+      await page.evaluate(() => globalThis.__matTest.store.refresh());
+      await until(async () => (await whoText(page, "#bfHand .bf-hand-who")) === "Izzah’s on it", "the sheet was redrawn");
+      await page.mouse.up();
+      await until(() => ticks(backend).length === 1, "the tap rang the bell");
+      assert.deepEqual(ticks(backend)[0].args, { id: "1", item: "Made-up rooftop table" });
+      await page.locator("#bfHand .bf-print").waitFor();
+    },
+  },
+  {
+    name: "chi#13: a bell rung on a sheet drawn before a pull put another item under that #: refused in a plain sentence, nothing ticked, the sheet shows the new item",
+    async run({ page }) {
+      const backend = await makeBook();
+      await openBefore(page, backend);
+      await slip(page, "1").click();
+      await until(() => isOpen(page), "open");
+      await renumber(backend, 1, "Made-up renumbered item");
+      assert.equal(await text(page, "#bfHand .bf-n"), "Made-up rooftop table", "this phone still shows the old #1");
+      await page.locator("#bfBell").click();
+      await until(async () => (await text(page, "#ubarT")) === CHANGED, "the store says why, plainly");
+      await until(async () => (await text(page, "#bfHand .bf-n")) === "Made-up renumbered item", "the list was fetched again");
+      assert.equal(await page.locator("#bfBell").isDisabled(), false, "the bell is live again: an open slip");
+      assert.equal(await page.locator("#bfHand .bf-print").count(), 0);
+      assert.deepEqual(ticks(backend).map((r) => r.args), [{ id: "1", item: "Made-up rooftop table" }]);
+      assert.equal(tickedBy(backend, "1"), "", "not ticked");
+      assert.equal(statusOf(backend, 1), "To book", "nothing written to the planner");
+      await advance(page, backend, 2000);
+      assert.equal(await isOpen(page), true, "no timer closes an open slip");
     },
   },
 ];

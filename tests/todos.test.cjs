@@ -2061,3 +2061,58 @@ test("Chicago layout: a Status cell the planner computes is left alone, and Pend
   assert.deepEqual(writes(call)[0], { kind: "cell", tab: "Book Now", cell: "F7", value: "Booked" });
   assert.equal(writes(call)[1].values[6], "Decide", "the Change Log keeps the old value");
 });
+
+
+// ---------- chi#13 (the Japan app's #78): a tick carries the item the phone showed ----------
+
+const CHANGED = "That number is another item in the planner now, so nothing was ticked. Check the list again.";
+
+test("chi#13: a tick for the item shown, after a pull put another item under that #, is refused: nothing saved, no History, nothing written, rev unchanged", async () => {
+  const call = linked();
+  await call("syncTodos");
+  // Mo renumbers his planner; a pull brings it in. A phone still shows the old #1.
+  call.fake.planner.tabs["Book Now"] = bookNow({ ...B1, Item: "Made-up item that took #1" }, B2, B3);
+  await forced(call);
+  const rev = (await call("rev")).rev;
+  const logs = logRows(call).length;
+  const r = await call("tickTodo", { id: "1", item: "Rail pass reservation" }, "Izzah");
+  assert.deepEqual([r.ok, r.error, r.message], [false, "item_changed", CHANGED]);
+  assert.deepEqual([stored(call, "1").ticked_by, stored(call, "1").ticked_item, stored(call, "1").planner_written], ["", "", ""]);
+  assert.equal(logRows(call).length, logs, "no History");
+  assert.deepEqual(writes(call), [], "nothing written to the planner");
+  assert.equal((await call("rev")).rev, rev);
+  // Ticked for the item now under #1, it goes through as any tick.
+  const t = await call("tickTodo", { id: "1", item: "Made-up item that took #1" }, "Izzah");
+  assert.deepEqual([t.ok, t.data.planner, stored(call, "1").ticked_item], [true, "written", "Made-up item that took #1"]);
+});
+
+test("chi#13: the item shown matches as sameItem_ does (runs of spaces and non-breaking spaces, the ends); case is another item", async () => {
+  const call = linked({ book: bookNow({ ...B1, Item: "Rail  pass  reservation" }, B2, B3) });
+  await call("syncTodos");
+  const ok = await call("tickTodo", { id: "1", item: "  Rail pass reservation " });
+  assert.deepEqual([ok.ok, ok.data.planner], [true, "written"]);
+  const cased = await call("tickTodo", { id: "2", item: "tea ceremony class" });
+  assert.deepEqual([cased.ok, cased.error], [false, "item_changed"]);
+  assert.equal(stored(call, "2").ticked_by, "");
+});
+
+test("chi#13: a tick with no item (a page from before this change) ticks as before", async () => {
+  const call = linked();
+  await call("syncTodos");
+  const t = await call("tickTodo", { id: "1" });
+  assert.deepEqual([t.ok, t.data.planner, stored(call, "1").ticked_item], [true, "written", "Rail pass reservation"]);
+});
+
+test("chi#13: an item that is not text, or longer than any Item, is a bad request; a changed item is said before already-done", async () => {
+  const call = linked();
+  await call("syncTodos");
+  for (const item of [null, 7, { a: 1 }, ["x"], "x".repeat(1001)]) {
+    const r = await call("tickTodo", { id: "1", item });
+    assert.deepEqual([r.ok, r.error, r.message], [false, "bad_input", "That request didn’t come through properly."], JSON.stringify(item).slice(0, 20));
+  }
+  assert.equal(stored(call, "1").ticked_by, "");
+  // #3 says Booked in the planner (done); a phone that showed another item there hears that the item changed.
+  const r = await call("tickTodo", { id: "3", item: "Made-up item #3 used to be" });
+  assert.deepEqual([r.error, r.message], ["item_changed", CHANGED]);
+  assert.equal((await call("tickTodo", { id: "3", item: "Snow park day trip" })).message, "That one is already done.");
+});
