@@ -30,6 +30,13 @@ test("I4: the live load is asked again for about 30 seconds; ship never advises 
 });
 
 
+test("chi#28: the push check asks the live stamp again for a while before refusing; the rule is the same", () => {
+  const pre = readFileSync(join(ROOT, "scripts", "prepush.mjs"), "utf8");
+  assert.match(pre, /askUntil\(\(\) => liveStamp\(/);
+  assert.match(pre, /\(s\) => s === commitStamp/);
+  assert.match(pre, /judgePush\(/);
+});
+
 const ok = { unit: { pass: 10, fail: 0 }, e2e: { pass: 5, fail: 0 } };
 const push = (over) => judgePush({ remoteRef: "refs/heads/main", localSha: "a".repeat(40), receipt: ok, commitStamp: "abc", live: "abc", ...over });
 
