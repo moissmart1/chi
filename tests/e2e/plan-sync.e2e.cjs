@@ -239,10 +239,9 @@ module.exports = [
       await until(() => page.evaluate((sel) => !!document.querySelector(sel + ".is-pen"), row(COCOA.id)), "the pencilled stop");
       const over = (sel) => page.evaluate((s) => [...document.querySelectorAll(s)].filter((e) => e.scrollWidth > e.clientWidth + 1 || e.getBoundingClientRect().right > innerWidth + 0.5).map((e) => e.className || e.id), sel);
       const cell = await page.evaluate((sel) => { const t = document.querySelector(sel + " .r-t"); return { sw: t.scrollWidth, cw: t.clientWidth, caveat: document.fonts.check("700 20px Caveat"), font: getComputedStyle(t).fontFamily }; }, row(COCOA.id));
-      // The pencilled time (20px, 6.1) does not fit the 50px time column the
-      // row has under 350px wide (needs 9px more): asked of the coordinator;
-      // checked here as it stands. Everything else in the row fits.
-      assert.deepEqual(await over(row(COCOA.id) + " .r-b, " + row(COCOA.id) + " .r-b *"), [], JSON.stringify(cell));
+      // Under 350px wide the pencilled time is 16px, so it fits the row's 50px time column.
+      assert.deepEqual(await over(row(COCOA.id) + ", " + row(COCOA.id) + " *"), [], JSON.stringify(cell));
+      assert.equal(await page.evaluate((sel) => getComputedStyle(document.querySelector(sel + " .r-t")).fontSize, row(COCOA.id)), "16px");
       await openEdit(page, MUSEUM.id);
       assert.deepEqual(await over("#stPr, #stPr *"), []);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
