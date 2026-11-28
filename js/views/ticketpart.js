@@ -437,6 +437,7 @@ export function mountTicketPart(box, store, keep) {
 
   return {
     fill, read, fieldsOf, changed, setBusy, setLocked, upload, clear,
+    locked: () => locked,
     pending: () => picks.filter((p) => p.state !== "saved").length,
     reading: () => reading > 0,
     inputs: () => FACTS.map(([k]) => fields[k]),

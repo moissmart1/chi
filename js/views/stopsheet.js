@@ -49,6 +49,8 @@ const notSaved = (word) => "That wasn’t saved. Tap " + word + " to try again."
 // Said on the undo bar when the sheet was closed while still checking, and
 // the check then showed the stop did not land.
 const LEFT_UNSAVED = "That stop wasn’t saved.";
+// Remove on a stop the planner took over while its sheet was open (the backend's own words).
+const PLANNER_OWNS = "This stop comes from the planner. Take its row out there and it goes from here.";
 const TIME = /^([01]\d|2[0-3]):[0-5]\d/;
 
 const MARKUP = `
@@ -324,7 +326,27 @@ export function mountStopSheet(root, store, { keep = null } = {}) {
     if (!isLed) printed = null;
   }
 
+  // While changing a stop, the planner may take it over (or its ticket
+  // details): the sheet takes the planner's look at once. What was typed in
+  // the fields it now owns is no longer sent.
+  function relook() {
+    if (!isOpen() || mode !== "edit" || phase) return;
+    const cur = current();
+    if (!cur) return;
+    const following = store.state.planFollow === true;
+    const nowLed = following && cur.fromPlanner === true;
+    if (nowLed !== led) {
+      setLook(nowLed, false);
+      del.hidden = nowLed;
+    }
+    if (part && withTix) {
+      const tk = following && cur.tkFromPlanner === true;
+      if (tk !== part.locked()) part.setLocked(tk);
+    }
+  }
+
   function render() {
+    relook();
     if (isOpen() && led) drawPrinted(current() || printed);
     update();
   }
@@ -526,6 +548,13 @@ export function mountStopSheet(root, store, { keep = null } = {}) {
 
   function onRemove() {
     if (mode !== "edit" || del.disabled) return;
+    // A stop the planner leads is taken off in the planner, never here.
+    const cur = current();
+    if (cur && cur.fromPlanner === true && store.state.planFollow === true) {
+      refused = PLANNER_OWNS;
+      update();
+      return;
+    }
     const id = stopId;
     store.deleteStop(id);
     stopId = null; // its row is gone: focus goes to the day's ＋ Add a stop

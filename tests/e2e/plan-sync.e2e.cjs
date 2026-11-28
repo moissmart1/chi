@@ -63,7 +63,8 @@ const waitSheet = (page) => until(() => page.evaluate(() => {
   return s.classList.contains("is-open") && Math.abs(s.getBoundingClientRect().bottom - innerHeight) < 1;
 }), "the stop sheet opens");
 async function openEdit(page, id) {
-  await page.dispatchEvent(row(id) + " .r-b", "click");
+  // Today's next stop is already open: a tap would close it.
+  if (!(await page.evaluate((sel) => document.querySelector(sel).classList.contains("is-open"), row(id)))) await page.dispatchEvent(row(id) + " .r-b", "click");
   await until(() => page.evaluate((sel) => {
     const r = document.querySelector(sel);
     const d = r.querySelector(".r-more > div");
@@ -226,6 +227,53 @@ module.exports = [
       await page.evaluate(() => globalThis.__matTest.store.autoPlan({ front: true }));
       await until(() => page.evaluate(() => document.querySelector('.r[data-id="teststop0002"] .r-t').textContent === "16:45"), "the change landed");
       assert.equal(await said(), "No signal. That wasn’t saved.");
+    },
+  },
+  {
+    name: "a change line with its Undo is never replaced by the plan's notice",
+    async run({ page }) {
+      const backend = await ready(page, { seed: seed() });
+      await pulled(backend);
+      await page.clock.fastForward(31 * 1000);
+      // A change of ours: its line and Undo show (the page's clock is paused, so it stays up).
+      await page.evaluate((id) => globalThis.__matTest.store.updateStop(id, { detail: "A line of ours" }), COCOA.id);
+      await until(async () => (await visible(page, "#ubarU")) && /Hot cocoa/.test(await text(page, "#ubarT")), "the change line and Undo");
+      const line = await text(page, "#ubarT");
+      // The planner changes a stop; the phone's own ask lands it.
+      backend.fake.planner.tabs.Plan = [PHEAD, prow(MUSEUM), prow({ ...PIER, time: "16:15" })];
+      backend.now += 61 * 1000;
+      await page.evaluate(() => globalThis.__matTest.store.autoPlan({ front: true }));
+      await until(() => page.evaluate(() => document.querySelector('.r[data-id="teststop0002"] .r-t').textContent === "16:15"), "the change landed");
+      assert.equal(await text(page, "#ubarT"), line, "the change line stays");
+      assert.equal(await visible(page, "#ubarU"), true, "its Undo stays");
+    },
+  },
+  {
+    name: "a stop the planner takes over while its sheet is open takes the printed look at once, and Remove is refused",
+    async run({ page }) {
+      const backend = await ready(page, { seed: seed() });
+      await pulled(backend);
+      await openEdit(page, COCOA.id);
+      assert.deepEqual(await hiddenAll(page, ["stPr", "stWhat", "stDel"]), [true, false, false], "today's sheet: the app's own stop");
+      await page.fill("#stDetail", "Typed while open");
+      // The planner adopts it (a Plan row with its id).
+      backend.fake.planner.tabs.Plan = [PHEAD, prow(MUSEUM), prow(PIER), prow(COCOA)];
+      await later(page, backend, 3 * 60 * 1000);
+      await until(async () => (await hiddenAll(page, ["stPr"]))[0] === false, "the printed box shows");
+      assert.deepEqual(await hiddenAll(page, ["stDay", "stWhat", "stTime", "stFixed", "stDel"]), [true, true, true, true, true]);
+      assert.deepEqual([await text(page, "#stPrT"), await text(page, "#stPrN")], ["15:30", "Hot cocoa on the way back"]);
+      assert.equal(await page.inputValue("#stDetail"), "Typed while open", "what was typed stays");
+      // Remove, reached anyway, is refused here and nothing is sent.
+      const removes = () => backend.requests.filter((r) => r.action === "deleteStop").length;
+      const before = removes();
+      await page.evaluate(() => document.getElementById("stDel").click());
+      assert.equal(await text(page, "#stMsg"), "This stop comes from the planner. Take its row out there and it goes from here.");
+      assert.equal(removes(), before);
+      assert.equal(await isOpen(page, "stop"), true);
+      // Save sends only what is ours.
+      await page.click("#stSave");
+      await until(async () => !(await isOpen(page, "stop")), "saved");
+      assert.deepEqual(Object.keys(backend.requests.filter((r) => r.action === "updateStop").at(-1).args.patch), ["detail"]);
     },
   },
   {
