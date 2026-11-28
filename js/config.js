@@ -5,7 +5,7 @@ export const API_URL = "https://script.google.com/macros/s/AKfycbybW4pghUgkPGM5m
 // The app's name wherever a person reads it (Izzah’s word, with a typographic
 // apostrophe). Inside the code the app stays "chi" (keys, caches, the folder).
 export const APP_NAME = "Wendy’s";
-export const APP_VERSION = "9";
+export const APP_VERSION = "10";
 // Every key this app keeps in localStorage or sessionStorage starts with
 // this. Another trip's app can be served from the same origin and so shares
 // the same storage: a different prefix keeps their keys, caches and unsent
