@@ -46,6 +46,10 @@
 // - hereNext: leave by from where you are (js/plan.js hereLine) for today's
 //   next stop: its sign line (.r-here: the sign, the miles and the walk) and
 //   its leave line (late: .r-lv.is-late). Absent, today's line stands.
+// - plan: true while the trip follows the planner's Plan tab (chi#16, look A):
+//   a stop that is not the planner's (fromPlanner false) is pencilled in
+//   (.is-pen on its .r, the PENCILLED IN line under its name), and the add
+//   row says ＋ Pencil in a stop. Absent, every row reads as it did.
 // - near: { [stopId]: nearStops(...) } for today's stops with no time: each
 //   gets the same sign line; the nearest of two or more gets the NEAREST
 //   sign above its name. Absent, the stop reads as it did.
@@ -168,6 +172,8 @@ function row(stop, i, model, keep) {
   r.dataset.id = stop.id;
   if (state === "used" || (state === "today" && isPast(stop, minutes, nextId))) r.classList.add("is-done");
   if (next) r.classList.add("is-next");
+  const pencilled = model.plan === true && stop.fromPlanner !== true;
+  if (pencilled) r.classList.add("is-pen");
 
   // The name and the line under it: the part that opens and closes the stop.
   const body = el("div", "r-b");
@@ -183,6 +189,12 @@ function row(stop, i, model, keep) {
     if (next) n.append(el("span", "tag", "Next"));
     if (title) n.append(title);
     body.append(n);
+  }
+  // Only in the app: pencilled in, under the name.
+  if (pencilled) {
+    const pen = el("div", "r-pen");
+    pen.append(el("span", "", "PENCILLED IN"), "Only in the app until it’s in the planner.");
+    body.append(pen);
   }
   // A time that cannot slip, under the name.
   if (stop.fixed === true) {
@@ -332,7 +344,7 @@ export function ticketEl(model, { keep = null } = {}) {
   // A stay typed into the Sheet by hand with no id cannot be opened: no row.
   const stay = model.stay;
   // ＋ Add a stop: after the day's stops, before the night's stay.
-  const add = el("button", "tk-add", "＋ Add a stop");
+  const add = el("button", "tk-add", model.plan === true ? "＋ Pencil in a stop" : "＋ Add a stop");
   add.type = "button";
   add.dataset.date = date;
   tk.append(add);

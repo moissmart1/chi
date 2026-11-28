@@ -10,7 +10,10 @@
 // shown with the ticket.
 //
 // mountTicketPart(box, store, keep) -> { fill(stop), read(), fieldsOf(stop),
-//   changed(), pending(), setBusy(on), upload(stopId), clear(), inputs() }
+//   changed(), pending(), setBusy(on), setLocked(on), upload(stopId), clear(), inputs() }
+// - setLocked(on): the four facts come from the planner's Tickets tab (chi#16):
+//   shown, not editable (disabled), under one line saying so, and read() gives
+//   them as they were filled, so they are never sent. fill() unlocks them.
 // - fill(stop): the stop's facts and pictures, nothing picked (stop is {} for a new one).
 // - read(): the facts as the backend takes them ({ tkRef, tkName, tkPeople, tkSeat }).
 // - upload(stopId) -> { saved, waiting, failed }: sends each picked picture in
@@ -76,6 +79,8 @@ export function mountTicketPart(box, store, keep) {
   const facts = el("div", "tkp-facts");
   const fhead = el("div", "st-sec tkp-fh");
   fhead.append("Shown with the ticket");
+  const printedLine = el("div", "st-pr-k tkp-pr", "PRINTED FROM THE PLANNER’S TICKETS");
+  printedLine.hidden = true;
   const fields = {};
   const pair = () => el("div", "st-2");
   const rows = [pair(), pair()];
@@ -90,7 +95,7 @@ export function mountTicketPart(box, store, keep) {
     rows[i < 2 ? 0 : 1].append(l);
     fields[k] = f;
   });
-  facts.append(fhead, ...rows);
+  facts.append(fhead, printedLine, ...rows);
   box.replaceChildren(head, have, none, picked, pick, say, facts);
 
   let stop = null;
@@ -99,6 +104,7 @@ export function mountTicketPart(box, store, keep) {
   let urls = [];
   const haveUrls = new Map(); // a picture on the stop -> its thumbnail's address, made once
   let busy = false;
+  let locked = false; // the facts come from the planner's Tickets tab
   let reading = 0; // files still being turned into pictures
 
   const people = () => (store.state.people || []).map((p) => p.name).filter(Boolean);
@@ -346,13 +352,21 @@ export function mountTicketPart(box, store, keep) {
     stop = s && s.id ? s : null;
     for (const [k] of FACTS) fields[k].value = str(s && s[k]);
     was = fieldsOf(s);
+    setLocked(false);
     drawHave();
   }
 
   function read() {
+    if (locked) return { ...was };
     const out = {};
     for (const [k] of FACTS) out[k] = fields[k].value.trim();
     return out;
+  }
+
+  function setLocked(on) {
+    locked = on === true;
+    printedLine.hidden = !locked;
+    for (const [k] of FACTS) fields[k].disabled = busy || locked;
   }
 
   const changed = () => picks.length > 0 || reading > 0 || FACTS.some(([k]) => fields[k].value.trim() !== was[k]);
@@ -362,7 +376,7 @@ export function mountTicketPart(box, store, keep) {
     busy = on;
     input.disabled = on;
     pick.classList.toggle("is-off", on);
-    for (const [k] of FACTS) fields[k].disabled = on;
+    for (const [k] of FACTS) fields[k].disabled = on || locked;
     drawPicked();
   }
 
@@ -422,7 +436,7 @@ export function mountTicketPart(box, store, keep) {
   });
 
   return {
-    fill, read, fieldsOf, changed, setBusy, upload, clear,
+    fill, read, fieldsOf, changed, setBusy, setLocked, upload, clear,
     pending: () => picks.filter((p) => p.state !== "saved").length,
     reading: () => reading > 0,
     inputs: () => FACTS.map(([k]) => fields[k]),

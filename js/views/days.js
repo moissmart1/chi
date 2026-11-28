@@ -656,6 +656,8 @@ export function mountDays(root, store, { clock, onAllDays = () => {}, onStay = (
         // Today's stamp is open and not yet pressed: the ticket says so.
         stampOpen: stampToday === day.date,
       };
+      // Following the planner's Plan tab: the app's own stops are pencilled in.
+      if (s.planFollow === true) model.plan = true;
       // Leave by, from where you are: only with a usable position within a mile of the next stop.
       if (nextId && here) {
         const hl = hereLine(dayStops.find((x) => x.id === nextId), now.minutes, here);

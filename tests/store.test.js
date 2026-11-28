@@ -3786,8 +3786,8 @@ test("untickTodo: while the tick itself is still on its way, it waits for it and
 // autoPlan(): while the trip follows the planner's Plan tab (load says
 // planFollow), at most once every 3 minutes per phone (30 seconds when the
 // app comes to the front), the plan is asked for with { auto: true }. It
-// says nothing in this stage; it reloads when a stop changed. Every value
-// here is made up.
+// reloads when a stop changed, and says so (stage 3); adoption alone says
+// nothing. Every value here is made up.
 
 const PL_HEAD = ["stop_id", "date", "time", "what", "booked", "fixed"];
 const PL_MUSEUM = { id: "teststop0001", date: "2026-12-28", time: "10:00", title: "Corner museum" };
@@ -3822,7 +3822,7 @@ test("autoPlan: the first ask adopts the planner's stops, reloads, and says noth
   assert.deepEqual(r, { added: 0, changed: 0, removed: 0, restored: 0, adopted: 2, same: 0, problems: [], more: false });
   assert.equal(loadsOf(p), loads + 1, "it reloads");
   assert.ok(p.store.state.stops.every((s) => s.fromPlanner === true));
-  assert.equal(p.store.state.notice, notice, "no notice in this stage");
+  assert.equal(p.store.state.notice, notice, "adoption alone says nothing");
   assert.equal(p.store.state.planPulledAt, new Date(NOW).toISOString());
 });
 
@@ -3861,6 +3861,8 @@ test("autoPlan: refreshes on a change, not on an unchanged tab", async () => {
   assert.equal(r.changed, 1);
   assert.equal(loadsOf(p), loads + 1);
   assert.equal(byId(p.store.state.stops, "teststop0001").time, "11:30");
+  assert.equal(p.store.state.notice, "The plan changed in the planner: 1 stop changed.");
+  p.store.clearNotice();
   // Only a problem appears: the list is brought up to date, quietly.
   p.fake.planner.tabs.Plan = [PL_HEAD, plRow({ ...PL_MUSEUM, time: "11:30" }), plRow(PL_PIER), ["", "2026-12-30", "", "No id here"]];
   p.at.ms += 3 * 60 * 1000;
@@ -3983,4 +3985,27 @@ test("autoPlan: a full list (20 shown, more beyond) behind a moved stop's line i
   p.fake.props.PLAN_PRINT = ""; // a full pull, which finds nothing new
   await p.store.autoPlan();
   assert.equal(loadsOf(p), loads, "no reload");
+});
+
+test("planNotice: the parts in order, zeros left out, put back counted as added, adoption alone says nothing", async () => {
+  const { planNotice } = await import("../js/store.js");
+  assert.equal(planNotice({ added: 1, changed: 2 }), "The plan changed in the planner: 1 stop added, 2 changed.");
+  assert.equal(planNotice({ added: 2, changed: 0, removed: 1 }), "The plan changed in the planner: 2 stops added, 1 taken off.");
+  assert.equal(planNotice({ added: 0, restored: 1 }), "The plan changed in the planner: 1 stop added.");
+  assert.equal(planNotice({ removed: 1 }), "The plan changed in the planner: 1 stop taken off.");
+  assert.equal(planNotice({ removed: 3 }), "The plan changed in the planner: 3 stops taken off.");
+  assert.equal(planNotice({ changed: 1, removed: 2 }), "The plan changed in the planner: 1 stop changed, 2 taken off.");
+  assert.equal(planNotice({ adopted: 5 }), null);
+  assert.equal(planNotice({}), null);
+});
+
+test("autoPlan: never says the plan changed over a notice already showing", async () => {
+  const p = planPhone();
+  await p.store.boot();
+  await p.store.autoPlan();
+  p.store.notify("No signal. That wasn’t saved.");
+  p.fake.planner.tabs.Plan = [PL_HEAD, plRow({ ...PL_MUSEUM, time: "11:30" }), plRow(PL_PIER)];
+  p.at.ms += 3 * 60 * 1000;
+  assert.equal((await p.store.autoPlan()).changed, 1);
+  assert.equal(p.store.state.notice, "No signal. That wasn’t saved.");
 });

@@ -3,7 +3,9 @@
 // mountUndoBar(root, store) adds #ubar to root. Each new change shows its
 // line (changeText) for 6 seconds, with Undo only while the change can be
 // undone; a newer change replaces it and starts the 6 seconds again. A
-// notice from the store shows the same way, without Undo, and is cleared.
+// notice from the store shows the same way, without Undo, and is cleared. A
+// quiet notice (store.state.noticeQuiet: the plan changed in the planner,
+// chi#16) never replaces a notice still showing; it is dropped.
 
 import { changeText } from "../format.js";
 
@@ -27,12 +29,14 @@ export function mountUndoBar(root, store) {
   let seen = store.state.lastChange ? store.state.lastChange.token : null; // the change last shown
   let undoToken = null; // what Undo undoes, while it shows
   let timer = null;
+  let noticeOn = false; // a notice (not a change) is showing
 
   function hide() {
     clearTimeout(timer);
     timer = null;
     bar.hidden = true;
     undoToken = null;
+    noticeOn = false;
   }
 
   function show(text, token) {
@@ -59,14 +63,21 @@ export function mountUndoBar(root, store) {
     const c = s.lastChange;
     if (s.notice) {
       const text = s.notice;
+      const quiet = s.noticeQuiet === true;
+      if (quiet && noticeOn) {
+        store.clearNotice();
+        return;
+      }
       seen = c ? c.token : seen; // the notice is newer than the change
       show(text, null);
+      noticeOn = true;
       store.clearNotice();
       return;
     }
     if (c && c.token !== seen) {
       seen = c.token;
       show(changeText(c), c.canUndo ? c.token : null);
+      noticeOn = false;
     } else if (c && c.token === seen && undoToken === c.token) {
       words.textContent = changeText(c); // the saved version of the same change
     }

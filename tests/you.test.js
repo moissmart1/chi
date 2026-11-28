@@ -80,3 +80,22 @@ test("problemHead: id, row and what, each left out when there is none", async ()
   assert.equal(problemHead({}), "A payment row");
   assert.equal(problemHead(), "A payment row");
 });
+
+test("pullWord: today's word for payments, Plan updated when only the plan changed, Not pulled when either failed (chi#16)", async () => {
+  const { pullWord } = await import("../js/views/you.js");
+  const quiet = { added: 0, changed: 0, problems: [] };
+  assert.equal(pullWord(quiet, null), "Nothing new", "not following: as today");
+  assert.equal(pullWord(quiet, { ok: true, added: 0, changed: 0, removed: 0, restored: 0, adopted: 3 }), "Nothing new", "adoption alone is no change");
+  for (const k of ["added", "changed", "removed", "restored"]) assert.equal(pullWord(quiet, { ok: true, [k]: 1 }), "Plan updated", k);
+  assert.equal(pullWord({ added: 2, changed: 0, problems: [] }, { ok: true, changed: 1 }), "Added 2", "the payments' word first");
+  assert.equal(pullWord(null, { ok: true, changed: 1 }), "Not pulled");
+  assert.equal(pullWord(quiet, { ok: false, code: "planner_unreadable" }), "Not pulled");
+});
+
+test("the plan lists' headings, one and more (chi#16)", async () => {
+  const { planRowsHead, appStopsHead } = await import("../js/views/you.js");
+  assert.equal(planRowsHead(1), "1 row of the Plan tab needs a look");
+  assert.equal(planRowsHead(3), "3 rows of the Plan tab need a look");
+  assert.equal(appStopsHead(1), "1 stop is only in the app");
+  assert.equal(appStopsHead(2), "2 stops are only in the app");
+});

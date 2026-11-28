@@ -15,6 +15,9 @@
   --f:"Libre Franklin","Helvetica Neue",Arial,system-ui,sans-serif;
   --reg:"VT323",ui-monospace,"Courier New",monospace;
   --slab:"Zilla Slab",Rockwell,Georgia,serif;
+  /* The plan from the planner (chi#16, look A): what is only in the app is pencilled in. */
+  --pencil:#55504A;
+  --pen:"Caveat","Bradley Hand","Segoe Print",cursive;
   --sheet:cubic-bezier(.32,.72,0,1);
   --gl:max(16px, env(safe-area-inset-left, 0px)); --gr:max(16px, env(safe-area-inset-right, 0px));
   /* The insets, read once here (the sideways block and the sheets' cap use them; a test can stand in for a notch). */

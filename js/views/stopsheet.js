@@ -20,6 +20,15 @@
 // words, so the phone's own keyboard is used; the field being typed in is
 // kept in view above it. Nothing here depends on the time.
 //
+// The plan from the planner (chi#16, look A "Printed and pencilled"), only
+// while store.state.planFollow is true: a stop with fromPlanner opens with
+// the planner's day, time, name, booked and fixed printed in a box (#stPr),
+// which follows the store while open; the day line, What, Time and the
+// switch are hidden, never read into a patch, and there is no Remove. A stop
+// with tkFromPlanner has its four ticket details shown but not editable. A
+// new stop is pencilled in ("Pencil in a stop", "Pencil it in"). With
+// planFollow false the sheet is exactly as it was.
+//
 // The ticket (js/views/ticketpart.js), once migrate has made the ticket tabs
 // (store.state.ticketsReady; until then the sheet is exactly as it was): the
 // four facts are stop fields, saved with the rest; picked pictures are sent
@@ -45,7 +54,15 @@ const TIME = /^([01]\d|2[0-3]):[0-5]\d/;
 const MARKUP = `
 <div class="sheet-top"><span id="stHead">Add a stop</span><button type="button" id="stDone">Done</button></div>
 <div class="st">
+  <div class="st-pr" id="stPr" role="group" aria-label="From the planner" hidden>
+    <div class="st-pr-k">PRINTED FROM THE PLANNER</div>
+    <div class="st-pr-h"><b id="stPrT"></b><span id="stPrN"></span></div>
+    <div class="st-pr-d"><span id="stPrD"></span><i id="stPrB"></i><i id="stPrF">TIME CAN’T SLIP</i></div>
+    <p class="st-pr-w">To move it, rename it or take it off, change its row in the planner’s Plan tab. It comes in here within a few minutes.</p>
+  </div>
+  <div class="st-ours" id="stOurs" hidden>Ours to fill in</div>
   <div class="st-day" id="stDay"></div>
+  <p class="st-penw" id="stPenW" hidden>Only in the app until it has a row in the planner.</p>
   <label class="st-f"><span>What</span><input id="stWhat" maxlength="80" autocomplete="off" enterkeyhint="next"></label>
   <label class="st-f st-time"><span>Time</span><input id="stTime" type="time"></label>
   <label class="st-f"><span>A line of detail</span><input id="stDetail" maxlength="120" autocomplete="off" enterkeyhint="next"></label>
@@ -121,6 +138,9 @@ export function mountStopSheet(root, store, { keep = null } = {}) {
   const atSign = $("stAtM");
   const atSay = $("stAtS");
   const tixBox = $("stTix");
+  const pr = { box: $("stPr"), t: $("stPrT"), n: $("stPrN"), d: $("stPrD"), b: $("stPrB"), fx: $("stPrF"), ours: $("stOurs"), penw: $("stPenW") };
+  // The fields the planner owns, hidden (never removed) on a planner stop.
+  const ledParts = [dayLine, f.title.closest("label"), f.time.closest("label"), f.fixed.closest("label")];
   const part = keep ? mountTicketPart(tixBox, store, keep) : null;
   let withTix = false; // the Ticket part is shown (migrate has run): its facts are part of the stop
 
@@ -136,6 +156,8 @@ export function mountStopSheet(root, store, { keep = null } = {}) {
   let tries = 0; // Saves sent for this add
   let saveWord = "Add stop";
   let session = 0; // one per opening, so a late answer knows whether its sheet is still the one open
+  let led = false; // this opening is of a stop the planner leads (its five fields are printed, not sent)
+  let printed = null; // that stop as last printed in the box
 
   const isOpen = () => sheet.classList.contains("is-open");
   const current = () => (store.state.stops || []).find((s) => s && s.id === stopId && !s.deleted) || null;
@@ -176,16 +198,16 @@ export function mountStopSheet(root, store, { keep = null } = {}) {
   }
 
   // The fields as the backend takes them.
+  // A planner stop's day, name, time and fixed are never among them.
   function read() {
     const place = f.place.value.trim();
     const w = where(place);
     return {
-      title: f.title.value.trim(),
-      time: cleanTime(f.time.value),
+      ...(led ? {} : { title: f.title.value.trim(), time: cleanTime(f.time.value) }),
       detail: f.detail.value.trim(),
       gettingThere: f.gettingThere.value.trim(),
       travelMin: cleanMin(f.travelMin.value),
-      fixed: f.fixed.checked,
+      ...(led ? {} : { fixed: f.fixed.checked }),
       place,
       link: f.link.value.trim(),
       lat: w.lat,
@@ -271,12 +293,41 @@ export function mountStopSheet(root, store, { keep = null } = {}) {
     }
     const off = !online();
     const gone = mode === "edit" && !current();
-    save.disabled = off || gone || f.title.value.trim() === "";
+    save.disabled = off || gone || (!led && f.title.value.trim() === "");
     del.disabled = off || gone;
     msg.textContent = off ? (unsaved ? NO_SIGNAL_UNSAVED : NO_SIGNAL) : gone ? GONE : refused || (unsaved ? notSaved(saveWord) : "");
   }
 
-  const render = update;
+  // The printed box: what the planner says of the stop, as the store has it
+  // now (a pull may change it while the sheet is open). textContent only.
+  function drawPrinted(stop) {
+    if (!stop) return;
+    printed = stop;
+    const time = cleanTime(stop.time);
+    pr.t.textContent = time;
+    pr.t.hidden = time === "";
+    pr.n.textContent = str(stop.title);
+    pr.d.textContent = typeof stop.date === "string" && stop.date ? dayHead(stop.date).en : "";
+    pr.b.textContent = stop.booked === true ? "BOOKED" : "NOT BOOKED";
+    pr.fx.hidden = stop.fixed !== true;
+  }
+
+  // Which sheet this opening is: a planner stop (the box, the fields it owns
+  // hidden, no Remove), a new stop pencilled in (one line under the day), or
+  // today's sheet.
+  function setLook(isLed, pencil) {
+    led = isLed;
+    pr.box.hidden = !isLed;
+    pr.ours.hidden = !isLed;
+    for (const x of ledParts) x.hidden = isLed;
+    pr.penw.hidden = !pencil;
+    if (!isLed) printed = null;
+  }
+
+  function render() {
+    if (isOpen() && led) drawPrinted(current() || printed);
+    update();
+  }
 
   function show(title, day, word) {
     session += 1;
@@ -288,7 +339,7 @@ export function mountStopSheet(root, store, { keep = null } = {}) {
     const dh = dayHead(day);
     dayLine.replaceChildren(el("b", "", dh.en));
     saveWord = word;
-    del.hidden = mode !== "edit";
+    del.hidden = mode !== "edit" || led;
     sheet.classList.add("is-open");
     sheet.inert = false;
     scrim.hidden = false;
@@ -305,8 +356,11 @@ export function mountStopSheet(root, store, { keep = null } = {}) {
     date = day;
     stopId = null;
     addId = null;
+    const pencil = store.state.planFollow === true;
+    setLook(false, pencil);
     fill({});
-    show("Add a stop", day, "Add stop");
+    if (pencil) show("Pencil in a stop", day, "Pencil it in");
+    else show("Add a stop", day, "Add stop");
     return true;
   }
 
@@ -320,7 +374,12 @@ export function mountStopSheet(root, store, { keep = null } = {}) {
     }
     mode = "edit";
     date = stop.date;
+    const following = store.state.planFollow === true;
+    setLook(following && stop.fromPlanner === true, false);
+    if (led) drawPrinted(stop);
     fill(stop);
+    // Its ticket details from the planner's Tickets tab: shown, not editable.
+    if (part) part.setLocked(withTix && following && stop.tkFromPlanner === true);
     show("Change a stop", stop.date, "Save");
     return true;
   }
@@ -348,6 +407,7 @@ export function mountStopSheet(root, store, { keep = null } = {}) {
     root.classList.remove("stop-open");
     sheet.style.removeProperty("--kb");
     if (part) part.clear();
+    setLook(false, false);
     if (sheet.contains(document.activeElement)) document.activeElement.blur();
     if (restoreFocus !== true) return;
     const edit = id ? root.querySelector('.r[data-id="' + CSS.escape(id) + '"] .r-edit') : null;
@@ -358,7 +418,7 @@ export function mountStopSheet(root, store, { keep = null } = {}) {
   function onSave() {
     if (save.disabled || phase) return;
     const now = read();
-    if (!now.title) return;
+    if (!led && !now.title) return;
     // Refused here in the backend's words, with everything typed kept.
     const why = problem(now);
     if (why) {

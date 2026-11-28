@@ -153,6 +153,18 @@ function unreadable(kind, x, names) {
 }
 
 // What a pull from the planner says it did.
+// What the notice says when a pull of the plan changed something (chi#16):
+// "The plan changed in the planner: 1 stop added, 2 changed." Put back counts
+// as added; a zero part is left out; the first part carries "stop(s)";
+// adoption alone says nothing (null).
+export function planNotice(d) {
+  const n = (k) => (d && Number.isFinite(d[k]) ? d[k] : 0);
+  const parts = [[n("added") + n("restored"), "added"], [n("changed"), "changed"], [n("removed"), "taken off"]].filter(([c]) => c > 0);
+  if (!parts.length) return null;
+  const words = parts.map(([c, w], i) => (i === 0 ? c + (c === 1 ? " stop " : " stops ") + w : c + " " + w));
+  return "The plan changed in the planner: " + words.join(", ") + ".";
+}
+
 function plannerNotice(d) {
   const plural = (n, one, many) => (n === 1 ? one : many);
   let said;
@@ -1525,8 +1537,9 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
   // The planner's plan, asked for on its own while the app is open and the
   // trip follows the planner (load says so): at most once every PLAN_AUTO_MS
   // on this phone, PLAN_FRONT_MS when the app has just come to the front.
-  // One at a time. Quiet: it reloads when a stop changed or the list of rows
-  // that need a look did, and says nothing. Resolves with the counts, or
+  // One at a time. It reloads when a stop changed or the list of rows that
+  // need a look did; when stops were added, changed, taken off or put back it
+  // says so (planNotice), never over a notice already showing. Resolves with the counts, or
   // null when it did not ask or it did not go through.
   let planBusy = false;
   let planAt = -Infinity;
@@ -1564,6 +1577,15 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
       }
       if (moved || stale) {
         await refresh();
+        // Never over something already being said (a failed save matters more).
+        if (!state.notice) {
+          const said = planNotice(counts);
+          // Quiet: the bar never puts it over a notice still showing.
+          if (said) {
+            state.notice = said;
+            state.noticeQuiet = true;
+          }
+        }
         changed();
       }
       return { ...counts, problems: Array.isArray(d.problems) ? d.problems : [], more: !!d.more };
@@ -1572,7 +1594,7 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
     }
   }
 
-  // Pull now's plan part: a plain call, never queued, asked again while the
+  // Pull now's plan part (the notice is autoPlan's alone): a plain call, never queued, asked again while the
   // backend says more remain (at most PLAN_PULLS calls), then a reload.
   // Says nothing itself. Resolves { ok: true, added, changed, removed,
   // restored, adopted, same, problems, more } or { ok: false, code, message }.
@@ -1858,11 +1880,13 @@ export function createStore({ api, storage, now = () => Date.now(), wait = defau
 
   function notify(text) {
     state.notice = text;
+    state.noticeQuiet = false;
     emit();
   }
 
   function clearNotice() {
     state.notice = null;
+    state.noticeQuiet = false;
     emit();
   }
 

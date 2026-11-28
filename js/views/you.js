@@ -21,7 +21,11 @@
 // screen(): the screen showing, "Days" or "Money", for Report a problem.
 // Planner (only when a planner is linked): when its payments were last pulled
 // and a key that pulls them again, and the Before list with them; what could
-// not be brought in is listed under it, with the same count in red.
+// not be brought in is listed under it, with the same count in red. While the
+// trip follows the planner's Plan tab (store.state.planFollow, chi#16, look
+// A): the row also says when the plan was read, Pull now pulls the plan too,
+// and two more lists follow: the Plan tab's rows that need a look
+// (#setPlanP) and the stops only in the app (#setPlanA).
 // root is the phone. getKey() gives the trip key for the invite link; the key
 // is only ever put on the clipboard, never drawn, logged or put in the report.
 // The same goes for the Claude connector's token (the Claude link row), which
@@ -99,6 +103,8 @@ const MARKUP = `
   <button type="button" class="set-r" id="setFreshRow"><span>Last updated<small>Tap to fetch the latest</small></span><b id="setFresh" aria-live="polite" data-w="Up to date 00:00"></b></button>
   <button type="button" class="set-r" id="setPlanner" hidden><span>Planner<small id="setPlannerS">Not pulled yet</small></span><b id="setPlannerV" aria-live="polite" data-w="2 need a look">Pull now</b></button>
   <div class="set-pp" id="setPlannerP" hidden></div>
+  <div class="set-pp" id="setPlanP" hidden></div>
+  <div class="set-pp is-app" id="setPlanA" hidden></div>
   <button type="button" class="set-r" id="setDemo" aria-expanded="false" aria-controls="setDemoDays"><span>Try another day<small>See how a day will look before you go</small></span><b id="setDemoV">Pick</b></button>
   <div class="set-days" id="setDemoDays" hidden></div>
   <button type="button" class="set-r" id="setHow" aria-expanded="false" aria-controls="setHowLines"><span>How this works</span><b id="setHowV">Show</b></button>
@@ -118,6 +124,8 @@ function el(tag, cls, text) {
   return n;
 }
 
+const str = (v) => (typeof v === "string" ? v : "");
+
 // The note "Report a problem" copies. Pure: the view gathers the inputs.
 // sentences: the newest history sentences, newest first, or null when the
 // history could not be fetched. setAside: the Sheet rows the app left out
@@ -131,6 +139,28 @@ export function plannerWord(r) {
   if (r.changed) return "Changed " + r.changed;
   if (Array.isArray(r.problems) && r.problems.length) return needsLook(r.problems.length);
   return "Nothing new";
+}
+
+// What the Planner row says after Pull now pulled the payments (r, as
+// plannerWord takes it) and, while following the planner, the plan (plan:
+// what store.syncPlan resolved with; null when it was not asked): today's
+// word for payments, or "Plan updated" when they had nothing to say and the
+// plan changed; "Not pulled" when either did not go through.
+export function pullWord(r, plan) {
+  if (!r || (plan && plan.ok !== true)) return "Not pulled";
+  const word = plannerWord(r);
+  const moved = plan && (plan.added || plan.changed || plan.removed || plan.restored);
+  return word === "Nothing new" && moved ? "Plan updated" : word;
+}
+
+// The heading of the Plan tab's list: "1 row of the Plan tab needs a look".
+export function planRowsHead(n) {
+  return n === 1 ? "1 row of the Plan tab needs a look" : n + " rows of the Plan tab need a look";
+}
+
+// The heading of the only-in-app list: "1 stop is only in the app".
+export function appStopsHead(n) {
+  return n === 1 ? "1 stop is only in the app" : n + " stops are only in the app";
 }
 
 // "1 needs a look", "2 need a look".
@@ -219,6 +249,8 @@ export function mountYou(root, store, { onHistory = () => {}, onDemo = () => {},
   const plannerS = $("setPlannerS");
   const plannerV = $("setPlannerV");
   const plannerP = $("setPlannerP");
+  const planP = $("setPlanP");
+  const planA = $("setPlanA");
   const how = $("setHow");
   const howV = $("setHowV");
   const howLines = $("setHowLines");
@@ -346,9 +378,25 @@ export function mountYou(root, store, { onHistory = () => {}, onDemo = () => {},
     const all = Array.isArray(pp.list) ? pp.list.filter((p) => p && typeof p === "object") : [];
     return { pp, all, more: Number.isFinite(pp.more) && pp.more > 0 ? pp.more : 0 };
   };
+  const following = (s) => s.plannerLinked === true && s.planFollow === true;
+  // The Plan tab's rows that need a look (load's planProblems), while following.
+  const planOf = (s) => {
+    const pp = following(s) && s.planProblems && typeof s.planProblems === "object" ? s.planProblems : {};
+    const all = Array.isArray(pp.list) ? pp.list.filter((p) => p && typeof p === "object") : [];
+    return { pp, all, more: Number.isFinite(pp.more) && pp.more > 0 ? pp.more : 0 };
+  };
+  // The live stops that are not the planner's, by day and time, while following.
+  const appStopsOf = (s) => (following(s) ? (s.stops || []).filter((x) => x && !x.deleted && x.fromPlanner !== true && typeof x.date === "string" && x.date) : [])
+    .slice()
+    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : (str(a.time) || "99:99") < (str(b.time) || "99:99") ? -1 : (str(a.time) || "99:99") > (str(b.time) || "99:99") ? 1 : 0));
+  const lookCount = (s) => {
+    const pay = problemsOf(s);
+    const plan = planOf(s);
+    return pay.all.length + pay.more + plan.all.length + plan.more;
+  };
   const plannerRest = (s) => {
-    const { all, more } = problemsOf(s);
-    return all.length + more > 0 ? needsLook(all.length + more) : PULL;
+    const n = lookCount(s);
+    return n > 0 ? needsLook(n) : PULL;
   };
   function setPlannerWord(text, red) {
     plannerV.textContent = text;
@@ -362,9 +410,13 @@ export function mountYou(root, store, { onHistory = () => {}, onDemo = () => {},
     plannerP.hidden = !show;
     if (linked) {
       const ms = Date.parse(typeof s.paymentsPulledAt === "string" ? s.paymentsPulledAt : "");
-      plannerS.textContent = Number.isFinite(ms) ? "Last pulled " + whenText(ms) : "Not pulled yet";
-      if (!pulling && !saying.has(plannerV)) setPlannerWord(plannerRest(s), all.length + more > 0);
+      if (following(s)) {
+        const pms = Date.parse(typeof s.planPulledAt === "string" ? s.planPulledAt : "");
+        plannerS.textContent = (Number.isFinite(pms) ? "Plan read " + whenText(pms) : "Plan not read yet") + " · " + (Number.isFinite(ms) ? "payments " + whenText(ms) : "payments not yet");
+      } else plannerS.textContent = Number.isFinite(ms) ? "Last pulled " + whenText(ms) : "Not pulled yet";
+      if (!pulling && !saying.has(plannerV)) setPlannerWord(plannerRest(s), lookCount(s) > 0);
     }
+    drawPlan(s);
     const key = show ? JSON.stringify([pp.at, all, more]) : "";
     if (key === shownProblems) return;
     shownProblems = key;
@@ -377,6 +429,37 @@ export function mountYou(root, store, { onHistory = () => {}, onDemo = () => {},
       plannerP.append(one);
     }
     if (more) plannerP.append(el("div", "", "and " + more + " more"));
+  }
+
+  // The plan's two lists, each only when it has something; redrawn only when it changes.
+  let shownPlan = null;
+  function drawPlan(s) {
+    const { pp, all, more } = planOf(s);
+    const app = appStopsOf(s);
+    const key = JSON.stringify([pp.at, all, more, app.map((x) => [x.id, x.date, x.time, x.title])]);
+    if (key === shownPlan) return;
+    shownPlan = key;
+    planP.hidden = all.length === 0;
+    planP.replaceChildren();
+    if (all.length) {
+      planP.append(el("h4", "", planRowsHead(all.length + more)));
+      for (const p of all) {
+        const one = el("div");
+        // A line with no row (a moved stop, a whole-tab line): the stop's name alone, when there is one.
+        const head = p.row === null ? str(p.what) : problemHead(p);
+        if (head) one.append(el("b", "", head));
+        one.append(typeof p.message === "string" ? p.message : "");
+        planP.append(one);
+      }
+      if (more) planP.append(el("div", "", "and " + more + " more"));
+    }
+    planA.hidden = app.length === 0;
+    planA.replaceChildren();
+    if (app.length) {
+      planA.append(el("h4", "", appStopsHead(app.length)));
+      for (const x of app.slice(0, 20)) planA.append(el("div", "", dayHead(x.date).en + " · " + (str(x.time) ? str(x.time) + " · " : "") + str(x.title)));
+      if (app.length > 20) planA.append(el("div", "", "and " + (app.length - 20) + " more"));
+    }
   }
 
   const freshWord = (s) => (s.loadedAt === null ? NOT_YET : freshText(s.loadedAt));
@@ -625,16 +708,14 @@ export function mountYou(root, store, { onHistory = () => {}, onDemo = () => {},
     setPlannerWord(PULLING, false);
     clearTimeout(saying.get(plannerV));
     saying.delete(plannerV);
-    let r = null;
-    try {
-      r = await store.syncPayments();
-    } catch {
-      r = null;
-    }
+    // While following the planner, the plan is pulled with the payments.
+    const pay = store.syncPayments().catch(() => null);
+    const plan = store.state.planFollow === true ? store.syncPlan().catch(() => ({ ok: false })) : Promise.resolve(null);
+    const [r, planR] = await Promise.all([pay, plan]);
     store.syncTodos({ force: true, quiet: true }).catch(() => {});
     pulling = false;
     planner.disabled = false;
-    const word = plannerWord(r);
+    const word = pullWord(r, planR);
     setPlannerWord(word, /need/.test(word));
     saying.set(
       plannerV,

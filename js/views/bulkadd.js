@@ -863,6 +863,8 @@ export function mountBulkAdd(root, store, keep, { onOpenDay = () => {}, onClose 
       const mineHere = adding.items.filter((i) => i.stop === id);
       const want = factsFor(mineHere, rows, now ? [now] : [{ id }])[id];
       if (!want) continue;
+      // Its details come from the planner's Tickets tab (chi#16): none are sent.
+      if (now && now.tkFromPlanner === true && store.state.planFollow === true) continue;
       if (!now) {
         missed(id, "gone");
         continue;

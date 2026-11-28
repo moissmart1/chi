@@ -162,6 +162,21 @@ button.set-r:active,a.set-r:active{background:var(--key-hi);transform:translateY
 .stop.is-saving #stSave:disabled{opacity:.6}
 .stop .sheet-top button:disabled{opacity:.3}
 
+/* The plan from the planner (chi#16, look A "Printed and pencilled"): a
+   planner stop's day, time, name, booked and fixed printed in a box; below
+   it, what is ours, filled in in pencil's words. A new stop is pencilled in. */
+.st-pr{border:1.5px solid var(--print);background:var(--mat);padding:10px 12px 11px;border-radius:0;box-shadow:none}
+.st-pr-k{font-family:var(--slab);font-weight:600;font-size:11.5px;letter-spacing:1.2px;color:var(--print2);line-height:1.2}
+.st-pr-h{display:flex;gap:10px;align-items:baseline;margin-top:5px}
+.st-pr-h b{font-weight:900;font-size:17px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.st-pr-h span{font-weight:900;font-size:19px;line-height:1.2;overflow-wrap:anywhere;min-width:0}
+.st-pr-d{font-size:13.5px;font-weight:700;margin-top:4px;display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}
+.st-pr-d i{font-style:normal;border:1.5px solid var(--print2);color:var(--print2);border-radius:2px;padding:0 5px 1px;font-size:11.5px;font-weight:900;letter-spacing:.4px;white-space:nowrap}
+.st-pr-w{margin:9px -12px 0;padding:8px 12px 0;border-top:1.5px dashed var(--rule);font-size:13px;font-weight:600;line-height:1.4;color:var(--print)}
+.st-ours{font-family:var(--pen);font-weight:700;font-size:21px;line-height:1;color:var(--pencil);margin:2px 0 -4px}
+/* Pencilling in a stop: .st-pr-w's type, without its rule. */
+.st-penw{margin:0;font-size:13px;font-weight:600;line-height:1.4;color:var(--print)}
+
 /* Try another day: the trip's days as a grid of buttons, "Sat 12". */
 .set-days{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
 .set-days button{height:52px;border:0;border-radius:8px;background:var(--key);color:var(--text);font-weight:900;font-size:15px;font-variant-numeric:tabular-nums;
